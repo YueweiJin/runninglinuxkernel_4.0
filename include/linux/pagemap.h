@@ -263,6 +263,7 @@ struct page *pagecache_get_page(struct address_space *mapping, pgoff_t offset,
  *
  * Otherwise, %NULL is returned.
  */
+/* JYW: 根据page index查找对应的page */
 static inline struct page *find_get_page(struct address_space *mapping,
 					pgoff_t offset)
 {
@@ -288,6 +289,10 @@ static inline struct page *find_get_page_flags(struct address_space *mapping,
  * Otherwise, %NULL is returned.
  *
  * find_lock_page() may sleep.
+ */
+/* JYW: 根据page index
+ * 查找page，增加页的使用计数器，并调用lock_page()设置PG_locked标志，
+ * 使函数返回时调用者能够以互斥的方式访问返回的页
  */
 static inline struct page *find_lock_page(struct address_space *mapping,
 					pgoff_t offset)
@@ -663,6 +668,7 @@ int replace_page_cache_page(struct page *old, struct page *new, gfp_t gfp_mask);
  * Like add_to_page_cache_locked, but used to add newly allocated pages:
  * the page is new, so we can just run __set_page_locked() against it.
  */
+/* JYW: 插入一个新的page到页高速缓存 */
 static inline int add_to_page_cache(struct page *page,
 		struct address_space *mapping, pgoff_t offset, gfp_t gfp_mask)
 {

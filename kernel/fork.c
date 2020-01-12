@@ -1800,6 +1800,7 @@ void __init proc_caches_init(void)
 /*
  * Check constraints on flags passed to the unshare system call.
  */
+/* JYW: 检查参数的合法性，以及过滤当前尚未实现支持的功能 */
 static int check_unshare_flags(unsigned long unshare_flags)
 {
 	if (unshare_flags & ~(CLONE_THREAD|CLONE_FS|CLONE_NEWNS|CLONE_SIGHAND|
@@ -1845,13 +1846,16 @@ static int unshare_fs(unsigned long unshare_flags, struct fs_struct **new_fsp)
 /*
  * Unshare file descriptor table if it is being shared
  */
+/* JYW: 脱离共享的打开文件表结构 */
 static int unshare_fd(unsigned long unshare_flags, struct files_struct **new_fdp)
 {
+    /* JYW: 获取当前线程的打开文件表结构 */
 	struct files_struct *fd = current->files;
 	int error = 0;
 
 	if ((unshare_flags & CLONE_FILES) &&
 	    (fd && atomic_read(&fd->count) > 1)) {
+        /* JYW: 分配一个新的文件结构并拷贝 */
 		*new_fdp = dup_fd(fd, &error);
 		if (!*new_fdp)
 			return error;
@@ -1898,6 +1902,7 @@ SYSCALL_DEFINE1(unshare, unsigned long, unshare_flags)
 	if (unshare_flags & CLONE_NEWNS)
 		unshare_flags |= CLONE_FS;
 
+    /* JYW: 检查参数的合法性，以及过滤当前尚未实现支持的功能 */
 	err = check_unshare_flags(unshare_flags);
 	if (err)
 		goto bad_unshare_out;
@@ -1911,6 +1916,7 @@ SYSCALL_DEFINE1(unshare, unsigned long, unshare_flags)
 	err = unshare_fs(unshare_flags, &new_fs);
 	if (err)
 		goto bad_unshare_out;
+    /* JYW: 脱离共享的打开文件表结构 */
 	err = unshare_fd(unshare_flags, &new_fd);
 	if (err)
 		goto bad_unshare_cleanup_fs;
@@ -1950,7 +1956,7 @@ SYSCALL_DEFINE1(unshare, unsigned long, unshare_flags)
 				new_fs = fs;
 			spin_unlock(&fs->lock);
 		}
-
+        /* JYW: 指向新分配的打开文件表，实现与主进程或其他线程的脱离 */
 		if (new_fd) {
 			fd = current->files;
 			current->files = new_fd;

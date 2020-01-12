@@ -30,6 +30,9 @@ static void module_create_drivers_dir(struct module_kobject *mk)
 	mk->drivers_dir = kobject_create_and_add("drivers", &mk->kobj);
 }
 
+/*  JYW: 把驱动在module的子系统(/sys/module/)中建立一个符号链接
+ * 同时在驱动中建立module的符号链接。
+ */
 void module_add_driver(struct module *mod, struct device_driver *drv)
 {
 	char *driver_name;

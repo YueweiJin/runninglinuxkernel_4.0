@@ -1658,6 +1658,7 @@ static void scsi_softirq_done(struct request *rq)
  * Return: nonzero return request was rejected and device's queue needs to be
  * plugged.
  */
+/* JYW: 下发SCSI命令 */
 static int scsi_dispatch_cmd(struct scsi_cmnd *cmd)
 {
 	struct Scsi_Host *host = cmd->device->host;
@@ -1715,6 +1716,10 @@ static int scsi_dispatch_cmd(struct scsi_cmnd *cmd)
 	}
 
 	trace_scsi_dispatch_cmd_start(cmd);
+    /*
+     * JYW:
+     *      ata_scsi_queuecmd: 下发SCSI命令至ATA设备
+     */
 	rtn = host->hostt->queuecommand(host, cmd);
 	if (rtn) {
 		trace_scsi_dispatch_cmd_error(cmd, rtn);
@@ -1760,6 +1765,7 @@ static void scsi_done(struct scsi_cmnd *cmd)
  *
  * Lock status: IO request lock assumed to be held when called.
  */
+/* JYW: scsi请求处理接口 */
 static void scsi_request_fn(struct request_queue *q)
 	__releases(q->queue_lock)
 	__acquires(q->queue_lock)
@@ -1774,6 +1780,7 @@ static void scsi_request_fn(struct request_queue *q)
 	 * the host is no longer able to accept any more requests.
 	 */
 	shost = sdev->host;
+    /* JYW: for循环中处理请求队列中的每个请求 */
 	for (;;) {
 		int rtn;
 		/*
@@ -1781,6 +1788,7 @@ static void scsi_request_fn(struct request_queue *q)
 		 * that the request is fully prepared even if we cannot
 		 * accept it.
 		 */
+		/* JYW: 根据算法获取一个请求 */
 		req = blk_peek_request(q);
 		if (!req)
 			break;
@@ -1849,7 +1857,9 @@ static void scsi_request_fn(struct request_queue *q)
 		/*
 		 * Dispatch the command to the low-level driver.
 		 */
+		/* JYW: 命令执行完成后回调scsi_done */
 		cmd->scsi_done = scsi_done;
+        /* JYW: 下发SCSI命令 */
 		rtn = scsi_dispatch_cmd(cmd);
 		if (rtn) {
 			scsi_queue_insert(cmd, rtn);
@@ -2147,7 +2157,7 @@ EXPORT_SYMBOL(__scsi_alloc_queue);
 struct request_queue *scsi_alloc_queue(struct scsi_device *sdev)
 {
 	struct request_queue *q;
-
+    /* JYW: 分配请求队列，设置scsi_request_fn为请求处理接口 */
 	q = __scsi_alloc_queue(sdev->host, scsi_request_fn);
 	if (!q)
 		return NULL;

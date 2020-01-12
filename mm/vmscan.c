@@ -106,6 +106,7 @@ struct scan_control {
 	unsigned long nr_reclaimed;
 };
 
+/* JYW: 近期最少使用链表，是按照近期的使用情况排列的，最少使用的存在链表末尾 */
 #define lru_to_page(_head) (list_entry((_head)->prev, struct page, lru))
 
 #ifdef ARCH_HAS_PREFETCH
@@ -146,6 +147,7 @@ int vm_swappiness = 60;
  */
 unsigned long vm_total_pages;
 
+/* JYW: 全局链表，用于遍历向PFRA注册的磁盘高速缓存回收方法 */
 static LIST_HEAD(shrinker_list);
 static DECLARE_RWSEM(shrinker_rwsem);
 
@@ -192,6 +194,7 @@ static unsigned long get_lru_size(struct lruvec *lruvec, enum lru_list lru)
 /*
  * Add a shrinker callback to be called from the vm.
  */
+/* JYW: 向PFRA注册磁盘高速缓存（目录项高速缓存、索引节点高速缓存...）回调 */
 int register_shrinker(struct shrinker *shrinker)
 {
 	size_t size = sizeof(*shrinker->nr_deferred);
@@ -212,6 +215,7 @@ int register_shrinker(struct shrinker *shrinker)
 		return -ENOMEM;
 
 	down_write(&shrinker_rwsem);
+	/* JYW: 插入全局链表shrinker_list中 */
 	list_add_tail(&shrinker->list, &shrinker_list);
 	up_write(&shrinker_rwsem);
 	return 0;
@@ -372,6 +376,7 @@ static unsigned long do_shrink_slab(struct shrink_control *shrinkctl,
  *
  * Returns the number of reclaimed slab objects.
  */
+/* JYW: 回收slab cache */
 static unsigned long shrink_slab(gfp_t gfp_mask, int nid,
 				 struct mem_cgroup *memcg,
 				 unsigned long nr_scanned,
@@ -397,6 +402,7 @@ static unsigned long shrink_slab(gfp_t gfp_mask, int nid,
 		goto out;
 	}
 
+	/* JYW: 遍历向系统注册的所有shrinker */
 	list_for_each_entry(shrinker, &shrinker_list, list) {
 		struct shrink_control sc = {
 			.gfp_mask = gfp_mask,
@@ -840,6 +846,7 @@ static void page_check_dirty_writeback(struct page *page,
 /*
  * shrink_page_list() returns the number of reclaimed pages
  */
+/* JYW: 正真的回收接口 */
 static unsigned long shrink_page_list(struct list_head *page_list,
 				      struct zone *zone,
 				      struct scan_control *sc,
@@ -1510,6 +1517,7 @@ static int current_may_throttle(void)
  * shrink_inactive_list() is a helper for shrink_zone().  It returns the number
  * of reclaimed pages
  */
+/* JYW: 回收inactive链表 */
 static noinline_for_stack unsigned long
 shrink_inactive_list(unsigned long nr_to_scan, struct lruvec *lruvec,
 		     struct scan_control *sc, enum lru_list lru)
@@ -1563,6 +1571,7 @@ shrink_inactive_list(unsigned long nr_to_scan, struct lruvec *lruvec,
 	if (nr_taken == 0)
 		return 0;
 
+	/* JYW: 核心 */
 	nr_reclaimed = shrink_page_list(&page_list, zone, sc, TTU_UNMAP,
 				&nr_dirty, &nr_unqueued_dirty, &nr_congested,
 				&nr_writeback, &nr_immediate,
@@ -1714,6 +1723,7 @@ static void move_active_pages_to_lru(struct lruvec *lruvec,
 		__count_vm_events(PGDEACTIVATE, pgmoved);
 }
 
+/* JYW: 将页面从active_list移到inactive_list */
 static void shrink_active_list(unsigned long nr_to_scan,
 			       struct lruvec *lruvec,
 			       struct scan_control *sc,
@@ -1889,15 +1899,18 @@ static int inactive_list_is_low(struct lruvec *lruvec, enum lru_list lru)
 		return inactive_anon_is_low(lruvec);
 }
 
+/* JYW: 回收链表 */
 static unsigned long shrink_list(enum lru_list lru, unsigned long nr_to_scan,
 				 struct lruvec *lruvec, struct scan_control *sc)
 {
+	/* JYW: 回收active链表 */
 	if (is_active_lru(lru)) {
 		if (inactive_list_is_low(lruvec, lru))
 			shrink_active_list(nr_to_scan, lruvec, sc, lru);
 		return 0;
 	}
 
+	/* JYW: 回收inactive链表 */
 	return shrink_inactive_list(nr_to_scan, lruvec, sc, lru);
 }
 
@@ -2121,6 +2134,7 @@ out:
 /*
  * This is a basic per-zone page freer.  Used by both kswapd and direct reclaim.
  */
+/* JYW: 基于zone的页面回收接口 */
 static void shrink_lruvec(struct lruvec *lruvec, int swappiness,
 			  struct scan_control *sc, unsigned long *lru_pages)
 {
@@ -2158,11 +2172,13 @@ static void shrink_lruvec(struct lruvec *lruvec, int swappiness,
 		unsigned long nr_anon, nr_file, percentage;
 		unsigned long nr_scanned;
 
+		/* JYW: 遍历4个LRU链表 */
 		for_each_evictable_lru(lru) {
 			if (nr[lru]) {
 				nr_to_scan = min(nr[lru], SWAP_CLUSTER_MAX);
 				nr[lru] -= nr_to_scan;
 
+				/* JYW: */
 				nr_reclaimed += shrink_list(lru, nr_to_scan,
 							    lruvec, sc);
 			}
@@ -2230,6 +2246,7 @@ static void shrink_lruvec(struct lruvec *lruvec, int swappiness,
 	 * rebalance the anon lru active/inactive ratio.
 	 */
 	if (inactive_anon_is_low(lruvec))
+		/* JYW: 将页面从active_list移到inactive_list */
 		shrink_active_list(SWAP_CLUSTER_MAX, lruvec,
 				   sc, LRU_ACTIVE_ANON);
 
@@ -2311,6 +2328,7 @@ static inline bool should_continue_reclaim(struct zone *zone,
 	}
 }
 
+/* JYW: 回收page */
 static bool shrink_zone(struct zone *zone, struct scan_control *sc,
 			bool is_classzone)
 {
@@ -2347,6 +2365,7 @@ static bool shrink_zone(struct zone *zone, struct scan_control *sc,
 			swappiness = mem_cgroup_swappiness(memcg);
 			scanned = sc->nr_scanned;
 
+			/* JYW: 基于zone的页面回收接口 */
 			shrink_lruvec(lruvec, swappiness, sc, &lru_pages);
 			zone_lru_pages += lru_pages;
 

@@ -26,6 +26,7 @@
 #include "slab.h"
 
 enum slab_state slab_state;
+/* JYW: 管理系统中所有的slab描述符 */
 LIST_HEAD(slab_caches);
 DEFINE_MUTEX(slab_mutex);
 struct kmem_cache *kmem_cache;
@@ -358,6 +359,7 @@ out_free_cache:
  * cacheline.  This can be beneficial if you're counting cycles as closely
  * as davem.
  */
+/* JYW: 创建一个slab/slub内存池 */
 struct kmem_cache *
 kmem_cache_create(const char *name, size_t size, size_t align,
 		  unsigned long flags, void (*ctor)(void *))
@@ -788,6 +790,7 @@ struct kmem_cache *kmalloc_slab(size_t size, gfp_t flags)
  * may already have been created because they were needed to
  * enable allocations for slab creation.
  */
+/* JYW: 创建kmalloc cache */
 void __init create_kmalloc_caches(unsigned long flags)
 {
 	int i;
@@ -981,6 +984,7 @@ memcg_accumulate_slabinfo(struct kmem_cache *s, struct slabinfo *info)
 	}
 }
 
+/* JYW: 打印/proc/slabinfo信息 */
 static void cache_show(struct kmem_cache *s, struct seq_file *m)
 {
 	struct slabinfo sinfo;
@@ -989,19 +993,23 @@ static void cache_show(struct kmem_cache *s, struct seq_file *m)
 	get_slabinfo(s, &sinfo);
 
 	memcg_accumulate_slabinfo(s, &sinfo);
-
+    /* JYW: 统计<active_objs> <num_objs> <objsize> 
+     *      <objperslab> <pagesperslab>
+     */
 	seq_printf(m, "%-17s %6lu %6lu %6u %4u %4d",
 		   cache_name(s), sinfo.active_objs, sinfo.num_objs, s->size,
 		   sinfo.objects_per_slab, (1 << sinfo.cache_order));
-
+    /* JYW: <limit> <batchcount> <sharedfactor> */
 	seq_printf(m, " : tunables %4u %4u %4u",
 		   sinfo.limit, sinfo.batchcount, sinfo.shared);
+    /* slabdata <active_slabs> <num_slabs> <sharedavail> */
 	seq_printf(m, " : slabdata %6lu %6lu %6lu",
 		   sinfo.active_slabs, sinfo.num_slabs, sinfo.shared_avail);
 	slabinfo_show_stats(m, s);
 	seq_putc(m, '\n');
 }
 
+/* JYW: 打印/proc/slabinfo信息 */
 static int slab_show(struct seq_file *m, void *p)
 {
 	struct kmem_cache *s = list_entry(p, struct kmem_cache, list);
@@ -1009,6 +1017,7 @@ static int slab_show(struct seq_file *m, void *p)
 	if (p == slab_caches.next)
 		print_slabinfo_header(m);
 	if (is_root_cache(s))
+        /* JYW: 打印/proc/slabinfo信息 */
 		cache_show(s, m);
 	return 0;
 }
@@ -1060,6 +1069,7 @@ static const struct file_operations proc_slabinfo_operations = {
 	.release	= seq_release,
 };
 
+/* JYW: 创建/proc/slabinfo */
 static int __init slab_proc_init(void)
 {
 	proc_create("slabinfo", SLABINFO_RIGHTS, NULL,

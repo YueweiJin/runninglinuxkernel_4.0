@@ -47,6 +47,7 @@
 
 #include "util.h"
 
+/* JYW: 共享内存文件数据 */
 struct shm_file_data {
 	int id;
 	struct ipc_namespace *ns;
@@ -116,6 +117,7 @@ static int __init ipc_ns_init(void)
 
 pure_initcall(ipc_ns_init);
 
+/* JYW: 注册了/proc/sysvipv/shm文件 */
 void __init shm_init(void)
 {
 	ipc_init_proc_interface("sysvipc/shm",
@@ -480,6 +482,7 @@ static const struct vm_operations_struct shm_vm_ops = {
  *
  * Called with shm_ids.rwsem held as a writer.
  */
+/* JYW: 创建一个新的共享内存段 */
 static int newseg(struct ipc_namespace *ns, struct ipc_params *params)
 {
 	key_t key = params->key;
@@ -517,7 +520,7 @@ static int newseg(struct ipc_namespace *ns, struct ipc_params *params)
 		ipc_rcu_putref(shp, ipc_rcu_free);
 		return error;
 	}
-
+    /* JYW: 共享内存名字 */
 	sprintf(name, "SYSV%08x", key);
 	if (shmflg & SHM_HUGETLB) {
 		struct hstate *hs;
@@ -544,12 +547,14 @@ static int newseg(struct ipc_namespace *ns, struct ipc_params *params)
 		if  ((shmflg & SHM_NORESERVE) &&
 				sysctl_overcommit_memory != OVERCOMMIT_NEVER)
 			acctflag = VM_NORESERVE;
+        /* JYW: 在tmpfs下面建立一个unlinked文件 */
 		file = shmem_file_setup(name, size, acctflag);
 	}
 	error = PTR_ERR(file);
 	if (IS_ERR(file))
 		goto no_file;
 
+    /* JYW: 添加一个id号 */
 	id = ipc_addid(&shm_ids(ns), &shp->shm_perm, ns->shm_ctlmni);
 	if (id < 0) {
 		error = id;
@@ -614,6 +619,7 @@ static inline int shm_more_checks(struct kern_ipc_perm *ipcp,
 	return 0;
 }
 
+/* JYW: shmget系统调用 */
 SYSCALL_DEFINE3(shmget, key_t, key, size_t, size, int, shmflg)
 {
 	struct ipc_namespace *ns;
@@ -1048,6 +1054,7 @@ out_unlock1:
  * "raddr" thing points to kernel space, and there has to be a wrapper around
  * this.
  */
+/* JYW: 映射共享内存到进程的虚拟地址空间 */
 long do_shmat(int shmid, char __user *shmaddr, int shmflg, ulong *raddr,
 	      unsigned long shmlba)
 {
@@ -1175,6 +1182,7 @@ long do_shmat(int shmid, char __user *shmaddr, int shmflg, ulong *raddr,
 			goto invalid;
 	}
 
+    /* JYW: 将文件映射到进程的虚拟地址空间 */
 	addr = do_mmap_pgoff(file, addr, size, prot, flags, 0, &populate);
 	*raddr = addr;
 	err = 0;
@@ -1206,6 +1214,7 @@ out:
 	return err;
 }
 
+/* JYW: 系统调用shmat */
 SYSCALL_DEFINE3(shmat, int, shmid, char __user *, shmaddr, int, shmflg)
 {
 	unsigned long ret;

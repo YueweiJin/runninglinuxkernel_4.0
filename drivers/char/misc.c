@@ -109,8 +109,10 @@ static const struct file_operations misc_proc_fops = {
 };
 #endif
 
+/* JYW: 用户打开miscdevice设备是通过主设备号对应的打开函数，在这个函数中找到次设备号对应的相应的具体设备的open函数 */
 static int misc_open(struct inode * inode, struct file * file)
 {
+    /* JYW: 获取次设备号 */
 	int minor = iminor(inode);
 	struct miscdevice *c;
 	int err = -ENODEV;
@@ -118,6 +120,7 @@ static int misc_open(struct inode * inode, struct file * file)
 
 	mutex_lock(&misc_mtx);
 	
+    /* JYW: 遍历链表查找混杂设备 */
 	list_for_each_entry(c, &misc_list, list) {
 		if (c->minor == minor) {
 			new_fops = fops_get(c->fops);		
@@ -144,6 +147,7 @@ static int misc_open(struct inode * inode, struct file * file)
 	replace_fops(file, new_fops);
 	if (file->f_op->open) {
 		file->private_data = c;
+        /* JYW: 打开当前混杂设备的具体open函数 */
 		err = file->f_op->open(inode,file);
 	}
 fail:
@@ -153,6 +157,7 @@ fail:
 
 static struct class *misc_class;
 
+/* JYW: 用户打开miscdevice设备是通过主设备号对应的打开函数，在这个函数中找到次设备号对应的相应的具体设备的open函数 */
 static const struct file_operations misc_fops = {
 	.owner		= THIS_MODULE,
 	.open		= misc_open,
@@ -174,7 +179,7 @@ static const struct file_operations misc_fops = {
  *	A zero is returned on success and a negative errno code for
  *	failure.
  */
- 
+/* JYW: 注册一个混杂设备 */ 
 int misc_register(struct miscdevice * misc)
 {
 	dev_t dev;
@@ -184,6 +189,7 @@ int misc_register(struct miscdevice * misc)
 
 	mutex_lock(&misc_mtx);
 
+    /* JYW: 动态分配一个次设备号 */
 	if (misc->minor == MISC_DYNAMIC_MINOR) {
 		int i = find_first_zero_bit(misc_minors, DYNAMIC_MINORS);
 		if (i >= DYNAMIC_MINORS) {
@@ -195,6 +201,7 @@ int misc_register(struct miscdevice * misc)
 	} else {
 		struct miscdevice *c;
 
+        /* JYW: 遍历链表，判断该次设备是否已经注册 */
 		list_for_each_entry(c, &misc_list, list) {
 			if (c->minor == misc->minor) {
 				err = -EBUSY;
@@ -203,8 +210,10 @@ int misc_register(struct miscdevice * misc)
 		}
 	}
 
+    /* JYW: 生成一个混杂设备的设备号 */
 	dev = MKDEV(MISC_MAJOR, misc->minor);
 
+    /* JYW: 创建一个设备并注册进sysfs中，在/dev/下生成一个设备节点，并在/sys/devices下面生成相应的节点 */
 	misc->this_device = device_create(misc_class, misc->parent, dev,
 					  misc, "%s", misc->name);
 	if (IS_ERR(misc->this_device)) {
@@ -219,6 +228,7 @@ int misc_register(struct miscdevice * misc)
 	 * Add it to the front, so that later devices can "override"
 	 * earlier defaults
 	 */
+	/* JYW: 将当前的一个混杂设备添加到混杂设备链表中 */
 	list_add(&misc->list, &misc_list);
  out:
 	mutex_unlock(&misc_mtx);
@@ -270,14 +280,17 @@ static int __init misc_init(void)
 	int err;
 
 #ifdef CONFIG_PROC_FS
+    /* JYW: 在/proc目录下创建一个misc文件 */
 	proc_create("misc", 0, NULL, &misc_proc_fops);
 #endif
+    /* JYW: 在/sys/class/下创建一个misc类 */
 	misc_class = class_create(THIS_MODULE, "misc");
 	err = PTR_ERR(misc_class);
 	if (IS_ERR(misc_class))
 		goto fail_remove;
 
 	err = -EIO;
+    /* JYW: 注册一个字符设备，此设备号从0-256 */
 	if (register_chrdev(MISC_MAJOR,"misc",&misc_fops))
 		goto fail_printk;
 	misc_class->devnode = misc_devnode;

@@ -336,8 +336,11 @@ typedef struct {
 typedef int (*read_actor_t)(read_descriptor_t *, struct page *,
 		unsigned long, unsigned long);
 
+/* JYW: 对所有者页进行操作的方法 */
 struct address_space_operations {
+	/* JYW: 从页写到所有者的磁盘映像 */
 	int (*writepage)(struct page *page, struct writeback_control *wbc);
+	/* JYW: 从所有者的磁盘映像读到页 */
 	int (*readpage)(struct file *, struct page *);
 
 	/* Write back some dirty pages from this mapping. */
@@ -394,7 +397,9 @@ int pagecache_write_end(struct file *, struct address_space *mapping,
 				loff_t pos, unsigned len, unsigned copied,
 				struct page *page, void *fsdata);
 
+/* JYW: 若所有者是一个文件，则嵌入在inode->i_data中 */
 struct address_space {
+	/* JYW: 指向拥有该对象的索引节点的指针 */
 	struct inode		*host;		/* owner: inode, block_device */
 	struct radix_tree_root	page_tree;	/* radix tree of all pages */
 	spinlock_t		tree_lock;	/* and lock protecting it */
@@ -405,6 +410,7 @@ struct address_space {
 	unsigned long		nrpages;	/* number of total pages */
 	unsigned long		nrshadows;	/* number of shadow entries */
 	pgoff_t			writeback_index;/* writeback starts here */
+	/* JYW: 对所有者页进行操作的方法 */
 	const struct address_space_operations *a_ops;	/* methods */
 	unsigned long		flags;		/* error bits/gfp mask */
 	spinlock_t		private_lock;	/* for use by the address_space */
@@ -566,6 +572,7 @@ struct inode {
 
 	const struct inode_operations	*i_op;
 	struct super_block	*i_sb;
+	/* JYW: 总是指向inode的数据页所有者的address_space对象 */
 	struct address_space	*i_mapping;
 
 #ifdef CONFIG_SECURITY
@@ -586,6 +593,7 @@ struct inode {
 		unsigned int __i_nlink;
 	};
 	dev_t			i_rdev;
+	/* JYW: 文件大小或者bdev的大小  */
 	loff_t			i_size;
 	struct timespec		i_atime;
 	struct timespec		i_mtime;
@@ -623,6 +631,7 @@ struct inode {
 #endif
 	const struct file_operations	*i_fop;	/* former ->i_op->default_file_ops */
 	struct file_lock_context	*i_flctx;
+	/* JYW: 关联文件数据页的对象 */
 	struct address_space	i_data;
 	struct list_head	i_devices;
 	union {
@@ -685,6 +694,7 @@ void unlock_two_nondirectories(struct inode *, struct inode*);
  * cmpxchg8b without the need of the lock prefix). For SMP compiles
  * and 64bit archs it makes no difference if preempt is enabled or not.
  */
+/* JYW: 获取inode size */
 static inline loff_t i_size_read(const struct inode *inode)
 {
 #if BITS_PER_LONG==32 && defined(CONFIG_SMP)
@@ -798,13 +808,16 @@ static inline int ra_has_index(struct file_ra_state *ra, pgoff_t index)
 		index <  ra->start + ra->size);
 }
 
+/* JYW: 表示一个表示一个打开的文件 */
 struct file {
 	union {
 		struct llist_node	fu_llist;
 		struct rcu_head 	fu_rcuhead;
 	} f_u;
 	struct path		f_path;
+	/* JYW: 指向该文件的inode,在打开时赋值的 */
 	struct inode		*f_inode;	/* cached value */
+	/* JYW: 所属文件系统的file_operations */
 	const struct file_operations	*f_op;
 
 	/*
@@ -1260,6 +1273,9 @@ struct super_block {
 	char s_id[32];				/* Informational name */
 	u8 s_uuid[16];				/* UUID */
 
+	/* JYW: 文件系统私有信息 
+	 * struct msdos_sb_info
+	 */
 	void 			*s_fs_info;	/* Filesystem private info */
 	unsigned int		s_max_links;
 	fmode_t			s_mode;
@@ -1535,6 +1551,7 @@ struct block_device_operations;
 
 struct iov_iter;
 
+/* JYW: 每种文件系统都有自己的file_operations数据结构 */
 struct file_operations {
 	struct module *owner;
 	loff_t (*llseek) (struct file *, loff_t, int);
@@ -1858,6 +1875,7 @@ int sync_inode_metadata(struct inode *inode, int wait);
 struct file_system_type {
 	const char *name;
 	int fs_flags;
+/* JYW: 这种类型的文件系统必须位于物理磁盘设备上 */
 #define FS_REQUIRES_DEV		1 
 #define FS_BINARY_MOUNTDATA	2
 #define FS_HAS_SUBTYPE		4

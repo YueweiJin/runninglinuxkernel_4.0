@@ -181,6 +181,7 @@ static int dbg_check_name(const struct ubifs_info *c,
 	return 0;
 }
 
+/* JYW: 由VFS的real_lookup调用 */
 static struct dentry *ubifs_lookup(struct inode *dir, struct dentry *dentry,
 				   unsigned int flags)
 {
@@ -190,6 +191,7 @@ static struct dentry *ubifs_lookup(struct inode *dir, struct dentry *dentry,
 	struct ubifs_dent_node *dent;
 	struct ubifs_info *c = dir->i_sb->s_fs_info;
 
+	/* JYW: 打印目录项的名字及inode号 */
 	dbg_gen("'%pd' in dir ino %lu", dentry, dir->i_ino);
 
 	if (dentry->d_name.len > UBIFS_MAX_NLEN)
@@ -199,8 +201,10 @@ static struct dentry *ubifs_lookup(struct inode *dir, struct dentry *dentry,
 	if (!dent)
 		return ERR_PTR(-ENOMEM);
 
+	/* JYW: 计算目录项的key */
 	dent_key_init(c, &key, dir->i_ino, &dentry->d_name);
 
+	/* JYW: 根据key，读取目录项或扩展属性项节点 */
 	err = ubifs_tnc_lookup_nm(c, &key, dent, &dentry->d_name);
 	if (err) {
 		if (err == -ENOENT) {
@@ -215,6 +219,7 @@ static struct dentry *ubifs_lookup(struct inode *dir, struct dentry *dentry,
 		goto out;
 	}
 
+	/* JYW: 获取UBIFS的inode结构，若没有则申请赋值 */
 	inode = ubifs_iget(dir->i_sb, le64_to_cpu(dent->inum));
 	if (IS_ERR(inode)) {
 		/*
@@ -1169,6 +1174,7 @@ int ubifs_getattr(struct vfsmount *mnt, struct dentry *dentry,
 }
 
 const struct inode_operations ubifs_dir_inode_operations = {
+	/* JYW: 由VFS的real_lookup调用 */
 	.lookup      = ubifs_lookup,
 	.create      = ubifs_create,
 	.link        = ubifs_link,

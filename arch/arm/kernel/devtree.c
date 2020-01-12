@@ -201,6 +201,7 @@ static const void * __init arch_get_next_mach(const char *const **match)
  * If a dtb was passed to the kernel in r2, then use it to choose the
  * correct machine_desc and to setup the system.
  */
+/* JYW: 查找和设备树匹配的machine */
 const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
 {
 	const struct machine_desc *mdesc, *mdesc_best = NULL;
@@ -241,6 +242,7 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
 	if (mdesc->dt_fixup)
 		mdesc->dt_fixup();
 
+	/* JYW: 扫描初始化用到的dtb节点 */
 	early_init_dt_scan_nodes();
 
 	/* Change machine number to match the mdesc we're using */

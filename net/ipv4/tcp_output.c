@@ -1307,8 +1307,13 @@ static inline int __tcp_mtu_to_mss(struct sock *sk, int pmtu)
 	mss_now -= icsk->icsk_ext_hdr_len;
 
 	/* Then reserve room for full set of TCP options and 8 bytes of data */
+#if 0 /* JYW */
 	if (mss_now < 48)
 		mss_now = 48;
+#else
+    if (mss_now < TCP_MIN_SND_MSS)
+        mss_now = TCP_MIN_SND_MSS;
+#endif
 	return mss_now;
 }
 
@@ -2328,6 +2333,9 @@ u32 __tcp_select_window(struct sock *sk)
 	if (mss > full_space)
 		mss = full_space;
 
+    /* JYW: 这里是为了防止接收缓存溢出的最后防线
+     *  ，当free_space小于全部rcvbuf按纯数据比例缩放后的大小的一半时，就要小心了
+     */
 	if (free_space < (full_space >> 1)) {
 		icsk->icsk_ack.quick = 0;
 
@@ -2350,7 +2358,11 @@ u32 __tcp_select_window(struct sock *sk)
 		if (free_space < (allowed_space >> 4) || free_space < mss)
 			return 0;
 	}
-
+    /* JYW: 虽然应用程序为TCP接收缓存腾出了free_space这么大小的空间
+     *      ，但是并不能全部通告给发送端
+     *      ，需要一点点通告并增加通告的大小，这就是慢启动了
+     *  最终，free_space要落实到window
+     */
 	if (free_space > tp->rcv_ssthresh)
 		free_space = tp->rcv_ssthresh;
 

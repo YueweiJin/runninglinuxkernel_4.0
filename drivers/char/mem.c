@@ -322,6 +322,7 @@ static int mmap_mem(struct file *file, struct vm_area_struct *vma)
 {
 	size_t size = vma->vm_end - vma->vm_start;
 
+    /* JYW: 不允许/dev/mem映射超过支持的物理内存范围 */
 	if (!valid_mmap_phys_addr_range(vma->vm_pgoff, size))
 		return -EINVAL;
 
@@ -814,14 +815,16 @@ static int memory_open(struct inode *inode, struct file *filp)
 	minor = iminor(inode);
 	if (minor >= ARRAY_SIZE(devlist))
 		return -ENXIO;
-
+    /* JYW: 根据打开设备的次设备号，找到对应的struct memdev */
 	dev = &devlist[minor];
 	if (!dev->fops)
 		return -ENXIO;
 
+    /* JYW: 赋值filp的f_op及f_mode成员 */
 	filp->f_op = dev->fops;
 	filp->f_mode |= dev->fmode;
 
+    /* JYW: 执行具体设备的open方法 */
 	if (dev->fops->open)
 		return dev->fops->open(inode, filp);
 

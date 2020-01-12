@@ -135,6 +135,7 @@ static struct xor_block_template xor_block_arm4regs = {
 	.do_5	= xor_arm4regs_5,
 };
 
+/* JYW: 默认注册arm4regs及8regs及32regs算法 */
 #undef XOR_TRY_TEMPLATES
 #define XOR_TRY_TEMPLATES			\
 	do {					\
@@ -144,6 +145,7 @@ static struct xor_block_template xor_block_arm4regs = {
 		NEON_TEMPLATES;			\
 	} while (0)
 
+/* JYW: 使用NEON协处理器计算，可惜Linux 3.10.0不支持，不确定是否可以移植过来 */
 #ifdef CONFIG_KERNEL_MODE_NEON
 
 extern struct xor_block_template const xor_block_neon_inner;

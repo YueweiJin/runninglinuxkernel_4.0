@@ -507,6 +507,7 @@ static void handle_signal(struct ksignal *ksig, struct pt_regs *regs)
  * the kernel can handle, and then we build all the user-level signal handling
  * stack-frames in one go after that.
  */
+/* => JYW: 信号处理 */
 static int do_signal(struct pt_regs *regs, int syscall)
 {
 	unsigned int retval = 0, continue_addr = 0, restart_addr = 0;
@@ -516,6 +517,7 @@ static int do_signal(struct pt_regs *regs, int syscall)
 	/*
 	 * If we were from a system call, check for system call restarting...
 	 */
+	/* => JYW: 如果来自于系统调用 */
 	if (syscall) {
 		continue_addr = regs->ARM_pc;
 		restart_addr = continue_addr - (thumb_mode(regs) ? 2 : 4);
@@ -570,16 +572,20 @@ static int do_signal(struct pt_regs *regs, int syscall)
 	return 0;
 }
 
+/* JYW: 在entry-common.S中被调用 */
 asmlinkage int
 do_work_pending(struct pt_regs *regs, unsigned int thread_flags, int syscall)
 {
 	do {
+        /* JYW: 当前进程可被抢占时，则启动主调度器schedule */
 		if (likely(thread_flags & _TIF_NEED_RESCHED)) {
 			schedule();
 		} else {
+		    /* JYW: 确保是用户模式 */
 			if (unlikely(!user_mode(regs)))
 				return 0;
 			local_irq_enable();
+            /* JYW: 如果有信号发生 */
 			if (thread_flags & _TIF_SIGPENDING) {
 				int restart = do_signal(regs, syscall);
 				if (unlikely(restart)) {

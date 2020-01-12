@@ -1323,6 +1323,7 @@ static void follow_dotdot(struct nameidata *nd)
  *
  * dir->d_inode->i_mutex must be held
  */
+/* JYW: 在目录项高速缓存中搜索分量的目录项对象, 若没找到则动态分配一个 */
 static struct dentry *lookup_dcache(struct qstr *name, struct dentry *dir,
 				    unsigned int flags, bool *need_lookup)
 {
@@ -1363,6 +1364,7 @@ static struct dentry *lookup_dcache(struct qstr *name, struct dentry *dir,
  *
  * dir->d_inode->i_mutex must be held
  */
+/* JYW: 若在缓存中没有找到，则从磁盘中查找 */
 static struct dentry *lookup_real(struct inode *dir, struct dentry *dentry,
 				  unsigned int flags)
 {
@@ -1374,6 +1376,7 @@ static struct dentry *lookup_real(struct inode *dir, struct dentry *dentry,
 		return ERR_PTR(-ENOENT);
 	}
 
+	/* JYW: 从磁盘中读取目录项 */
 	old = dir->i_op->lookup(dir, dentry, flags);
 	if (unlikely(old)) {
 		dput(dentry);
@@ -1388,10 +1391,12 @@ static struct dentry *__lookup_hash(struct qstr *name,
 	bool need_lookup;
 	struct dentry *dentry;
 
+	/* JYW: 在目录项高速缓存中搜索分量的目录项对象, 若没找到则动态分配一个 */
 	dentry = lookup_dcache(name, base, flags, &need_lookup);
 	if (!need_lookup)
 		return dentry;
 
+	/* JYW: 若在缓存中没有找到，则从磁盘中查找 */
 	return lookup_real(base->d_inode, dentry, flags);
 }
 

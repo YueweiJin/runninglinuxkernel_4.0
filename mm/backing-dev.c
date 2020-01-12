@@ -387,6 +387,7 @@ static void bdi_wb_init(struct bdi_writeback *wb, struct backing_dev_info *bdi)
 	INIT_LIST_HEAD(&wb->b_more_io);
 	INIT_LIST_HEAD(&wb->b_dirty_time);
 	spin_lock_init(&wb->list_lock);
+    /* JYW: 初始化延时任务 */
 	INIT_DELAYED_WORK(&wb->dwork, bdi_writeback_workfn);
 }
 

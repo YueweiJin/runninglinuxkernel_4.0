@@ -69,6 +69,7 @@ struct bio {
 
 	bio_end_io_t		*bi_end_io;
 
+	/* JYW: buffer_head */
 	void			*bi_private;
 #ifdef CONFIG_BLK_CGROUP
 	/*

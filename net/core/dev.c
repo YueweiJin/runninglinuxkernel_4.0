@@ -3661,13 +3661,14 @@ another_round:
 
 	if (pfmemalloc)
 		goto skip_taps;
-
+    /* JYW: 处理ptype报文  */
 	list_for_each_entry_rcu(ptype, &ptype_all, list) {
 		if (pt_prev)
 			ret = deliver_skb(skb, pt_prev, orig_dev);
 		pt_prev = ptype;
 	}
 
+    /* JYW: 处理ptype报文  */
 	list_for_each_entry_rcu(ptype, &skb->dev->ptype_all, list) {
 		if (pt_prev)
 			ret = deliver_skb(skb, pt_prev, orig_dev);
@@ -7423,7 +7424,7 @@ static int __init net_dev_init(void)
 
 	if (netdev_kobject_init())
 		goto out;
-
+    /* JYW: 初始化ptype_all链表 */
 	INIT_LIST_HEAD(&ptype_all);
 	for (i = 0; i < PTYPE_HASH_SIZE; i++)
 		INIT_LIST_HEAD(&ptype_base[i]);

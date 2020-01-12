@@ -132,6 +132,12 @@ struct ubifs_znode *ubifs_tnc_levelorder_next(struct ubifs_znode *zr,
  *     closest branch is returned in @n; the slot if all keys in this znode are
  *     greater than @key, then %-1 is returned in @n.
  */
+/* JYW: 根据key查找节点的分支
+ *  return 1: 查找到分支   @n: 分支索引
+ *  return 0:
+ *            key很大  @n: zonde->child_cnt - 1;
+ *            key很小  @n: -1
+ */
 int ubifs_search_zbranch(const struct ubifs_info *c,
 			 const struct ubifs_znode *znode,
 			 const union ubifs_key *key, int *n)
@@ -142,13 +148,16 @@ int ubifs_search_zbranch(const struct ubifs_info *c,
 
 	ubifs_assert(end > beg);
 
+	/* JYW: 查找分支号 */
 	while (end > beg) {
 		mid = (beg + end) >> 1;
 		cmp = keys_cmp(c, key, &zbr[mid].key);
+		/* JYW: key很大，往右边分支搜索 */
 		if (cmp > 0)
 			beg = mid + 1;
 		else if (cmp < 0)
 			end = mid;
+		/* JYW: 匹配到key，则返回1,输出分支号赋值给n */
 		else {
 			*n = mid;
 			return 1;
@@ -270,6 +279,7 @@ long ubifs_destroy_tnc_subtree(struct ubifs_znode *znode)
  * is wrong with it, this function prints complaint messages and returns
  * %-EINVAL.
  */
+/* JYW: 从FLASH中读取一个索引节点,并填充znode */
 static int read_znode(struct ubifs_info *c, int lnum, int offs, int len,
 		      struct ubifs_znode *znode)
 {
@@ -280,6 +290,7 @@ static int read_znode(struct ubifs_info *c, int lnum, int offs, int len,
 	if (!idx)
 		return -ENOMEM;
 
+	/* JYW: 从逻辑擦除块中读取节点，并对节点头进行检查，判断是否合法 */
 	err = ubifs_read_node(c, idx, UBIFS_IDX_NODE, len, lnum, offs);
 	if (err < 0) {
 		kfree(idx);
@@ -302,7 +313,9 @@ static int read_znode(struct ubifs_info *c, int lnum, int offs, int len,
 	}
 
 	for (i = 0; i < znode->child_cnt; i++) {
+		/* JYW: 根据索引节点及分支号找到对应的struct ubifs_branch */
 		const struct ubifs_branch *br = ubifs_idx_branch(c, idx, i);
+		/* JYW: 找到znode的分支 */
 		struct ubifs_zbranch *zbr = &znode->zbranch[i];
 
 		key_read(c, &br->key, &zbr->key);
@@ -403,6 +416,7 @@ out_dump:
  * returns pointer to it in case of success and a negative error code in case
  * of failure.
  */
+/* JYW: 从FLASH上读取索引节点，并转换成内存表示的znode，被zbranch指向 */
 struct ubifs_znode *ubifs_load_znode(struct ubifs_info *c,
 				     struct ubifs_zbranch *zbr,
 				     struct ubifs_znode *parent, int iip)
@@ -419,6 +433,7 @@ struct ubifs_znode *ubifs_load_znode(struct ubifs_info *c,
 	if (!znode)
 		return ERR_PTR(-ENOMEM);
 
+	/* JYW: 从FLASH中读取一个索引节点,并填充znode */
 	err = read_znode(c, zbr->lnum, zbr->offs, zbr->len, znode);
 	if (err)
 		goto out;
@@ -435,6 +450,7 @@ struct ubifs_znode *ubifs_load_znode(struct ubifs_info *c,
 
 	zbr->znode = znode;
 	znode->parent = parent;
+	/* JYW: 获取内核时间 */
 	znode->time = get_seconds();
 	znode->iip = iip;
 
@@ -455,6 +471,7 @@ out:
  * zero in case of success or a negative negative error code in case of
  * failure.
  */
+/* JYW: FLASH或者wbuf上读取叶子节点 */
 int ubifs_tnc_read_node(struct ubifs_info *c, struct ubifs_zbranch *zbr,
 			void *node)
 {
@@ -471,6 +488,7 @@ int ubifs_tnc_read_node(struct ubifs_info *c, struct ubifs_zbranch *zbr,
 		err = ubifs_read_node_wbuf(wbuf, node, type, zbr->len,
 					   zbr->lnum, zbr->offs);
 	else
+		/* JYW: 从逻辑擦除块中读取节点，并对节点头进行检查，判断是否合法 */
 		err = ubifs_read_node(c, node, type, zbr->len, zbr->lnum,
 				      zbr->offs);
 

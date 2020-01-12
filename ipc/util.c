@@ -217,6 +217,7 @@ int ipc_get_maxid(struct ipc_ids *ids)
  *
  * Called with writer ipc_ids.rwsem held.
  */
+/* JYW: 添加一个id号 */
 int ipc_addid(struct ipc_ids *ids, struct kern_ipc_perm *new, int size)
 {
 	kuid_t euid;
@@ -282,6 +283,7 @@ static int ipcget_new(struct ipc_namespace *ns, struct ipc_ids *ids,
 	int err;
 
 	down_write(&ids->rwsem);
+    /* JYW: newseg */
 	err = ops->getnew(ns, params);
 	up_write(&ids->rwsem);
 	return err;

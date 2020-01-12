@@ -23,8 +23,10 @@
 #ifndef CONFIG_FORCE_MAX_ZONEORDER
 #define MAX_ORDER 11
 #else
+/* JYW: 配置文件中定义是11 */
 #define MAX_ORDER CONFIG_FORCE_MAX_ZONEORDER
 #endif
+/* JYW: 这里是1024 */
 #define MAX_ORDER_NR_PAGES (1 << (MAX_ORDER - 1))
 
 /*
@@ -69,6 +71,7 @@ enum {
 #  define is_migrate_cma(migratetype) false
 #endif
 
+/* JYW: 按order遍历各order下各种迁移类型链表 */
 #define for_each_migratetype_order(order, type) \
 	for (order = 0; order < MAX_ORDER; order++) \
 		for (type = 0; type < MIGRATE_TYPES; type++)
@@ -89,6 +92,7 @@ static inline int get_pfnblock_migratetype(struct page *page, unsigned long pfn)
 					MIGRATETYPE_MASK);
 }
 
+/* JYW: 引入迁移类型来避免碎片化 */
 struct free_area {
 	struct list_head	free_list[MIGRATE_TYPES];
 	unsigned long		nr_free;
@@ -172,7 +176,10 @@ enum zone_stat_item {
 #define LRU_ACTIVE 1
 #define LRU_FILE 2
 
+/* JYW: 每个zone有5个LRU链表用以存放各种最近使用状态的页面 */
 enum lru_list {
+	/* JYW: 下面的4个是可以回收的 */
+	/* JYW: 页面回收时，优先回收inactive的页面 */
 	LRU_INACTIVE_ANON = LRU_BASE,
 	LRU_ACTIVE_ANON = LRU_BASE + LRU_ACTIVE,
 	LRU_INACTIVE_FILE = LRU_BASE + LRU_FILE,
@@ -213,6 +220,7 @@ struct zone_reclaim_stat {
 	unsigned long		recent_scanned[2];
 };
 
+/* JYW: lru链表 */
 struct lruvec {
 	struct list_head lists[NR_LRU_LISTS];
 	struct zone_reclaim_stat reclaim_stat;
@@ -238,6 +246,7 @@ struct lruvec {
 /* LRU Isolation modes. */
 typedef unsigned __bitwise__ isolate_mode_t;
 
+/* JYW: zone水位标记 */
 enum zone_watermarks {
 	WMARK_MIN,
 	WMARK_LOW,
@@ -249,15 +258,19 @@ enum zone_watermarks {
 #define low_wmark_pages(z) (z->watermark[WMARK_LOW])
 #define high_wmark_pages(z) (z->watermark[WMARK_HIGH])
 
+/* JYW: per-cpu缓存参数，可调整，有例子可以提升网卡性能 */
 struct per_cpu_pages {
-	int count;		/* number of pages in the list */
-	int high;		/* high watermark, emptying needed */
+	int count;		/* JYW: number of pages in the list */
+	/* JYW: 当缓存的页面高于这个水位时，会回收页面到伙伴系统 */
+	int high;		/* JYW: high watermark, emptying needed */
+		/* JYW: 一次性回页面到伙伴系统的页面数量,2^batch个page */
 	int batch;		/* chunk size for buddy add/remove */
 
 	/* Lists of pages, one per migrate type stored on the pcp-lists */
 	struct list_head lists[MIGRATE_PCPTYPES];
 };
 
+/* JYW: zone中的一个字段，指向per-cpu缓存 */
 struct per_cpu_pageset {
 	struct per_cpu_pages pcp;
 #ifdef CONFIG_NUMA
@@ -328,6 +341,8 @@ struct zone {
 	/* Read-mostly fields */
 
 	/* zone watermarks, access with *_wmark_pages(zone) macros */
+	/* JYW: 每个zone在系统启动时会计算出3个水位值,
+	 * 在页面分配器和kswapd页面回收中会用到 */
 	unsigned long watermark[NR_WMARK];
 
 	/*
@@ -338,6 +353,7 @@ struct zone {
 	 * on the higher zones). This array is recalculated at runtime if the
 	 * sysctl_lowmem_reserve_ratio sysctl changes.
 	 */
+	/* JYW: 保留内存 */
 	long lowmem_reserve[MAX_NR_ZONES];
 
 #ifdef CONFIG_NUMA
@@ -349,8 +365,9 @@ struct zone {
 	 * this zone's LRU.  Maintained by the pageout code.
 	 */
 	unsigned int inactive_ratio;
-
+	/* JYW: 指向内存节点 */
 	struct pglist_data	*zone_pgdat;
+	/* JYW: 用于维护Per-CPU上的一系列页面，以减少自旋锁的争用 */
 	struct per_cpu_pageset __percpu *pageset;
 
 	/*
@@ -364,6 +381,8 @@ struct zone {
 	 * Flags for a pageblock_nr_pages block. See pageblock-flags.h.
 	 * In SPARSEMEM, this map is stored in struct mem_section
 	 */
+	/* JYW: 指向用于存放每个pageblock的MIGRATE_TYPES类型的内存空间 */
+	/* JYW: 有usemap_size()来计算，每个pageblock用4个bit来存放MIGRATE_TYPES */
 	unsigned long		*pageblock_flags;
 #endif /* CONFIG_SPARSEMEM */
 
@@ -376,6 +395,7 @@ struct zone {
 #endif /* CONFIG_NUMA */
 
 	/* zone_start_pfn == zone_start_paddr >> PAGE_SHIFT */
+	/* JYW：zone中开始页面的页帧号 */
 	unsigned long		zone_start_pfn;
 
 	/*
@@ -419,10 +439,14 @@ struct zone {
 	 * adjust_managed_page_count() should be used instead of directly
 	 * touching zone->managed_pages and totalram_pages.
 	 */
+	/* JYW：见上面注释 */
 	unsigned long		managed_pages;
+	/* JYW：见上面注释 */
 	unsigned long		spanned_pages;
+	/* JYW：见上面注释 */
 	unsigned long		present_pages;
 
+	/* JYW: zone的名称 zone_names[]*/
 	const char		*name;
 
 	/*
@@ -475,12 +499,14 @@ struct zone {
 
 	ZONE_PADDING(_pad1_)
 	/* free areas of different sizes */
+	/* JYW: 管理空闲区域的数组,包含管理链表 */
 	struct free_area	free_area[MAX_ORDER];
 
 	/* zone flags, see below */
 	unsigned long		flags;
 
 	/* Write-intensive fields used from the page allocator */
+	/* JYW：并行访问时用于对zone保护的自旋锁 */
 	spinlock_t		lock;
 
 	ZONE_PADDING(_pad2_)
@@ -488,7 +514,9 @@ struct zone {
 	/* Write-intensive fields used by page reclaim */
 
 	/* Fields commonly accessed by the page reclaim scanner */
+	/* JYW: 用于对zone中LRU链表并行访问时进行保护的自旋锁 */
 	spinlock_t		lru_lock;
+	/* JYW: zone上的lru链表 */
 	struct lruvec		lruvec;
 
 	/* Evictions & activations on the inactive file list */
@@ -525,7 +553,7 @@ struct zone {
 #endif
 
 	ZONE_PADDING(_pad3_)
-	/* Zone statistics */
+	/* JYW: Zone statistics */
 	atomic_long_t		vm_stat[NR_VM_ZONE_STAT_ITEMS];
 } ____cacheline_internodealigned_in_smp;
 
@@ -545,6 +573,7 @@ enum zone_flags {
 	ZONE_FAIR_DEPLETED,		/* fair zone policy batch depleted */
 };
 
+/* JYW: 根据zone获取最后一个页帧号 */
 static inline unsigned long zone_end_pfn(const struct zone *zone)
 {
 	return zone->zone_start_pfn + zone->spanned_pages;
@@ -652,6 +681,7 @@ struct zonelist_cache {
 	unsigned long last_full_zap;		/* when last zap'd (jiffies) */
 };
 #else
+/* JYW: UMA模型下，个数位1 */
 #define MAX_ZONELISTS 1
 struct zonelist_cache;
 #endif
@@ -715,6 +745,7 @@ extern struct page *mem_map;
  * per-zone basis.
  */
 struct bootmem_data;
+/* JYW: 用于管理该内存节点下所有的zone */
 typedef struct pglist_data {
 	struct zone node_zones[MAX_NR_ZONES];
 	struct zonelist node_zonelists[MAX_ZONELISTS];
@@ -741,10 +772,14 @@ typedef struct pglist_data {
 	 */
 	spinlock_t node_size_lock;
 #endif
+	/* JYW: 表示一个内存节点的起始页帧号 */
 	unsigned long node_start_pfn;
+	/* JYW: 实际管理的页面数量。通常等于spanned_pages */
 	unsigned long node_present_pages; /* total number of physical pages */
+	/* JYW: 表示node包含的页面数量，包括空洞 */
 	unsigned long node_spanned_pages; /* total size of physical page
 					     range, including holes */
+	/* JYW: 表示一个内存节点的编号 */
 	int node_id;
 	wait_queue_head_t kswapd_wait;
 	wait_queue_head_t pfmemalloc_wait;
@@ -853,6 +888,7 @@ static inline int zone_movable_is_highmem(void)
 #endif
 }
 
+/* JYW: 判断是否是高端内存区域 */
 static inline int is_highmem_idx(enum zone_type idx)
 {
 #ifdef CONFIG_HIGHMEM
@@ -992,6 +1028,12 @@ struct zoneref *next_zones_zonelist(struct zoneref *z,
  * used to iterate the zonelist with next_zones_zonelist by advancing it by
  * one before calling.
  */
+/* JYW: 这里就是highidx,之前通过gfp_zone()而来 */
+/*
+ * JYW: 
+ * 	ZONE_HIGHMEM  _zonerefs[0]->zone_index=1
+ * 	ZONE_NORMAL   _zonerefs[1]->zone_index=0
+ */
 static inline struct zoneref *first_zones_zonelist(struct zonelist *zonelist,
 					enum zone_type highest_zoneidx,
 					nodemask_t *nodes,
@@ -1013,6 +1055,11 @@ static inline struct zoneref *first_zones_zonelist(struct zonelist *zonelist,
  *
  * This iterator iterates though all zones at or below a given zone index and
  * within a given nodemask
+ */
+/* JYW: 遍历内存节点中的zonelist */
+/* JYW: 遍历顺序如下：
+ *	GFP_KERNEL 		->	ZONE_NORMAL
+ *	GFP_HIGHUSER_MOVABLE 	->	ZONE_HIGHMEM->ZONE_NORMAL 
  */
 #define for_each_zone_zonelist_nodemask(zone, z, zlist, highidx, nodemask) \
 	for (z = first_zones_zonelist(zlist, highidx, nodemask, &zone);	\

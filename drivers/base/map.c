@@ -29,10 +29,12 @@ struct kobj_map {
 	struct mutex *lock;
 };
 
+/* JYW: 通过系统的指针数组和链表管理设备 */
 int kobj_map(struct kobj_map *domain, dev_t dev, unsigned long range,
 	     struct module *module, kobj_probe_t *probe,
 	     int (*lock)(dev_t, void *), void *data)
 {
+    /* JYW: range可能占用几个主设备号 */
 	unsigned n = MAJOR(dev + range - 1) - MAJOR(dev) + 1;
 	unsigned index = MAJOR(dev);
 	unsigned i;
@@ -55,6 +57,7 @@ int kobj_map(struct kobj_map *domain, dev_t dev, unsigned long range,
 		p->data = data;
 	}
 	mutex_lock(domain->lock);
+    /* JYW: 遍历单向链表，找到合适的位置，安放创建的probe结构，完成字符设备的注册 */
 	for (i = 0, p -= n; i < n; i++, p++, index++) {
 		struct probe **s = &domain->probes[index % 255];
 		while (*s && (*s)->range < range)
@@ -93,6 +96,7 @@ void kobj_unmap(struct kobj_map *domain, dev_t dev, unsigned long range)
 	kfree(found);
 }
 
+/* JYW: 根据设备号搜索kobj结构，然后通过container方法获得通用磁盘对象结构体 */
 struct kobject *kobj_lookup(struct kobj_map *domain, dev_t dev, int *index)
 {
 	struct kobject *kobj;
@@ -133,6 +137,7 @@ retry:
 	return NULL;
 }
 
+/* JYW: 动态分配一个struct kobj_map类型的对象 */
 struct kobj_map *kobj_map_init(kobj_probe_t *base_probe, struct mutex *lock)
 {
 	struct kobj_map *p = kmalloc(sizeof(struct kobj_map), GFP_KERNEL);

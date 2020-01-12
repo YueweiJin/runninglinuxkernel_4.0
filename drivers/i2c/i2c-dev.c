@@ -481,6 +481,7 @@ static long i2cdev_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	return 0;
 }
 
+/* JYW: 打开一个I2C字符设备 */
 static int i2cdev_open(struct inode *inode, struct file *file)
 {
 	unsigned int minor = iminor(inode);
@@ -488,10 +489,12 @@ static int i2cdev_open(struct inode *inode, struct file *file)
 	struct i2c_adapter *adap;
 	struct i2c_dev *i2c_dev;
 
+    /* JYW: 根据次设备号，找到对应的I2C设备 */
 	i2c_dev = i2c_dev_get_by_minor(minor);
 	if (!i2c_dev)
 		return -ENODEV;
 
+    /* JYW: 获得对应的适配器 */
 	adap = i2c_get_adapter(i2c_dev->adap->nr);
 	if (!adap)
 		return -ENODEV;
@@ -503,6 +506,7 @@ static int i2cdev_open(struct inode *inode, struct file *file)
 	 * or I2C core code!!  It just holds private copies of addressing
 	 * information and maybe a PEC flag.
 	 */
+	/* JYW: 分配一个I2C逻辑从设备 */
 	client = kzalloc(sizeof(*client), GFP_KERNEL);
 	if (!client) {
 		i2c_put_adapter(adap);
@@ -541,6 +545,7 @@ static const struct file_operations i2cdev_fops = {
 
 static struct class *i2c_dev_class;
 
+/* JYW: 为I2C字符驱动绑定一个适配器 */
 static int i2cdev_attach_adapter(struct device *dev, void *dummy)
 {
 	struct i2c_adapter *adap;
@@ -572,6 +577,7 @@ error:
 	return res;
 }
 
+/* JYW: 为I2C字符驱动解除一个适配器 */
 static int i2cdev_detach_adapter(struct device *dev, void *dummy)
 {
 	struct i2c_adapter *adap;
@@ -592,14 +598,17 @@ static int i2cdev_detach_adapter(struct device *dev, void *dummy)
 	return 0;
 }
 
+/* JYW: 适配器添加或删除的通知函数 */
 static int i2cdev_notifier_call(struct notifier_block *nb, unsigned long action,
 			 void *data)
 {
 	struct device *dev = data;
 
 	switch (action) {
+    /* JYW: 添加一个适配器 */
 	case BUS_NOTIFY_ADD_DEVICE:
 		return i2cdev_attach_adapter(dev, NULL);
+    /* JYW: 删除一个适配器 */
 	case BUS_NOTIFY_DEL_DEVICE:
 		return i2cdev_detach_adapter(dev, NULL);
 	}
@@ -623,10 +632,12 @@ static int __init i2c_dev_init(void)
 
 	printk(KERN_INFO "i2c /dev entries driver\n");
 
+    /* JYW: 注册一个i2c字符设备 */
 	res = register_chrdev(I2C_MAJOR, "i2c", &i2cdev_fops);
 	if (res)
 		goto out;
 
+    /* JYW: 创建一个I2C类 */
 	i2c_dev_class = class_create(THIS_MODULE, "i2c-dev");
 	if (IS_ERR(i2c_dev_class)) {
 		res = PTR_ERR(i2c_dev_class);

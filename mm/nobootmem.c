@@ -82,16 +82,18 @@ void __init free_bootmem_late(unsigned long addr, unsigned long size)
 	}
 }
 
+/* => 按2的10次幂释放到伙伴系统 */
 static void __init __free_pages_memory(unsigned long start, unsigned long end)
 {
 	int order;
 
+	printk("JYW=> %s: ==== start=%#lx, end=%#lx ==== \n", __func__, start, end);
 	while (start < end) {
 		order = min(MAX_ORDER - 1UL, __ffs(start));
 
 		while (start + (1UL << order) > end)
 			order--;
-
+		printk("JYW=> %s: start=%#lx, order=%d\n", __func__, start, order);
 		__free_pages_bootmem(pfn_to_page(start), order);
 
 		start += (1UL << order);
@@ -113,6 +115,7 @@ static unsigned long __init __free_memory_core(phys_addr_t start,
 	return end_pfn - start_pfn;
 }
 
+/* JYW: 释放空闲内存到伙伴系统 */
 static unsigned long __init free_low_memory_core_early(void)
 {
 	unsigned long count = 0;
@@ -171,6 +174,7 @@ void __init reset_all_zones_managed_pages(void)
  *
  * Returns the number of pages actually released.
  */
+/* JYW: 将空闲page释放到伙伴系统 */
 unsigned long __init free_all_bootmem(void)
 {
 	unsigned long pages;

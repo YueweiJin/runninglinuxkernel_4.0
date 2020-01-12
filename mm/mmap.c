@@ -282,6 +282,7 @@ static struct vm_area_struct *remove_vma(struct vm_area_struct *vma)
 
 static unsigned long do_brk(unsigned long addr, unsigned long len);
 
+/* JYW：系统调用brk,参数brk表示所要求的新边界 */
 SYSCALL_DEFINE1(brk, unsigned long, brk)
 {
 	unsigned long retval;
@@ -305,6 +306,7 @@ SYSCALL_DEFINE1(brk, unsigned long, brk)
 #else
 	min_brk = mm->start_brk;
 #endif
+	/* JYW: 不能越界到数据段 */
 	if (brk < min_brk)
 		goto out;
 
@@ -318,12 +320,14 @@ SYSCALL_DEFINE1(brk, unsigned long, brk)
 			      mm->end_data, mm->start_data))
 		goto out;
 
+	/* JYW: 申请内存的大小必须页面对齐 */
 	newbrk = PAGE_ALIGN(brk);
 	oldbrk = PAGE_ALIGN(mm->brk);
 	if (oldbrk == newbrk)
 		goto set_brk;
 
 	/* Always allow shrinking brk. */
+	/* JYW: 如果新边界小于老边界，那么表示释放空间 */
 	if (brk <= mm->brk) {
 		if (!do_munmap(mm, newbrk, oldbrk-newbrk))
 			goto set_brk;
@@ -331,6 +335,7 @@ SYSCALL_DEFINE1(brk, unsigned long, brk)
 	}
 
 	/* Check against existing mmap mappings. */
+	/* JYW: 老边界开始的地址空间已经在使用了，不需要再寻找了 */
 	if (find_vma_intersection(mm, oldbrk, newbrk+PAGE_SIZE))
 		goto out;
 
@@ -342,6 +347,7 @@ set_brk:
 	mm->brk = brk;
 	populate = newbrk > oldbrk && (mm->def_flags & VM_LOCKED) != 0;
 	up_write(&mm->mmap_sem);
+	/* JYW: 如果有VM_LOCK标志，表示需要立即分配物理内存 */
 	if (populate)
 		mm_populate(oldbrk, newbrk - oldbrk);
 	return brk;
@@ -546,6 +552,11 @@ anon_vma_interval_tree_post_update_vma(struct vm_area_struct *vma)
 		anon_vma_interval_tree_insert(avc, &avc->anon_vma->rb_root);
 }
 
+/* JYW: 为新的VMA查找合适的插入位置：
+ *  rb_parent指针指向要插入的节点的父节点；
+ *  pprev指针指向要插入的节点的父节点指向的VMA数据结构
+ *  rb_link指向要插入节点指针本身的地址 
+ */
 static int find_vma_links(struct mm_struct *mm, unsigned long addr,
 		unsigned long end, struct vm_area_struct **pprev,
 		struct rb_node ***rb_link, struct rb_node **rb_parent)
@@ -560,12 +571,15 @@ static int find_vma_links(struct mm_struct *mm, unsigned long addr,
 
 		__rb_parent = *__rb_link;
 		vma_tmp = rb_entry(__rb_parent, struct vm_area_struct, vm_rb);
-
+		/* JYW:
+		 * 如果addr小于某个节点VMA的结束地址，继续遍历当前VMA的左子树 */
 		if (vma_tmp->vm_end > addr) {
 			/* Fail if an existing vma overlaps the area */
 			if (vma_tmp->vm_start < end)
 				return -ENOMEM;
 			__rb_link = &__rb_parent->rb_left;
+		/* JYW:
+		 * 如果addr大于某个节点VMA的结束地址，继续遍历当前VMA的右子树 */
 		} else {
 			rb_prev = __rb_parent;
 			__rb_link = &__rb_parent->rb_right;
@@ -1025,6 +1039,7 @@ can_vma_merge_after(struct vm_area_struct *vma, unsigned long vm_flags,
  * Odd one out? Case 8, because it extends NNNN but needs flags of XXXX:
  * mprotect_fixup updates vm_flags & vm_page_prot on successful return.
  */
+/* JYW: 将一个新的VMA和附近的VMA合并功能 */
 struct vm_area_struct *vma_merge(struct mm_struct *mm,
 			struct vm_area_struct *prev, unsigned long addr,
 			unsigned long end, unsigned long vm_flags,
@@ -1247,7 +1262,7 @@ static inline int mlock_future_check(struct mm_struct *mm,
 /*
  * The caller must hold down_write(&current->mm->mmap_sem).
  */
-
+/* JYW: 将文件映射到进程的虚拟地址空间 */
 unsigned long do_mmap_pgoff(struct file *file, unsigned long addr,
 			unsigned long len, unsigned long prot,
 			unsigned long flags, unsigned long pgoff,
@@ -1290,6 +1305,9 @@ unsigned long do_mmap_pgoff(struct file *file, unsigned long addr,
 	/* Obtain the address to map to. we verify (or select) it and ensure
 	 * that it represents a valid section of the address space.
 	 */
+	/* JYW:
+ 	 * 判断虚拟内存空间是否有足够的空间，返回一段没有映射过的空间的起始地址
+ 	*/
 	addr = get_unmapped_area(file, addr, len, pgoff, flags);
 	if (addr & ~PAGE_MASK)
 		return addr;
@@ -1989,6 +2007,9 @@ arch_get_unmapped_area_topdown(struct file *filp, const unsigned long addr0,
 }
 #endif
 
+/* JYW:
+ * 判断虚拟内存空间是否有足够的空间，返回一段没有映射过的空间的起始地址
+ */
 unsigned long
 get_unmapped_area(struct file *file, unsigned long addr, unsigned long len,
 		unsigned long pgoff, unsigned long flags)
@@ -2024,6 +2045,7 @@ get_unmapped_area(struct file *file, unsigned long addr, unsigned long len,
 EXPORT_SYMBOL(get_unmapped_area);
 
 /* Look up the first VMA which satisfies  addr < vm_end,  NULL if none. */
+/* JYW: 查找一个VMA */
 struct vm_area_struct *find_vma(struct mm_struct *mm, unsigned long addr)
 {
 	struct rb_node *rb_node;
@@ -2061,6 +2083,7 @@ EXPORT_SYMBOL(find_vma);
 /*
  * Same as find_vma, but also return a pointer to the previous VMA in *pprev.
  */
+/* JYW: 找到上一个VMA */ 
 struct vm_area_struct *
 find_vma_prev(struct mm_struct *mm, unsigned long addr,
 			struct vm_area_struct **pprev)
@@ -2722,6 +2745,9 @@ static unsigned long do_brk(unsigned long addr, unsigned long len)
 
 	flags = VM_DATA_DEFAULT_FLAGS | VM_ACCOUNT | mm->def_flags;
 
+	/* JYW:
+	 * 判断虚拟内存空间是否有足够的空间，返回一段没有映射过的空间的起始地址
+	 */
 	error = get_unmapped_area(NULL, addr, len, 0, MAP_FIXED);
 	if (error & ~PAGE_MASK)
 		return error;
@@ -2855,6 +2881,7 @@ void exit_mmap(struct mm_struct *mm)
  * and into the inode's i_mmap tree.  If vm_file is non-NULL
  * then i_mmap_rwsem is taken here.
  */
+/* JYW: 插入一个VMA */
 int insert_vm_struct(struct mm_struct *mm, struct vm_area_struct *vma)
 {
 	struct vm_area_struct *prev;
@@ -2876,6 +2903,12 @@ int insert_vm_struct(struct mm_struct *mm, struct vm_area_struct *vma)
 		BUG_ON(vma->anon_vma);
 		vma->vm_pgoff = vma->vm_start >> PAGE_SHIFT;
 	}
+
+	/* JYW: 为新的VMA查找合适的插入位置：
+	 *  rb_parent指针指向要插入的节点的父节点；
+	 *  pprev指针指向要插入的节点的父节点指向的VMA数据结构
+	 *  rb_link指向要插入节点指针本身的地址 
+ 	*/
 	if (find_vma_links(mm, vma->vm_start, vma->vm_end,
 			   &prev, &rb_link, &rb_parent))
 		return -ENOMEM;

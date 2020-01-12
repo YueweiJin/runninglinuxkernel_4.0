@@ -174,16 +174,19 @@ extern struct page *empty_zero_page;
 extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
 
 /* to find an entry in a page-table-directory */
+/* JYW: 由虚拟地址找到PGD页表的索引 */
 #define pgd_index(addr)		((addr) >> PGDIR_SHIFT)
-
+/* JYW：返回进程页表对应的PGD目录项 */
 #define pgd_offset(mm, addr)	((mm)->pgd + pgd_index(addr))
 
 /* to find an entry in a kernel page-table-directory */
+/* JYW: 返回内核页表对应的PGD目录项 */
 #define pgd_offset_k(addr)	pgd_offset(&init_mm, addr)
 
 #define pmd_none(pmd)		(!pmd_val(pmd))
 #define pmd_present(pmd)	(pmd_val(pmd))
 
+/* JYW: 获得指向页表项的基地址 */
 static inline pte_t *pmd_page_vaddr(pmd_t pmd)
 {
 	return __va(pmd_val(pmd) & PHYS_MASK & (s32)PAGE_MASK);
@@ -199,8 +202,10 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
 #define __pte_unmap(pte)	kunmap_atomic(pte)
 #endif
 
+/* JYW: 根据虚拟地址，获取PT页表的索引 */
 #define pte_index(addr)		(((addr) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
 
+/* JYW: 查找内核页表中相应的PT页表的表项 */
 #define pte_offset_kernel(pmd,addr)	(pmd_page_vaddr(*(pmd)) + pte_index(addr))
 
 #define pte_offset_map(pmd,addr)	(__pte_map(pmd) + pte_index(addr))

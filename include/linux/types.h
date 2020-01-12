@@ -6,6 +6,7 @@
 
 #ifndef __ASSEMBLY__
 
+/* JYW: 有用的宏，将bit数转换为位图数组 */
 #define DECLARE_BITMAP(name,bits) \
 	unsigned long name[BITS_TO_LONGS(bits)]
 

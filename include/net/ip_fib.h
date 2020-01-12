@@ -69,8 +69,11 @@ struct fnhe_hash_bucket {
 #define FNHE_HASH_SIZE		(1 << FNHE_HASH_SHIFT)
 #define FNHE_RECLAIM_DEPTH	5
 
+/* JYW: 包含下一跳网关及出口设备的结构 */
 struct fib_nh {
+	/* JYW: 数据包输出设备接口 */
 	struct net_device	*nh_dev;
+	/* JYW: 用于链接到hash链表中: fib_info_devhash */
 	struct hlist_node	nh_hash;
 	struct fib_info		*nh_parent;
 	unsigned int		nh_flags;
@@ -83,6 +86,7 @@ struct fib_nh {
 	__u32			nh_tclassid;
 #endif
 	int			nh_oif;
+	/* JYW: 下一跳网关地址 */
 	__be32			nh_gw;
 	__be32			nh_saddr;
 	int			nh_saddr_genid;
@@ -96,7 +100,9 @@ struct fib_nh {
  */
 
 struct fib_info {
+	/* JYW: 用于被链接到fib_info_hash */
 	struct hlist_node	fib_hash;
+	/* JYW: 用于被链接到fib_info_laddrhash */
 	struct hlist_node	fib_lhash;
 	struct net		*fib_net;
 	int			fib_treeref;
@@ -118,6 +124,7 @@ struct fib_info {
 	int			fib_power;
 #endif
 	struct rcu_head		rcu;
+	/* JYW: 指向fib_nh，用于获取出口设备以及下一跳网关的数据结构 */
 	struct fib_nh		fib_nh[0];
 #define fib_dev		fib_nh[0].nh_dev
 };
@@ -180,11 +187,15 @@ __be32 fib_info_update_nh_saddr(struct net *net, struct fib_nh *nh);
 #define FIB_RES_PREFSRC(net, res)	((res).fi->fib_prefsrc ? : \
 					 FIB_RES_SADDR(net, res))
 
+/* JYW: 路由表的抽象 */
 struct fib_table {
+	/* JYW: 使用hash链表将多个路由表连接在一起 */
 	struct hlist_node	tb_hlist;
+	/* JYW: 路由表的id */
 	u32			tb_id;
 	int			tb_default;
 	int			tb_num_default;
+	/* JYW: 指向struct trie数据结构,在fib_trie_table中被分配 */
 	unsigned long		tb_data[0];
 };
 
@@ -204,6 +215,8 @@ void fib_free_table(struct fib_table *tb);
 #define TABLE_LOCAL_INDEX	(RT_TABLE_LOCAL & (FIB_TABLE_HASHSZ - 1))
 #define TABLE_MAIN_INDEX	(RT_TABLE_MAIN  & (FIB_TABLE_HASHSZ - 1))
 
+/* JYW:
+ * 根据id号，在全局路由表的hash链表数组中查找是否存在id对应的struct_fib_table*/
 static inline struct fib_table *fib_get_table(struct net *net, u32 id)
 {
 	struct hlist_head *ptr;

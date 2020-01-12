@@ -74,6 +74,7 @@ extern const struct machine_desc *machine_desc;
  * Machine type table - also only accessible during boot
  */
 extern const struct machine_desc __arch_info_begin[], __arch_info_end[];
+/* JYW: 遍历每一个machine描述符 */
 #define for_each_machine_desc(p)			\
 	for (p = __arch_info_begin; p < __arch_info_end; p++)
 
@@ -91,6 +92,7 @@ static const struct machine_desc __mach_desc_##_type	\
 #define MACHINE_END				\
 };
 
+/* JYW: 用来定义一个machine描述符，编译的时候会放到.arch.info.init段中，形成描述符列表 */
 #define DT_MACHINE_START(_name, _namestr)		\
 static const struct machine_desc __mach_desc_##_name	\
  __used							\

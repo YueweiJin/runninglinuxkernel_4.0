@@ -23,6 +23,7 @@ irqchip_of_match_end __used __section(__irqchip_of_table_end);
 
 extern struct of_device_id __irqchip_of_table[];
 
+/* JYW: 中断控制器初始化 */
 void __init irqchip_init(void)
 {
 	of_irq_init(__irqchip_of_table);

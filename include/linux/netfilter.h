@@ -44,22 +44,34 @@ int netfilter_init(void);
 struct sk_buff;
 
 struct nf_hook_ops;
+/*
+ * JYW:
+ * in: 数据包入口设备
+ * out: 数据包出口设备
+ * okfn: 钩子执行后调用的函数
+ */
 typedef unsigned int nf_hookfn(const struct nf_hook_ops *ops,
 			       struct sk_buff *skb,
 			       const struct net_device *in,
 			       const struct net_device *out,
 			       int (*okfn)(struct sk_buff *));
 
+/* JYW: 钩子函数 */
 struct nf_hook_ops {
+	/* JYW: 被链接到链表进行管理 */
 	struct list_head list;
 
 	/* User fills in from here down. */
+	/* JYW: hook处理函数 */
 	nf_hookfn	*hook;
 	struct module	*owner;
 	void		*priv;
+	/* JYW: hook协议,见enum nf_inet_hooks */
 	u_int8_t	pf;
+	/* JYW: hook点 */
 	unsigned int	hooknum;
 	/* Hooks are ordered in ascending priority. */
+	/* JYW: 优先级 */
 	int		priority;
 };
 
@@ -188,6 +200,7 @@ NF_HOOK_COND(uint8_t pf, unsigned int hook, struct sk_buff *skb,
 	return ret;
 }
 
+/* JYW: hool执行函数 */
 static inline int
 NF_HOOK(uint8_t pf, unsigned int hook, struct sk_buff *skb,
 	struct net_device *in, struct net_device *out,

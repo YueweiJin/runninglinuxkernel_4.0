@@ -86,6 +86,7 @@ static __always_inline enum lru_list page_off_lru(struct page *page)
  * Returns the LRU list a page should be on, as an index
  * into the array of LRU lists.
  */
+/* JYW: 判断page属于哪个链表 */
 static __always_inline enum lru_list page_lru(struct page *page)
 {
 	enum lru_list lru;

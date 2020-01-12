@@ -55,6 +55,7 @@ struct fat_bios_param_block {
 	u32	fat16_vol_id;
 
 	u32	fat32_length;
+	/* JYW: 根目录起始簇, 一般为2 */
 	u32	fat32_root_cluster;
 	u16	fat32_info_sector;
 	u8	fat32_state;
@@ -306,6 +307,7 @@ int fat_block_truncate_page(struct inode *inode, loff_t from)
 	return block_truncate_page(inode->i_mapping, from, fat_get_block);
 }
 
+/* JYW */
 static const struct address_space_operations fat_aops = {
 	.readpage	= fat_readpage,
 	.readpages	= fat_readpages,
@@ -1352,6 +1354,7 @@ static bool fat_bpb_is_zero(struct fat_boot_sector *b)
 	return true;
 }
 
+/* JYW: 读取BIOS Paramter Block */
 static int fat_read_bpb(struct super_block *sb, struct fat_boot_sector *b,
 	int silent, struct fat_bios_param_block *bpb)
 {
@@ -1493,6 +1496,7 @@ out:
 /*
  * Read the super block of an MS-DOS FS.
  */
+/* JYW: 读取超级块 */
 int fat_fill_super(struct super_block *sb, void *data, int silent, int isvfat,
 		   void (*setup)(struct super_block *))
 {
@@ -1540,6 +1544,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent, int isvfat,
 		goto out_fail;
 	}
 
+	/* JYW: 读取BIOS Paramter Block */
 	error = fat_read_bpb(sb, (struct fat_boot_sector *)bh->b_data, silent,
 		&bpb);
 	if (error == -EINVAL && sbi->options.dos1xfloppy)
@@ -1587,6 +1592,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent, int isvfat,
 	sbi->cluster_bits = ffs(sbi->cluster_size) - 1;
 	sbi->fats = bpb.fat_fats;
 	sbi->fat_bits = 0;		/* Don't know yet */
+	/* JYW: FAT表的起始位置 */
 	sbi->fat_start = bpb.fat_reserved;
 	sbi->fat_length = bpb.fat_fat_length;
 	sbi->root_cluster = 0;
@@ -1691,6 +1697,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent, int isvfat,
 	/* set up enough so that it can read an inode */
 	fat_hash_init(sb);
 	dir_hash_init(sb);
+	/* JYW: entry访问方式初始化 */
 	fat_ent_access_init(sb);
 
 	/*

@@ -82,6 +82,7 @@ EXPORT_SYMBOL(copy_to_user_page);
 #ifndef CONFIG_NEED_MULTIPLE_NODES
 /* use the per-pgdat data instead for discontigmem - mbligh */
 unsigned long max_mapnr;
+/* JYW: 全局变量，所有的struct page实例，同一由该数组管理 */
 struct page *mem_map;
 
 EXPORT_SYMBOL(max_mapnr);
@@ -1665,6 +1666,7 @@ static inline int remap_pmd_range(struct mm_struct *mm, pud_t *pud,
 	return 0;
 }
 
+/* JYW: 填充页表 */
 static inline int remap_pud_range(struct mm_struct *mm, pgd_t *pgd,
 			unsigned long addr, unsigned long end,
 			unsigned long pfn, pgprot_t prot)
@@ -1695,11 +1697,15 @@ static inline int remap_pud_range(struct mm_struct *mm, pgd_t *pgd,
  *
  *  Note: this is only safe if the mm semaphore is held when called.
  */
+/*
+ * JYW: 映射连续的物理内存到用户空间
+ */
 int remap_pfn_range(struct vm_area_struct *vma, unsigned long addr,
 		    unsigned long pfn, unsigned long size, pgprot_t prot)
 {
 	pgd_t *pgd;
 	unsigned long next;
+    /* JYW: 计算本次映射的结尾虚拟地址 */
 	unsigned long end = addr + PAGE_ALIGN(size);
 	struct mm_struct *mm = vma->vm_mm;
 	int err;
@@ -1731,15 +1737,21 @@ int remap_pfn_range(struct vm_area_struct *vma, unsigned long addr,
 	err = track_pfn_remap(vma, &prot, pfn, addr, PAGE_ALIGN(size));
 	if (err)
 		return -EINVAL;
-
+    /*
+     * VM_PFNMAP: 可能是OS外的内存
+     */
 	vma->vm_flags |= VM_IO | VM_PFNMAP | VM_DONTEXPAND | VM_DONTDUMP;
 
 	BUG_ON(addr >= end);
 	pfn -= addr >> PAGE_SHIFT;
+    /* JYW：返回进程页表对应的PGD目录项 */
 	pgd = pgd_offset(mm, addr);
+    /* JYW: 刷cache */
 	flush_cache_range(vma, addr, end);
 	do {
+        /* JYW: 计算下一个将要被映射的虚拟地址 */
 		next = pgd_addr_end(addr, end);
+        /* JYW: 填充页表 */
 		err = remap_pud_range(mm, pgd, addr, next,
 				pfn + (addr >> PAGE_SHIFT), prot);
 		if (err)
@@ -2567,6 +2579,7 @@ static inline int check_stack_guard_page(struct vm_area_struct *vma, unsigned lo
  * but allow concurrent faults), and pte mapped but not yet locked.
  * We return with mmap_sem still held, but pte unmapped and unlocked.
  */
+/* JYW: 映射一个匿名页面 */
 static int do_anonymous_page(struct mm_struct *mm, struct vm_area_struct *vma,
 		unsigned long address, pte_t *page_table, pmd_t *pmd,
 		unsigned int flags)
@@ -2579,22 +2592,33 @@ static int do_anonymous_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	pte_unmap(page_table);
 
 	/* Check if we need to add a guard page to the stack */
+	/* JYW: 判断当前VMA是否需要添加一个guard page作为安全垫 */
 	if (check_stack_guard_page(vma, address) < 0)
 		return VM_FAULT_SIGSEGV;
 
 	/* Use the zero-page for reads */
+	/* JYW: 分配属性是只读的,系统使用一个全填充位0的全局零页面 */
 	if (!(flags & FAULT_FLAG_WRITE) && !mm_forbids_zeropage(mm)) {
+		/* JYW: 使用零页面来生成一个pte entry,设置PTE_SPECIAL位 */
 		entry = pte_mkspecial(pfn_pte(my_zero_pfn(address),
 						vma->vm_page_prot));
+		/* JYW: 获取当前pte页表项 */
 		page_table = pte_offset_map_lock(mm, pmd, address, &ptl);
+		/* JYW:
+		 * 如果获取的pte页表项内容不为空，那么跳到setpte标签处设置硬件pte表项，把新的PTE
+		 * entry 设置到硬件页表中
+		 */
 		if (!pte_none(*page_table))
 			goto unlock;
 		goto setpte;
 	}
 
+	/* JYW: 分配属性是可写的 */
+
 	/* Allocate our own private page. */
 	if (unlikely(anon_vma_prepare(vma)))
 		goto oom;
+	/* JYW: 分配一个可写的匿名页面,优先使用高端内存 */
 	page = alloc_zeroed_user_highpage_movable(vma, address);
 	if (!page)
 		goto oom;
@@ -2608,6 +2632,7 @@ static int do_anonymous_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	if (mem_cgroup_try_charge(page, mm, GFP_KERNEL, &memcg))
 		goto oom_free_page;
 
+	/* JYW: 生成一个新的pte entry */
 	entry = mk_pte(page, vma->vm_page_prot);
 	if (vma->vm_flags & VM_WRITE)
 		entry = pte_mkwrite(pte_mkdirty(entry));
@@ -2616,11 +2641,15 @@ static int do_anonymous_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	if (!pte_none(*page_table))
 		goto release;
 
+	/* JYW: 增加系统中匿名页面的统计计数 */
 	inc_mm_counter_fast(mm, MM_ANONPAGES);
+	/* JYW: 把匿名页面添加到RMAP反向映射系统中 */
 	page_add_new_anon_rmap(page, vma, address);
 	mem_cgroup_commit_charge(page, memcg, false);
+	/* JYW: 把匿名页面添加到LRU链表中,在kswap内核模块中会用到LRU链表 */
 	lru_cache_add_active_or_unevictable(page, vma);
 setpte:
+	/* JYW: 设置到硬件页表中 */
 	set_pte_at(mm, address, page_table, entry);
 
 	/* No need to invalidate - it was non-present before */
@@ -3006,12 +3035,15 @@ static int do_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 			- vma->vm_start) >> PAGE_SHIFT) + vma->vm_pgoff;
 
 	pte_unmap(page_table);
+	/* JYW: 出现只读异常 */
 	if (!(flags & FAULT_FLAG_WRITE))
 		return do_read_fault(mm, vma, address, pmd, pgoff, flags,
 				orig_pte);
+	/* JYW: 私有映射且发生了写时复制 */
 	if (!(vma->vm_flags & VM_SHARED))
 		return do_cow_fault(mm, vma, address, pmd, pgoff, flags,
 				orig_pte);
+	/* JYW: 在共享映射中发生了写缺页异常 */
 	return do_shared_fault(mm, vma, address, pmd, pgoff, flags, orig_pte);
 }
 
@@ -3149,16 +3181,23 @@ static int handle_pte_fault(struct mm_struct *mm,
 	 */
 	entry = *pte;
 	barrier();
+	/* JYW: 页不在内存中，即pte还没有映射物理页面，这是真正的缺页 */
 	if (!pte_present(entry)) {
+		/* JYW: 如果PTE内容为空 */
 		if (pte_none(entry)) {
+			/* JYW:
+			 * 对于文件映射,通常vma的vm_ops操作函数定义了fault方法
+			 */
 			if (vma->vm_ops) {
 				if (likely(vma->vm_ops->fault))
 					return do_fault(mm, vma, address, pte,
 							pmd, flags, entry);
 			}
+			/* JYW: 匿名映射 */
 			return do_anonymous_page(mm, vma, address,
 						 pte, pmd, flags);
 		}
+		/* JYW: 如果PTE内容不为空，说明该页被交换到swap分区 */
 		return do_swap_page(mm, vma, address,
 					pte, pmd, flags, entry);
 	}
@@ -3166,17 +3205,26 @@ static int handle_pte_fault(struct mm_struct *mm,
 	if (pte_protnone(entry))
 		return do_numa_page(mm, vma, address, entry, pte, pmd);
 
+	/* JYW: PTE有映射内容，但是之前是只读,需要写时，发生写时复制缺页中断
+	 * 例如父子进程之间共享的内存，当其中一方需要写入新内容时，就会触发写时复制
+	 */
+
 	ptl = pte_lockptr(mm, pmd);
 	spin_lock(ptl);
 	if (unlikely(!pte_same(*pte, entry)))
 		goto unlock;
+	/* JYW: 如果传进来的flags设置了可写的属性 */
 	if (flags & FAULT_FLAG_WRITE) {
+		/* JYW: 当前pte是只读的 */
 		if (!pte_write(entry))
 			return do_wp_page(mm, vma, address,
 					pte, pmd, ptl, entry);
-		entry = pte_mkdirty(entry);
-	}
+		/* JYW: 当前PTE属性是可写的，为什么要继续处理呢？ */
+	        entry = pte_mkdirty(entry);
+        } 
 	entry = pte_mkyoung(entry);
+	/* JYW:
+	 * 如果PTE内容发生变化，则需要把新的内容写入到PTE表项中，并且要刷到对应的TLB和cache */
 	if (ptep_set_access_flags(vma, address, pte, entry, flags & FAULT_FLAG_WRITE)) {
 		update_mmu_cache(vma, address, pte);
 	} else {
@@ -3200,6 +3248,7 @@ unlock:
  * The mmap_sem may have been released depending on flags and our
  * return value.  See filemap_fault() and __lock_page_or_retry().
  */
+/* JYW: 核心处理接口 */
 static int __handle_mm_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 			     unsigned long address, unsigned int flags)
 {
@@ -3211,10 +3260,14 @@ static int __handle_mm_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 	if (unlikely(is_vm_hugetlb_page(vma)))
 		return hugetlb_fault(mm, vma, address, flags);
 
+	/* JYW: 获取address对应在当前进程页表的PGD页面目录项 */
 	pgd = pgd_offset(mm, address);
+	/* JYW: 获取pud表项 */
 	pud = pud_alloc(mm, pgd, address);
+	/* JYW: 如果无法分配PUD，则返回VM_FAULT_OOM错误 */
 	if (!pud)
 		return VM_FAULT_OOM;
+	/* JYW: 获取pmd表项 */
 	pmd = pmd_alloc(mm, pud, address);
 	if (!pmd)
 		return VM_FAULT_OOM;
@@ -3275,8 +3328,10 @@ static int __handle_mm_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 	 * read mode and khugepaged takes it in write mode. So now it's
 	 * safe to run pte_offset_map().
 	 */
+	/* JYW: 获取pte表项 */
 	pte = pte_offset_map(pmd, address);
 
+	/* JYW: 核心接口 */
 	return handle_pte_fault(mm, vma, address, pte, pmd, flags);
 }
 
@@ -3286,6 +3341,7 @@ static int __handle_mm_fault(struct mm_struct *mm, struct vm_area_struct *vma,
  * The mmap_sem may have been released depending on flags and our
  * return value.  See filemap_fault() and __lock_page_or_retry().
  */
+/* JYW: 缺页异常的核心处理函数 */
 int handle_mm_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 		    unsigned long address, unsigned int flags)
 {
@@ -3306,6 +3362,7 @@ int handle_mm_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 	if (flags & FAULT_FLAG_USER)
 		mem_cgroup_oom_enable();
 
+	/* JYW: 核心处理 */
 	ret = __handle_mm_fault(mm, vma, address, flags);
 
 	if (flags & FAULT_FLAG_USER) {

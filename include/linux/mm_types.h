@@ -45,9 +45,15 @@ typedef void compound_page_dtor(struct page *);
  */
 struct page {
 	/* First double word block */
+	/* JYW: 见enum pageflags */
 	unsigned long flags;		/* Atomic flags, some possibly
 					 * updated asynchronously */
 	union {
+		/* JYW: 用于确定页是映射的或匿名的
+		 *  如果字段空，则该页属于交换高速缓存
+		 *  非空，且最低位为1，表示该页为匿名页, 同时指向anon_vma描述符的指针
+		 *  非空，且最低位为0，表示该页为映射页，同时指向文件的address_space对象
+		 */
 		struct address_space *mapping;	/* If low bit clear, points to
 						 * inode address_space, or NULL.
 						 * If page mapped as anonymous
@@ -61,6 +67,7 @@ struct page {
 	/* Second double word */
 	struct {
 		union {
+			/* JYW: 文件中以页大小为单位的偏移量 */
 			pgoff_t index;		/* Our offset within mapping. */
 			void *freelist;		/* sl[aou]b first free object */
 			bool pfmemalloc;	/* If set by the page allocator,
@@ -107,15 +114,23 @@ struct page {
 					 * never succeed on tail
 					 * pages.
 					 */
+					/* JYW:
+					 * 表示这个页面被进程映射的个数，即已经映射了多少个用户pte                                          * 表项
+					 */
 					atomic_t _mapcount;
 
 					struct { /* SLUB */
 						unsigned inuse:16;
+                        /* JYW: 管理的objects的数量 */
 						unsigned objects:15;
 						unsigned frozen:1;
 					};
 					int units;	/* SLOB */
 				};
+				/* JYW:
+				 * 表示内核中引用该页面的次数，为0时表示页面空闲或将要被释放
+				 * 通常用get_page()和put_page_testzero()及put_page()
+			         */
 				atomic_t _count;		/* Usage count, see below. */
 			};
 			unsigned int active;	/* SLAB */
@@ -133,6 +148,7 @@ struct page {
 			struct page *next;	/* Next partial slab */
 #ifdef CONFIG_64BIT
 			int pages;	/* Nr of partial slabs left */
+            /* JYW: cpu partial上free的objects */
 			int pobjects;	/* Approximate # of objects */
 #else
 			short int pages;
@@ -171,7 +187,9 @@ struct page {
 		spinlock_t ptl;
 #endif
 #endif
+        /* JYW: 所属的kmem_cache对象 */
 		struct kmem_cache *slab_cache;	/* SL[AU]B: Pointer to slab */
+        /* JYW: 所属复合页的第一个页面 */
 		struct page *first_page;	/* Compound tail pages */
 	};
 
@@ -253,16 +271,18 @@ struct vm_region {
  * space that has a special rule for the page-fault handlers (ie a shared
  * library, the executable area etc).
  */
+/* JYW: 表示进程地址空间或进程线性区 */
 struct vm_area_struct {
 	/* The first cache line has the info for VMA tree walking. */
 
-	unsigned long vm_start;		/* Our start address within vm_mm. */
-	unsigned long vm_end;		/* The first byte after our end address
+	unsigned long vm_start;		/* JYW: Our start address within vm_mm. */
+	unsigned long vm_end;		/* JYW: The first byte after our end address
 					   within vm_mm. */
 
 	/* linked list of VM areas per task, sorted by address */
 	struct vm_area_struct *vm_next, *vm_prev;
 
+	/* => JYW：作为一个节点，加入红黑树中 */
 	struct rb_node vm_rb;
 
 	/*
@@ -275,7 +295,7 @@ struct vm_area_struct {
 
 	/* Second cache line starts here. */
 
-	struct mm_struct *vm_mm;	/* The address space we belong to. */
+	struct mm_struct *vm_mm;	/* JYW: The address space we belong to. */
 	pgprot_t vm_page_prot;		/* Access permissions of this VMA. */
 	unsigned long vm_flags;		/* Flags, see mm.h. */
 
@@ -294,8 +314,10 @@ struct vm_area_struct {
 	 * can only be in the i_mmap tree.  An anonymous MAP_PRIVATE, stack
 	 * or brk vma (with NULL file) can only be in an anon_vma list.
 	 */
+	/* JYW: 链接到anon_vam的双向链表中 */
 	struct list_head anon_vma_chain; /* Serialized by mmap_sem &
 					  * page_table_lock */
+	/* JYW: 指向anon_vma结构 */
 	struct anon_vma *anon_vma;	/* Serialized by page_table_lock */
 
 	/* Function pointers to deal with this struct. */
@@ -347,8 +369,12 @@ struct mm_rss_stat {
 };
 
 struct kioctx_table;
+
+/* JYW: 一个进程task_struct关联一个mm_struct */
 struct mm_struct {
+	/* JYW: 管理vma的线性链表 */
 	struct vm_area_struct *mmap;		/* list of VMAs */
+	/* JYW: 通过红黑树来管理vma */
 	struct rb_root mm_rb;
 	u32 vmacache_seqnum;                   /* per-thread vmacache */
 #ifdef CONFIG_MMU
@@ -360,6 +386,7 @@ struct mm_struct {
 	unsigned long mmap_legacy_base;         /* base of mmap area in bottom-up allocations */
 	unsigned long task_size;		/* size of task vm space */
 	unsigned long highest_vm_end;		/* highest vma end address */
+	/* JYW: 进程的页表 */
 	pgd_t * pgd;
 	atomic_t mm_users;			/* How many users with user space? */
 	atomic_t mm_count;			/* How many references to "struct mm_struct" (users count as 1) */
@@ -387,6 +414,7 @@ struct mm_struct {
 	unsigned long stack_vm;		/* VM_GROWSUP/DOWN */
 	unsigned long def_flags;
 	unsigned long start_code, end_code, start_data, end_data;
+	/* JYW: brk记录动态分配区的当前底部 */
 	unsigned long start_brk, brk, start_stack;
 	unsigned long arg_start, arg_end, env_start, env_end;
 

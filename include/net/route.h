@@ -52,6 +52,7 @@ struct rtable {
 
 	int			rt_genid;
 	unsigned int		rt_flags;
+	/* JYW: 表明了目标地址的类型，例如RTN_LOCAL,RTN_MULTICAST */
 	__u16			rt_type;
 	__u8			rt_is_input;
 	__u8			rt_uses_gateway;

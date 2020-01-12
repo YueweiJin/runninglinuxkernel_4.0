@@ -55,6 +55,7 @@
 #include <linux/namei.h>
 #include <linux/slab.h>
 
+/* JYW: 读取一个block数据 */
 static int read_block(struct inode *inode, void *addr, unsigned int block,
 		      struct ubifs_data_node *dn)
 {
@@ -63,7 +64,9 @@ static int read_block(struct inode *inode, void *addr, unsigned int block,
 	union ubifs_key key;
 	unsigned int dlen;
 
+	/* JYW: 计算数据节点的哈希 */
 	data_key_init(c, &key, inode->i_ino, block);
+	/* JYW: 根据key，读取节点 */
 	err = ubifs_tnc_lookup(c, &key, dn);
 	if (err) {
 		if (err == -ENOENT)
@@ -80,6 +83,7 @@ static int read_block(struct inode *inode, void *addr, unsigned int block,
 
 	dlen = le32_to_cpu(dn->ch.len) - UBIFS_DATA_NODE_SZ;
 	out_len = UBIFS_BLOCK_SIZE;
+	/* JYW: 解压数据 */
 	err = ubifs_decompress(&dn->data, dlen, addr, &out_len,
 			       le16_to_cpu(dn->compr_type));
 	if (err || len != out_len)
@@ -102,6 +106,7 @@ dump:
 	return -EINVAL;
 }
 
+/* JYW: 读取一个page */
 static int do_readpage(struct page *page)
 {
 	void *addr;
@@ -142,6 +147,7 @@ static int do_readpage(struct page *page)
 			err = -ENOENT;
 			memset(addr, 0, UBIFS_BLOCK_SIZE);
 		} else {
+			/* JYW: 读取一个block数据到addr */
 			ret = read_block(inode, addr, block, dn);
 			if (ret) {
 				err = ret;
@@ -155,6 +161,7 @@ static int do_readpage(struct page *page)
 					memset(addr + ilen, 0, dlen - ilen);
 			}
 		}
+		/* JYW: 读完一个page就结束 */
 		if (++i >= UBIFS_BLOCKS_PER_PAGE)
 			break;
 		block += 1;
@@ -885,6 +892,7 @@ out_unlock:
 	return err;
 }
 
+/* JYW: 读取一个page */
 static int ubifs_readpage(struct file *file, struct page *page)
 {
 	if (ubifs_bulk_read(page))

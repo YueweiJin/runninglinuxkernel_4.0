@@ -440,6 +440,7 @@ int __radix_tree_create(struct radix_tree_root *root, unsigned long index,
  *
  *	Insert an item into the radix tree at position @index.
  */
+/* JYW: 插入index，但是不更新标记 */
 int radix_tree_insert(struct radix_tree_root *root,
 			unsigned long index, void *item)
 {
@@ -584,6 +585,7 @@ EXPORT_SYMBOL(radix_tree_lookup);
  *	Returns the address of the tagged item.   Setting a tag on a not-present
  *	item is a bug.
  */
+/* JYW: 标记index所在的node及下的子node的所有tag */
 void *radix_tree_tag_set(struct radix_tree_root *root,
 			unsigned long index, unsigned int tag)
 {
@@ -630,6 +632,7 @@ EXPORT_SYMBOL(radix_tree_tag_set);
  *	Returns the address of the tagged item on success, else NULL.  ie:
  *	has the same return value and semantics as radix_tree_lookup().
  */
+/* JYW: 清除tag标记 */
 void *radix_tree_tag_clear(struct radix_tree_root *root,
 			unsigned long index, unsigned int tag)
 {
@@ -1411,6 +1414,7 @@ EXPORT_SYMBOL(radix_tree_delete_item);
  *
  *	Returns the address of the deleted item, or NULL if it was not present.
  */
+/* JYW: 删除一个index，同时更新相应的标记 */
 void *radix_tree_delete(struct radix_tree_root *root, unsigned long index)
 {
 	return radix_tree_delete_item(root, index, NULL);

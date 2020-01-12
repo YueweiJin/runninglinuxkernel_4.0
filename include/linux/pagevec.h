@@ -14,7 +14,9 @@
 struct page;
 struct address_space;
 
+/* JYW: 页面向量,保存特定数量的页面 */
 struct pagevec {
+	/* JYW: 当前页面的个数 */
 	unsigned long nr;
 	unsigned long cold;
 	struct page *pages[PAGEVEC_SIZE];
@@ -44,11 +46,13 @@ static inline void pagevec_reinit(struct pagevec *pvec)
 	pvec->nr = 0;
 }
 
+/* JYW: 获取page向量中的页面个数 */
 static inline unsigned pagevec_count(struct pagevec *pvec)
 {
 	return pvec->nr;
 }
 
+/* JYW: 获取pagevec是否还有剩余空间 */
 static inline unsigned pagevec_space(struct pagevec *pvec)
 {
 	return PAGEVEC_SIZE - pvec->nr;
@@ -57,6 +61,7 @@ static inline unsigned pagevec_space(struct pagevec *pvec)
 /*
  * Add a page to a pagevec.  Returns the number of slots still available.
  */
+/* JYW: 将页面存放到page向量中,并返回剩余的数量 */
 static inline unsigned pagevec_add(struct pagevec *pvec, struct page *page)
 {
 	pvec->pages[pvec->nr++] = page;

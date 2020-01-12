@@ -82,6 +82,7 @@ enum {
 	RX_FIS_UNK		= 0x60, /* offset of Unknown FIS data */
 
 	/* global controller registers */
+    /* JYW: HBA能力，具体见HOST_CAP_XX */
 	HOST_CAP		= 0x00, /* host capabilities */
 	HOST_CTL		= 0x04, /* global host control */
 	HOST_IRQ_STAT		= 0x08, /* interrupt status */
@@ -134,10 +135,14 @@ enum {
 	PORT_CMD		= 0x18, /* port command */
 	PORT_TFDATA		= 0x20,	/* taskfile data */
 	PORT_SIG		= 0x24,	/* device TF signature */
+	/* JYW: Port x Command Issue，每个bit代表一个命令槽 */
+    /* JYW: 注意NCQ情况下并不表示硬盘已执行完成，仅表示硬盘已准备接收新的命令 */
 	PORT_CMD_ISSUE		= 0x38, /* command issue */
 	PORT_SCR_STAT		= 0x28, /* SATA phy register: SStatus */
 	PORT_SCR_CTL		= 0x2c, /* SATA phy register: SControl */
 	PORT_SCR_ERR		= 0x30, /* SATA phy register: SError */
+	/* JYW: 1：表示硬盘中对应标记的命令还未执行（或者与该标记对应的命令将被发送给硬盘）*/
+	/* JYW: 0：表示硬盘中与该标记对应的命令已经执行 */
 	PORT_SCR_ACT		= 0x34, /* SATA phy register: SActive */
 	PORT_SCR_NTF		= 0x3c, /* SATA phy register: SNotification */
 	PORT_FBS		= 0x40, /* FIS-based Switching */
@@ -320,7 +325,7 @@ struct ahci_host_priv {
 	unsigned int		flags;		/* AHCI_HFLAG_* */
 	u32			force_port_map;	/* force port map */
 	u32			mask_port_map;	/* mask out particular bits */
-
+    /* JYW: 控制器寄存器基地址 */
 	void __iomem *		mmio;		/* bus-independent mem map */
 	u32			cap;		/* cap to use */
 	u32			cap2;		/* cap2 to use */

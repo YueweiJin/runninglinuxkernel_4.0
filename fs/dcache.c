@@ -2201,6 +2201,7 @@ seqretry:
  * dentry is returned. The caller must use dput to free the entry when it has
  * finished using it. %NULL is returned if the dentry does not exist.
  */
+/* JYW: 得到与给定的父目录项parent和文件名（要解析的路径名分量）相关的目录项对象 */
 struct dentry *d_lookup(const struct dentry *parent, const struct qstr *name)
 {
 	struct dentry *dentry;
@@ -2208,6 +2209,7 @@ struct dentry *d_lookup(const struct dentry *parent, const struct qstr *name)
 
 	do {
 		seq = read_seqbegin(&rename_lock);
+		/* JYW: 得到与给定的父目录项parent和文件名（要解析的路径名分量）相关的目录项对象 */
 		dentry = __d_lookup(parent, name);
 		if (dentry)
 			break;
@@ -2231,6 +2233,7 @@ EXPORT_SYMBOL(d_lookup);
  *
  * __d_lookup callers must be commented.
  */
+/* JYW: 得到与给定的父目录项parent和文件名（要解析的路径名分量）相关的目录项对象 */
 struct dentry *__d_lookup(const struct dentry *parent, const struct qstr *name)
 {
 	unsigned int len = name->len;

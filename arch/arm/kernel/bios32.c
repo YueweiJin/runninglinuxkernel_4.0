@@ -64,10 +64,11 @@ static void pcibios_bus_report_status(struct pci_bus *bus, u_int status_mask, in
 			pcibios_bus_report_status(dev->subordinate, status_mask, warn);
 }
 
+/* JYW: 报告PCIe总线的状态 */
 void pcibios_report_status(u_int status_mask, int warn)
 {
 	struct pci_bus *bus;
-
+    /* JYW: 遍历总线 */
 	list_for_each_entry(bus, &pci_root_buses, node)
 		pcibios_bus_report_status(bus, status_mask, warn);
 }
@@ -389,6 +390,7 @@ static u8 pcibios_swizzle(struct pci_dev *dev, u8 *pin)
 	struct pci_sys_data *sys = dev->sysdata;
 	int slot, oldpin = *pin;
 
+    /* JYW: Hi3536: pci_common_swizzle */
 	if (sys->swizzle)
 		slot = sys->swizzle(dev, pin);
 	else
@@ -409,6 +411,7 @@ static int pcibios_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
 	struct pci_sys_data *sys = dev->sysdata;
 	int irq = -1;
 
+    /* JYW: Hi3536: pcie_map_irq */
 	if (sys->map_irq)
 		irq = sys->map_irq(dev, slot, pin);
 
@@ -419,6 +422,7 @@ static int pcibios_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
 	return irq;
 }
 
+/* JYW: 初始化资源 */
 static int pcibios_init_resources(int busnr, struct pci_sys_data *sys)
 {
 	int ret;
@@ -450,6 +454,7 @@ static int pcibios_init_resources(int busnr, struct pci_sys_data *sys)
 	return 0;
 }
 
+/* JYW: 初始化硬件 */
 static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
 			    struct list_head *head)
 {
@@ -473,7 +478,7 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
 
 		if (hw->private_data)
 			sys->private_data = hw->private_data[nr];
-
+        /* JYW: Hi3536: pcie_setup */
 		ret = hw->setup(nr, sys);
 
 		if (ret > 0) {
@@ -482,7 +487,7 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
 				kfree(sys);
 				break;
 			}
-
+            /* JYW: Hi3536: pcie_scan_bus */
 			if (hw->scan)
 				sys->bus = hw->scan(nr, sys);
 			else
@@ -503,18 +508,33 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
 	}
 }
 
+/*
+JYW: 
+static struct hw_pci hipcie __initdata = {
+	.nr_controllers = 1,
+	.preinit    = pcie_preinit,
+	.swizzle    = pci_common_swizzle,
+	.setup      = pcie_setup,
+	.scan       = pcie_scan_bus,
+	.map_irq    = pcie_map_irq,
+};
+*/
 void pci_common_init_dev(struct device *parent, struct hw_pci *hw)
 {
 	struct pci_sys_data *sys;
 	LIST_HEAD(head);
 
 	pci_add_flags(PCI_REASSIGN_ALL_RSRC);
+    /* JYW: Hi3536: 为空，什么都不做 */
 	if (hw->preinit)
 		hw->preinit();
+    /* JYW: 初始化硬件 */
 	pcibios_init_hw(parent, hw, &head);
+    /* JYW: Hi3536: 没有定义 */
 	if (hw->postinit)
 		hw->postinit();
 
+    /* JYW: 修正中断 */
 	pci_fixup_irqs(pcibios_swizzle, pcibios_map_irq);
 
 	list_for_each_entry(sys, &head, node) {

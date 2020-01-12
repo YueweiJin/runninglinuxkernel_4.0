@@ -550,6 +550,7 @@ struct ubifs_dent_node {
  * Note, do not forget to amend 'zero_data_node_unused()' function when
  * changing the padding fields.
  */
+/* JYW: 表示一个ubifs的数据节点 */
 struct ubifs_data_node {
 	struct ubifs_ch ch;
 	__u8 key[UBIFS_MAX_KEY_LEN];
@@ -752,6 +753,7 @@ struct ubifs_branch {
  * @level: tree level
  * @branches: LEB number / offset / length / key branches
  */
+/* JYW: 表示存在FLASH上的一个索引节点 */
 struct ubifs_idx_node {
 	struct ubifs_ch ch;
 	__le16 child_cnt;

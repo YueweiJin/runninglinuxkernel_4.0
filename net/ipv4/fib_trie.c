@@ -141,6 +141,7 @@ struct trie_stat {
 	unsigned int nodesizes[MAX_STAT_DEPTH];
 };
 
+/* JYW: 在fib_trie_table中被分配,作为fib_table的一个成员 */
 struct trie {
 	struct tnode __rcu *trie;
 #ifdef CONFIG_IP_FIB_TRIE_STATS
@@ -1301,6 +1302,7 @@ static inline t_key prefix_mismatch(t_key key, struct tnode *n)
 }
 
 /* should be called with rcu_read_lock */
+/* JYW: 完成路由表的查找 */
 int fib_table_lookup(struct fib_table *tb, const struct flowi4 *flp,
 		     struct fib_result *res, int fib_flags)
 {
@@ -1856,6 +1858,7 @@ void __init fib_trie_init(void)
 }
 
 
+/* JYW: 创建一个路由表 */
 struct fib_table *fib_trie_table(u32 id)
 {
 	struct fib_table *tb;

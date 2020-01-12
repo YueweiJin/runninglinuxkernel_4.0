@@ -1257,12 +1257,14 @@ n_tty_receive_char_special(struct tty_struct *tty, unsigned char c)
 {
 	struct n_tty_data *ldata = tty->disc_data;
 
+    /* JYW: 如果IXON属性打开 */
 	if (I_IXON(tty)) {
 		if (c == START_CHAR(tty)) {
 			start_tty(tty);
 			process_echoes(tty);
 			return 0;
 		}
+        /* JYW: 如果接收到STOP_CHAR字符，则关闭串口 */
 		if (c == STOP_CHAR(tty)) {
 			stop_tty(tty);
 			return 0;
@@ -2389,6 +2391,7 @@ static ssize_t n_tty_write(struct tty_struct *tty, struct file *file,
 
 			while (nr > 0) {
 				mutex_lock(&ldata->output_lock);
+                /* JYW: uart_write，返回写入的字节数 */
 				c = tty->ops->write(tty, b, nr);
 				mutex_unlock(&ldata->output_lock);
 				if (c < 0) {

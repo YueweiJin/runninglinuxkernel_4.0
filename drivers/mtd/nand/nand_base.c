@@ -104,6 +104,7 @@ static int nand_do_write_oob(struct mtd_info *mtd, loff_t to,
  */
 DEFINE_LED_TRIGGER(nand_led_trigger);
 
+/* JYW: 对擦除操作时的ofs、len进行检查，确保对齐 */
 static int check_offs_len(struct mtd_info *mtd,
 					loff_t ofs, uint64_t len)
 {
@@ -510,15 +511,18 @@ static int nand_block_isreserved(struct mtd_info *mtd, loff_t ofs)
  * Check, if the block is bad. Either by reading the bad block table or
  * calling of the scan function.
  */
+/* JYW: 检查一个block是否是坏块 */
 static int nand_block_checkbad(struct mtd_info *mtd, loff_t ofs, int getchip,
 			       int allowbbt)
 {
 	struct nand_chip *chip = mtd->priv;
 
+    /* JYW: 一般不走这里 */
 	if (!chip->bbt)
 		return chip->block_bad(mtd, ofs, getchip);
 
 	/* Return info from the table */
+    /* JYW: 从bbt中查找给定的block是否是坏块 */
 	return nand_isbad_bbt(mtd, ofs, allowbbt);
 }
 
@@ -1602,6 +1606,7 @@ read_retry:
 			max_bitflips = max_t(unsigned int, max_bitflips, ret);
 
 			/* Transfer not aligned data */
+            /* JYW: 非对齐的读取需要将读出的整页内容 */
 			if (use_bufpoi) {
 				if (!NAND_HAS_SUBPAGE_READ(chip) && !oob &&
 				    !(mtd->ecc_stats.failed - ecc_failures) &&
@@ -1658,6 +1663,7 @@ read_retry:
 					     chip->pagebuf_bitflips);
 		}
 
+        /* JYW: 减去已经读取的长度 */
 		readlen -= bytes;
 
 		/* Reset to retry mode 0 */
@@ -2452,6 +2458,7 @@ static int nand_do_write_ops(struct mtd_info *mtd, loff_t to,
 			/* We still need to erase leftover OOB data */
 			memset(chip->oob_poi, 0xff, mtd->oobsize);
 		}
+        /* JYW: 实际的写操作 */
 		ret = chip->write_page(mtd, chip, column, bytes, wbuf,
 					oob_required, page, cached,
 					(ops->mode == MTD_OPS_RAW));
@@ -2462,6 +2469,7 @@ static int nand_do_write_ops(struct mtd_info *mtd, loff_t to,
 		if (!writelen)
 			break;
 
+        /* JYW: 只有buf的头部colnum不为0，自增buf和写入page数目*/
 		column = 0;
 		buf += bytes;
 		realpage++;
@@ -2664,6 +2672,7 @@ static int nand_write_oob(struct mtd_info *mtd, loff_t to,
 		goto out;
 	}
 
+    /* JYW: 若datbuf为空，则仅写OOB */
 	if (!ops->datbuf)
 		ret = nand_do_write_oob(mtd, to, ops);
 	else
@@ -2839,6 +2848,7 @@ static void nand_sync(struct mtd_info *mtd)
  * @mtd: MTD device structure
  * @offs: offset relative to mtd start
  */
+/* JYW: 检查一个block是否是坏块 */
 static int nand_block_isbad(struct mtd_info *mtd, loff_t offs)
 {
 	return nand_block_checkbad(mtd, offs, 1, 0);
@@ -2849,18 +2859,22 @@ static int nand_block_isbad(struct mtd_info *mtd, loff_t offs)
  * @mtd: MTD device structure
  * @ofs: offset relative to mtd start
  */
+/* JYW: 标记坏块，如果已经是坏块，则直接返回 */
 static int nand_block_markbad(struct mtd_info *mtd, loff_t ofs)
 {
 	int ret;
 
+    /* JYW: 检查一个block是否是坏块 */
 	ret = nand_block_isbad(mtd, ofs);
 	if (ret) {
 		/* If it was bad already, return success and do nothing */
+        /* JYW: 如果已经是坏块，则直接返回 */
 		if (ret > 0)
 			return 0;
 		return ret;
 	}
 
+    /* JYW: 标记坏块 */
 	return nand_block_markbad_lowlevel(mtd, ofs);
 }
 
@@ -2991,6 +3005,7 @@ static void nand_set_defaults(struct nand_chip *chip, int busw)
 		chip->write_byte = busw ? nand_write_byte16 : nand_write_byte;
 	if (!chip->read_buf || chip->read_buf == nand_read_buf)
 		chip->read_buf = busw ? nand_read_buf16 : nand_read_buf;
+    /* JYW: 海思控制器都没有定义 */
 	if (!chip->scan_bbt)
 		chip->scan_bbt = nand_default_bbt;
 
@@ -3558,6 +3573,7 @@ static void nand_decode_bbm_options(struct mtd_info *mtd,
 	int maf_id = id_data[0];
 
 	/* Set the bad block position */
+    /* JYW: 大页的NAND的坏块标记位为OOB的其实位置 */
 	if (mtd->writesize > 512 || (chip->options & NAND_BUSWIDTH_16))
 		chip->badblockpos = NAND_LARGE_BADBLOCK_POS;
 	else
@@ -3643,6 +3659,8 @@ static struct nand_flash_dev *nand_get_flash_type(struct mtd_info *mtd,
 	*maf_id = chip->read_byte(mtd);
 	*dev_id = chip->read_byte(mtd);
 
+    /* JYW: 到这里，正常就能读取到厂商ID和设备ID */
+    printk("JYW==> %s(%d): maf_id: %#x, dev_id: %#x\n", __func__, __LINE__, *maf_id, *dev_id);
 	/*
 	 * Try again to make sure, as some systems the bus-hold or other
 	 * interface concerns can cause random data which looks like a
@@ -3656,6 +3674,7 @@ static struct nand_flash_dev *nand_get_flash_type(struct mtd_info *mtd,
 	for (i = 0; i < 8; i++)
 		id_data[i] = chip->read_byte(mtd);
 
+    /* JYW: 必须确保厂商ID和设备ID 和第一次读的完全相同 */
 	if (id_data[0] != *maf_id || id_data[1] != *dev_id) {
 		pr_info("second ID read did not match %02x,%02x against %02x,%02x\n",
 			*maf_id, *dev_id, id_data[0], id_data[1]);
@@ -3757,6 +3776,7 @@ ident_done:
 	chip->erase = single_erase;
 
 	/* Do not replace user supplied command function! */
+    /* JYW: 打页的NAND的cmdfunc为nand_command_lp */
 	if (mtd->writesize > 512 && chip->cmdfunc == nand_command)
 		chip->cmdfunc = nand_command_lp;
 
@@ -3790,6 +3810,7 @@ ident_done:
  *
  * The mtd->owner field must be set to the module of the caller.
  */
+/* JYW: 扫描NAND设备 */
 int nand_scan_ident(struct mtd_info *mtd, int maxchips,
 		    struct nand_flash_dev *table)
 {
@@ -3801,9 +3822,10 @@ int nand_scan_ident(struct mtd_info *mtd, int maxchips,
 	nand_set_defaults(chip, chip->options & NAND_BUSWIDTH_16);
 
 	/* Read the flash type */
+    /* JYW: 获得NAND FLASH的厂家ID，然后查找表格是否支持 */
 	type = nand_get_flash_type(mtd, chip, &nand_maf_id,
 				   &nand_dev_id, table);
-
+    /* JYW: 海思平台在这里正常就能找到设备，否则退出 */
 	if (IS_ERR(type)) {
 		if (!(chip->options & NAND_SCAN_SILENT_NODEV))
 			pr_warn("No NAND device found\n");
@@ -4205,6 +4227,7 @@ EXPORT_SYMBOL(nand_scan_tail);
  * appropriate values. The mtd->owner field must be set to the module of the
  * caller.
  */
+/* JYW: 扫描NAND设备 */
 int nand_scan(struct mtd_info *mtd, int maxchips)
 {
 	int ret;
@@ -4215,6 +4238,7 @@ int nand_scan(struct mtd_info *mtd, int maxchips)
 		BUG();
 	}
 
+    /* JYW: 扫描NAND设备 */
 	ret = nand_scan_ident(mtd, maxchips, NULL);
 	if (!ret)
 		ret = nand_scan_tail(mtd);

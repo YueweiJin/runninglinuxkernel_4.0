@@ -1275,6 +1275,7 @@ enum perf_event_task_context {
 	perf_nr_task_contexts,
 };
 
+/* JYW: 表示一个进程 */
 struct task_struct {
 	volatile long state;	/* -1 unrunnable, 0 runnable, >0 stopped */
 	void *stack;
@@ -1292,8 +1293,15 @@ struct task_struct {
 	int wake_cpu;
 #endif
 	int on_rq;
-
+    /* JYW:
+     * prio:
+     * static_prio: 
+     *  静态优先级，进程启动时分配。
+     *  内核不会直接保存nice值，由NICE_TO_PRIO将nice转换为static_prio
+     * normal_prio:
+     */
 	int prio, static_prio, normal_prio;
+    /* JYW: 实时优先级 */
 	unsigned int rt_priority;
 	const struct sched_class *sched_class;
 	struct sched_entity se;
@@ -1311,7 +1319,7 @@ struct task_struct {
 #ifdef CONFIG_BLK_DEV_IO_TRACE
 	unsigned int btrace_seq;
 #endif
-
+    /* JYW: 进程的调度策略 */
 	unsigned int policy;
 	int nr_cpus_allowed;
 	cpumask_t cpus_allowed;
@@ -1460,8 +1468,10 @@ struct task_struct {
 /* CPU-specific state of this task */
 	struct thread_struct thread;
 /* filesystem information */
+	/* JYW: 表示文件系统信息 */
 	struct fs_struct *fs;
 /* open file information */
+	/* JYW: 表示进程已打开的文件信息 */
 	struct files_struct *files;
 /* namespaces */
 	struct nsproxy *nsproxy;
@@ -2259,6 +2269,7 @@ extern int task_prio(const struct task_struct *p);
  *
  * Return: The nice value [ -20 ... 0 ... 19 ].
  */
+/* JYW: 获取进程的nice值 */
 static inline int task_nice(const struct task_struct *p)
 {
 	return PRIO_TO_NICE((p)->static_prio);

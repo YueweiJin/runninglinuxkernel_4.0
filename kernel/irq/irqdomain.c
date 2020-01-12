@@ -40,6 +40,7 @@ static void irq_domain_check_hierarchy(struct irq_domain *domain);
  * Allocates and initialize and irq_domain structure.
  * Returns pointer to IRQ domain, or NULL on failure.
  */
+/* JYW: 分配一个新的irq_domain数据结构并进行初始化 */
 struct irq_domain *__irq_domain_add(struct device_node *of_node, int size,
 				    irq_hw_number_t hwirq_max, int direct_max,
 				    const struct irq_domain_ops *ops,
@@ -63,6 +64,7 @@ struct irq_domain *__irq_domain_add(struct device_node *of_node, int size,
 	irq_domain_check_hierarchy(domain);
 
 	mutex_lock(&irq_domain_mutex);
+	/* JYW: 挂入irq_domain_list全局链表 */
 	list_add(&domain->link, &irq_domain_list);
 	mutex_unlock(&irq_domain_mutex);
 
@@ -464,6 +466,7 @@ int irq_create_strict_mappings(struct irq_domain *domain, unsigned int irq_base,
 }
 EXPORT_SYMBOL_GPL(irq_create_strict_mappings);
 
+/* JYW: 创建映射并返回对应的IRQ号 */
 unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
 {
 	struct irq_domain *domain;
@@ -471,6 +474,7 @@ unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
 	unsigned int type = IRQ_TYPE_NONE;
 	int virq;
 
+	/* JYW: 通过device_node找到外设中断所属的中断控制器的irq_domain */
 	domain = irq_data->np ? irq_find_host(irq_data->np) : irq_default_domain;
 	if (!domain) {
 		pr_warn("no irq domain found for %s !\n",
@@ -482,6 +486,9 @@ unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
 	if (domain->ops->xlate == NULL)
 		hwirq = irq_data->args[0];
 	else {
+		/* JYW: 每个domain定义了映射相关方法集合,
+		 * xlate主要是将dts中的中断号转换为控制器的物理中断号  */
+		/* 如： GIC-V2 gic_irq_domain_hierarchy_ops */
 		if (domain->ops->xlate(domain, irq_data->np, irq_data->args,
 					irq_data->args_count, &hwirq, &type))
 			return 0;
@@ -492,10 +499,13 @@ unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
 		 * If we've already configured this interrupt,
 		 * don't do it again, or hell will break loose.
 		 */
+		/* JYW:
+		 * 如果这个硬件中断号已经映射过了，则通过irq_find_mapping可以找到映射后的软中断号 */
 		virq = irq_find_mapping(domain, hwirq);
 		if (virq)
 			return virq;
 
+		/* JYW: 否则先分配虚拟中断号 */
 		virq = irq_domain_alloc_irqs(domain, 1, NUMA_NO_NODE, irq_data);
 		if (virq <= 0)
 			return 0;
@@ -540,6 +550,7 @@ EXPORT_SYMBOL_GPL(irq_dispose_mapping);
  * @domain: domain owning this hardware interrupt
  * @hwirq: hardware irq number in that domain space
  */
+/* JYW: 根据硬件中断号查找Linux irq */
 unsigned int irq_find_mapping(struct irq_domain *domain,
 			      irq_hw_number_t hwirq)
 {
@@ -728,6 +739,7 @@ static int irq_domain_alloc_descs(int virq, unsigned int cnt,
 	unsigned int hint;
 
 	if (virq >= 0) {
+		/* JYW: 返回软件中断号 */
 		virq = irq_alloc_descs(virq, virq, cnt, node);
 	} else {
 		hint = hwirq % nr_irqs;
@@ -1013,6 +1025,7 @@ static void irq_domain_free_irqs_recursive(struct irq_domain *domain,
 	}
 }
 
+/* JYW: 将硬件中断号和软件中断号进行绑定 */
 static int irq_domain_alloc_irqs_recursive(struct irq_domain *domain,
 					   unsigned int irq_base,
 					   unsigned int nr_irqs, void *arg)
@@ -1026,6 +1039,7 @@ static int irq_domain_alloc_irqs_recursive(struct irq_domain *domain,
 		ret = irq_domain_alloc_irqs_recursive(parent, irq_base,
 						      nr_irqs, arg);
 	if (ret >= 0)
+		/* JYW: gic_irq_domain_alloc */
 		ret = domain->ops->alloc(domain, irq_base, nr_irqs, arg);
 	if (ret < 0 && recursive)
 		irq_domain_free_irqs_recursive(parent, irq_base, nr_irqs);
@@ -1054,6 +1068,7 @@ static int irq_domain_alloc_irqs_recursive(struct irq_domain *domain,
  * resources. In this way, it's easier to rollback when failing to
  * allocate resources.
  */
+/* JYW: 返回分配的Linux中断号 */
 int __irq_domain_alloc_irqs(struct irq_domain *domain, int irq_base,
 			    unsigned int nr_irqs, int node, void *arg,
 			    bool realloc)
@@ -1074,6 +1089,7 @@ int __irq_domain_alloc_irqs(struct irq_domain *domain, int irq_base,
 	if (realloc && irq_base >= 0) {
 		virq = irq_base;
 	} else {
+		/* JYW: 从allocated_irqs位图中查找第一个空闲的比特位 */
 		virq = irq_domain_alloc_descs(irq_base, nr_irqs, 0, node);
 		if (virq < 0) {
 			pr_debug("cannot allocate IRQ(base %d, count %d)\n",
@@ -1089,6 +1105,7 @@ int __irq_domain_alloc_irqs(struct irq_domain *domain, int irq_base,
 	}
 
 	mutex_lock(&irq_domain_mutex);
+	/* JYW: 将硬件中断号和软件中断号进行绑定 */
 	ret = irq_domain_alloc_irqs_recursive(domain, virq, nr_irqs, arg);
 	if (ret < 0) {
 		mutex_unlock(&irq_domain_mutex);

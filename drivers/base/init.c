@@ -17,6 +17,7 @@
  * Call the driver model init functions to initialize their
  * subsystems. Called early from init/main.c.
  */
+ /* JYW: 初始化Linux设备驱动模型 */
 void __init driver_init(void)
 {
 	/* These are the core pieces */
@@ -30,6 +31,7 @@ void __init driver_init(void)
 	/* These are also core pieces, but must come after the
 	 * core core pieces.
 	 */
+    /* JYW: 平台总线初始化 */
 	platform_bus_init();
 	cpu_dev_init();
 	memory_dev_init();

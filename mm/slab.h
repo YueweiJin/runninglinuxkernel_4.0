@@ -145,9 +145,13 @@ struct seq_file;
 struct file;
 
 struct slabinfo {
+    /* JYW: 总的活跃的slab对象数 */
 	unsigned long active_objs;
+    /* JYW: 总的slab对象个数(包括active和free的) */
 	unsigned long num_objs;
+    /* JYW: 总的活跃的slab个数 */
 	unsigned long active_slabs;
+    /* JYW: 总的slab个数 */
 	unsigned long num_slabs;
 	unsigned long shared_avail;
 	unsigned int limit;
@@ -329,14 +333,18 @@ static inline struct kmem_cache *cache_from_obj(struct kmem_cache *s, void *x)
 /*
  * The slab lists for all objects.
  */
+/* JYW: slab/slub节点 */
 struct kmem_cache_node {
+    /* JYW: 自旋锁，保护数据 */
 	spinlock_t list_lock;
 
 #ifdef CONFIG_SLAB
 	struct list_head slabs_partial;	/* partial list first, better asm code */
 	struct list_head slabs_full;
 	struct list_head slabs_free;
+    /* JYW: 三个链表中，所有空闲对象数目 */
 	unsigned long free_objects;
+    /* JYW: slab中可容许的空闲对象数目最大阈值 */
 	unsigned int free_limit;
 	unsigned int colour_next;	/* Per-node cache coloring */
 	struct array_cache *shared;	/* shared per node */
@@ -346,7 +354,9 @@ struct kmem_cache_node {
 #endif
 
 #ifdef CONFIG_SLUB
+    /* JYW: slab数量(看代码是一个复合page) */
 	unsigned long nr_partial;
+    /* JYW: slab节点的slab partial链表 */
 	struct list_head partial;
 #ifdef CONFIG_SLUB_DEBUG
 	atomic_long_t nr_slabs;

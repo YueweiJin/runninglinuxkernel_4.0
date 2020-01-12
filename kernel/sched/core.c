@@ -3052,6 +3052,7 @@ out_unlock:
 }
 #endif
 
+/* JYW: 设置进程的用户nice值 */
 void set_user_nice(struct task_struct *p, long nice)
 {
 	int old_prio, delta, queued;
@@ -3071,6 +3072,7 @@ void set_user_nice(struct task_struct *p, long nice)
 	 * it wont have any effect on scheduling until the task is
 	 * SCHED_DEADLINE, SCHED_FIFO or SCHED_RR:
 	 */
+	/* JYW: 实时进程仅设置static_prio */
 	if (task_has_dl_policy(p) || task_has_rt_policy(p)) {
 		p->static_prio = NICE_TO_PRIO(nice);
 		goto out_unlock;
@@ -3122,6 +3124,7 @@ int can_nice(const struct task_struct *p, const int nice)
  * sys_setpriority is a more generic, but much slower function that
  * does similar things.
  */
+/* JYW: 设置进程的nice值增量 */
 SYSCALL_DEFINE1(nice, int, increment)
 {
 	long nice, retval;
@@ -3131,7 +3134,11 @@ SYSCALL_DEFINE1(nice, int, increment)
 	 * We don't have to worry. Conceptually one call occurs first
 	 * and we have a single winner.
 	 */
+    /* JYW: 限定范围 */
 	increment = clamp(increment, -NICE_WIDTH, NICE_WIDTH);
+
+    /* JYW: 重新计算进程的nice值 */
+
 	nice = task_nice(current) + increment;
 
 	nice = clamp_val(nice, MIN_NICE, MAX_NICE);
@@ -3142,6 +3149,7 @@ SYSCALL_DEFINE1(nice, int, increment)
 	if (retval)
 		return retval;
 
+    /* JYW: 设置进程的用户nice值 */
 	set_user_nice(current, nice);
 	return 0;
 }
@@ -3202,6 +3210,7 @@ struct task_struct *idle_task(int cpu)
  *
  * The task of @pid, if found. %NULL otherwise.
  */
+/* JYW: 根据pid找到对应的task_struct */
 static struct task_struct *find_process_by_pid(pid_t pid)
 {
 	return pid ? find_task_by_vpid(pid) : current;
@@ -3835,6 +3844,7 @@ SYSCALL_DEFINE3(sched_setattr, pid_t, pid, struct sched_attr __user *, uattr,
  * Return: On success, the policy of the thread. Otherwise, a negative error
  * code.
  */
+/* JYW: 获取进程的调度策略 */
 SYSCALL_DEFINE1(sched_getscheduler, pid_t, pid)
 {
 	struct task_struct *p;
@@ -3845,6 +3855,7 @@ SYSCALL_DEFINE1(sched_getscheduler, pid_t, pid)
 
 	retval = -ESRCH;
 	rcu_read_lock();
+    /* JYW: 根据pid找到对应的task_struct */
 	p = find_process_by_pid(pid);
 	if (p) {
 		retval = security_task_getscheduler(p);
@@ -3864,6 +3875,7 @@ SYSCALL_DEFINE1(sched_getscheduler, pid_t, pid)
  * Return: On success, 0 and the RT priority is in @param. Otherwise, an error
  * code.
  */
+/* JYW: 获取进程的实时优先级 */
 SYSCALL_DEFINE2(sched_getparam, pid_t, pid, struct sched_param __user *, param)
 {
 	struct sched_param lp = { .sched_priority = 0 };
@@ -3874,6 +3886,7 @@ SYSCALL_DEFINE2(sched_getparam, pid_t, pid, struct sched_param __user *, param)
 		return -EINVAL;
 
 	rcu_read_lock();
+    /* JYW: 根据pid找到对应的task_struct */
 	p = find_process_by_pid(pid);
 	retval = -ESRCH;
 	if (!p)
@@ -3883,6 +3896,7 @@ SYSCALL_DEFINE2(sched_getparam, pid_t, pid, struct sched_param __user *, param)
 	if (retval)
 		goto out_unlock;
 
+    /* JYW: 判断调度策略是否是实时策略 */
 	if (task_has_rt_policy(p))
 		lp.sched_priority = p->rt_priority;
 	rcu_read_unlock();
@@ -3942,6 +3956,7 @@ static int sched_read_attr(struct sched_attr __user *uattr,
  * @size: sizeof(attr) for fwd/bwd comp.
  * @flags: for future extension.
  */
+/* JYW: 获取进程的调度属性 */
 SYSCALL_DEFINE4(sched_getattr, pid_t, pid, struct sched_attr __user *, uattr,
 		unsigned int, size, unsigned int, flags)
 {
@@ -4180,6 +4195,7 @@ SYSCALL_DEFINE3(sched_getaffinity, pid_t, pid, unsigned int, len,
  *
  * Return: 0.
  */
+/* JYW: 主动让出CPU */
 SYSCALL_DEFINE0(sched_yield)
 {
 	struct rq *rq = this_rq_lock();
@@ -4392,6 +4408,7 @@ EXPORT_SYMBOL(io_schedule_timeout);
  * rt_priority that can be used by a given scheduling class.
  * On failure, a negative error code is returned.
  */
+/* JYW: 获取指定调度策略的最大优先级 */
 SYSCALL_DEFINE1(sched_get_priority_max, int, policy)
 {
 	int ret = -EINVAL;
@@ -4419,6 +4436,7 @@ SYSCALL_DEFINE1(sched_get_priority_max, int, policy)
  * rt_priority that can be used by a given scheduling class.
  * On failure, a negative error code is returned.
  */
+/* JYW: 获取指定调度策略的最小优先级 */
 SYSCALL_DEFINE1(sched_get_priority_min, int, policy)
 {
 	int ret = -EINVAL;
@@ -4448,6 +4466,7 @@ SYSCALL_DEFINE1(sched_get_priority_min, int, policy)
  * Return: On success, 0 and the timeslice is in @interval. Otherwise,
  * an error code.
  */
+/* JYW: 获取一个进程的时间片 */
 SYSCALL_DEFINE2(sched_rr_get_interval, pid_t, pid,
 		struct timespec __user *, interval)
 {
@@ -4473,6 +4492,7 @@ SYSCALL_DEFINE2(sched_rr_get_interval, pid_t, pid,
 
 	rq = task_rq_lock(p, &flags);
 	time_slice = 0;
+    /* JYW: 获取一个进程的时间片 */
 	if (p->sched_class->get_rr_interval)
 		time_slice = p->sched_class->get_rr_interval(rq, p);
 	task_rq_unlock(rq, p, &flags);
@@ -7920,6 +7940,7 @@ undo:
 	return ret;
 }
 
+/* JYW: 根据/proc/sys/kernel/sched_rr_timeslice_ms设置 */
 int sched_rr_handler(struct ctl_table *table, int write,
 		void __user *buffer, size_t *lenp,
 		loff_t *ppos)

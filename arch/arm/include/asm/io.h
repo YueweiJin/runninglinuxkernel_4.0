@@ -332,10 +332,18 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
  * Documentation/io-mapping.txt.
  *
  */
+/* 
+ * JYW:
+ * 与vmalloc类似，通过在vmalloc区分配虚拟地址块
+ * 但ioremap并不需要通过伙伴系统去分配物理页，因为ioremap要映射的目标地址是I/O空间，不是物理内存
+ * 为了简化不同架构平台代码移植工作，对于ioremap返回的地址，应该统一使用readb/writeb、readwwritew这样的宏
+ */
 #define ioremap(cookie,size)		__arm_ioremap((cookie), (size), MT_DEVICE)
+/* JYW: 通过清除页表项中的C标志。使得处理器在访问这段地址时不会被cahce，这对外设空间的地址是非常重要的 */
 #define ioremap_nocache(cookie,size)	__arm_ioremap((cookie), (size), MT_DEVICE)
 #define ioremap_cache(cookie,size)	__arm_ioremap((cookie), (size), MT_DEVICE_CACHED)
 #define ioremap_wc(cookie,size)		__arm_ioremap((cookie), (size), MT_DEVICE_WC)
+/* JYW: 如果被映射的I/O空间不再使用，将vmalloc区中分配的虚拟内存块返还给vmalloc区，清除对应的页表页目录项 */
 #define iounmap				__arm_iounmap
 
 /*

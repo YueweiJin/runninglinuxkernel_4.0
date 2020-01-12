@@ -391,9 +391,10 @@ static void tcp_fixup_rcvbuf(struct sock *sk)
 	/* Dynamic Right Sizing (DRS) has 2 to 3 RTT latency
 	 * Allow enough cushion so that sender is not limited by our window
 	 */
+	/* JYW: 如果运行自动调节 */
 	if (sysctl_tcp_moderate_rcvbuf)
 		rcvmem <<= 2;
-
+    /* JYW: 不能超过sysctl_tcp_rmem的最大值 */
 	if (sk->sk_rcvbuf < rcvmem)
 		sk->sk_rcvbuf = min(rcvmem, sysctl_tcp_rmem[2]);
 }
@@ -437,6 +438,7 @@ void tcp_init_buffer_space(struct sock *sk)
 }
 
 /* 5. Recalculate window clamp after socket hit its memory bounds. */
+/* JYW: 当接收缓冲区超过最大值后，重新计算滑动窗口的最大值 */
 static void tcp_clamp_window(struct sock *sk)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
@@ -1308,6 +1310,12 @@ static bool tcp_shifted_skb(struct sock *sk, struct sk_buff *skb,
 	TCP_SKB_CB(skb)->seq += shifted;
 
 	tcp_skb_pcount_add(prev, pcount);
+    /*
+     * JYW: SACK漏洞
+     * 官方解释及补丁：https://github.com/Netflix/security-bulletins/blob/master/advisories/third-party/2019-001.md
+     * 详细解释1：https://blog.csdn.net/dog250/article/details/94271032
+     * 详细解释2：https://www.codercto.com/a/89801.html
+     */
 	BUG_ON(tcp_skb_pcount(skb) < pcount);
 	tcp_skb_pcount_add(skb, -pcount);
 
@@ -1373,6 +1381,28 @@ static int skb_can_shift(const struct sk_buff *skb)
 {
 	return !skb_headlen(skb) && skb_is_nonlinear(skb);
 }
+
+#if 0 /* JYW */
+int tcp_skb_shift(struct sk_buff *to, struct sk_buff *from,
+
+          int pcount, int shiftlen)
+
+{
+    /* TCP min gso_size is 8 bytes (TCP_MIN_GSO_SIZE)
+    * Since TCP_SKB_CB(skb)->tcp_gso_segs is 16 bits, we need
+    * to make sure not storing more than 65535 * 8 bytes per skb,
+    * even if current MSS is bigger.
+    */
+
+   if (unlikely(to->len + shiftlen >= 65535 * TCP_MIN_GSO_SIZE))
+       return 0;
+
+   if (unlikely(tcp_skb_pcount(to) + pcount > 65535))
+       return 0;
+
+   return skb_shift(to, from, shiftlen);
+}
+#endif
 
 /* Try collapsing SACK blocks spanning across multiple skbs to a single
  * skb.
@@ -1479,7 +1509,11 @@ static struct sk_buff *tcp_shift_skb_data(struct sock *sk, struct sk_buff *skb,
 	if (!after(TCP_SKB_CB(skb)->seq + len, tp->snd_una))
 		goto fallback;
 
+#if 1
 	if (!skb_shift(prev, skb, len))
+#else
+    if (!tcp_skb_shift(prev, skb, pcount, len))
+#endif
 		goto fallback;
 	if (!tcp_shifted_skb(sk, skb, state, pcount, len, mss, dup_sack))
 		goto out;
@@ -1498,10 +1532,17 @@ static struct sk_buff *tcp_shift_skb_data(struct sock *sk, struct sk_buff *skb,
 		goto out;
 
 	len = skb->len;
+#if 1 /* JYW */
 	if (skb_shift(prev, skb, len)) {
 		pcount += tcp_skb_pcount(skb);
 		tcp_shifted_skb(sk, skb, state, tcp_skb_pcount(skb), len, mss, 0);
 	}
+#else
+    pcount = tcp_skb_pcount(skb);
+    if (tcp_skb_shift(prev, skb, pcount, len))
+        tcp_shifted_skb(sk, prev, skb, state, pcount,
+            len, mss, 0);
+#endif
 
 out:
 	state->fack_count += pcount;
@@ -4203,19 +4244,23 @@ static void tcp_ofo_queue(struct sock *sk)
 static bool tcp_prune_ofo_queue(struct sock *sk);
 static int tcp_prune_queue(struct sock *sk);
 
+/* JYW: 正常返回0，异常返回1 */
 static int tcp_try_rmem_schedule(struct sock *sk, struct sk_buff *skb,
 				 unsigned int size)
 {
+    /* JYW: 如果当个套接字已分配内存大于接收缓冲区或者TCP总内存超限，则进入删减 */
 	if (atomic_read(&sk->sk_rmem_alloc) > sk->sk_rcvbuf ||
 	    !sk_rmem_schedule(sk, skb, size)) {
 
+        /* JYW: 删减队列 */
 		if (tcp_prune_queue(sk) < 0)
 			return -1;
 
+        /* JYW: 删减队列后，还是不够，则继续删减ofo队列 */
 		if (!sk_rmem_schedule(sk, skb, size)) {
 			if (!tcp_prune_ofo_queue(sk))
 				return -1;
-
+            /* JYW: 再次判断，仍然不够，则返回-1 */
 			if (!sk_rmem_schedule(sk, skb, size))
 				return -1;
 		}
@@ -4445,6 +4490,7 @@ static void tcp_data_queue(struct sock *sk, struct sk_buff *skb)
 
 		if (eaten <= 0) {
 queue_and_out:
+            /* JYW: 内存删减失败后，则丢弃 */
 			if (eaten < 0 &&
 			    tcp_try_rmem_schedule(sk, skb, skb->truesize))
 				goto drop;
@@ -4709,6 +4755,7 @@ static bool tcp_prune_ofo_queue(struct sock *sk)
  * until the socket owning process reads some of the data
  * to stabilize the situation.
  */
+/* JYW: 删减队列 */
 static int tcp_prune_queue(struct sock *sk)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
@@ -4716,7 +4763,7 @@ static int tcp_prune_queue(struct sock *sk)
 	SOCK_DEBUG(sk, "prune_queue: c=%x\n", tp->copied_seq);
 
 	NET_INC_STATS_BH(sock_net(sk), LINUX_MIB_PRUNECALLED);
-
+    /* JYW: 若超出接收缓冲区的大小，则重新调整滑动窗口的最大值 */
 	if (atomic_read(&sk->sk_rmem_alloc) >= sk->sk_rcvbuf)
 		tcp_clamp_window(sk);
 	else if (sk_under_memory_pressure(sk))

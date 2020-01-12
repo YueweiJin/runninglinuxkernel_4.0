@@ -194,6 +194,7 @@ EXPORT_SYMBOL(end_buffer_write_sync);
  * succeeds, there is no need to take private_lock. (But if
  * private_lock is contended then so is mapping->tree_lock).
  */
+/* JYW: 从页高速缓存中查找page关联的buffer_head */
 static struct buffer_head *
 __find_get_block_slow(struct block_device *bdev, sector_t block)
 {
@@ -206,16 +207,21 @@ __find_get_block_slow(struct block_device *bdev, sector_t block)
 	struct page *page;
 	int all_mapped = 1;
 
+	/* JYW: 根据块号和块大小得到与块设备相关的页的索引 */
 	index = block >> (PAGE_CACHE_SHIFT - bd_inode->i_blkbits);
+	/* JYW: 根据page index查找对应的page, 如果没有这一项，则返回NULL  */
 	page = find_get_page_flags(bd_mapping, index, FGP_ACCESSED);
 	if (!page)
 		goto out;
 
 	spin_lock(&bd_mapping->private_lock);
+	/* JYW: 若未关联buffer head，则返回NULL */
 	if (!page_has_buffers(page))
 		goto out_unlock;
+	/* JYW: 获取page关联的块缓冲区首部 */
 	head = page_buffers(page);
 	bh = head;
+	/* JYW: 遍历链表找到匹配的block缓冲 */
 	do {
 		if (!buffer_mapped(bh))
 			all_mapped = 0;
@@ -908,6 +914,7 @@ no_grow:
 }
 EXPORT_SYMBOL_GPL(alloc_page_buffers);
 
+/* JYW: 将块缓冲区描述符绑定到page */
 static inline void
 link_dev_buffers(struct page *page, struct buffer_head *head)
 {
@@ -919,15 +926,19 @@ link_dev_buffers(struct page *page, struct buffer_head *head)
 		bh = bh->b_this_page;
 	} while (bh);
 	tail->b_this_page = head;
+	/* JYW: 将块缓冲区描述符绑定到page */
 	attach_page_buffers(page, head);
 }
 
+/* JYW: 获取块设备的最大block数 */
 static sector_t blkdev_max_block(struct block_device *bdev, unsigned int size)
 {
 	sector_t retval = ~((sector_t)0);
+	/* JYW: 获取inode size */
 	loff_t sz = i_size_read(bdev->bd_inode);
 
 	if (sz) {
+		/* JYW: 获取blksize的位数 */
 		unsigned int sizebits = blksize_bits(size);
 		retval = (sz >> sizebits);
 	}
@@ -937,10 +948,12 @@ static sector_t blkdev_max_block(struct block_device *bdev, unsigned int size)
 /*
  * Initialise the state of a blockdev page's buffers.
  */ 
+/* JYW: 初始化buffer head */
 static sector_t
 init_page_buffers(struct page *page, struct block_device *bdev,
 			sector_t block, int size)
 {
+	/* JYW: 获取page的私有类型buffer head */
 	struct buffer_head *head = page_buffers(page);
 	struct buffer_head *bh = head;
 	int uptodate = PageUptodate(page);
@@ -971,6 +984,8 @@ init_page_buffers(struct page *page, struct block_device *bdev,
  *
  * This is used purely for blockdev mappings.
  */
+/* JYW: 为bdev的一个块创建一个page映射，将page纳入i_mapping,
+ * 并初始化buffer_head，关联到page */
 static int
 grow_dev_page(struct block_device *bdev, sector_t block,
 	      pgoff_t index, int size, int sizebits, gfp_t gfp)
@@ -1023,7 +1038,9 @@ grow_dev_page(struct block_device *bdev, sector_t block,
 	 * run under the page lock.
 	 */
 	spin_lock(&inode->i_mapping->private_lock);
+	/* JYW: 将块缓冲区描述符绑定到page */
 	link_dev_buffers(page, bh);
+	/* JYW: 初始化buffer head */
 	end_block = init_page_buffers(page, bdev, (sector_t)index << sizebits,
 			size);
 	spin_unlock(&inode->i_mapping->private_lock);
@@ -1039,6 +1056,7 @@ failed:
  * Create buffers for the specified block device block's page.  If
  * that page was dirty, the buffers are set dirty also.
  */
+/* JYW: 创建一个块缓冲区，并添加到页高速缓存中 */
 static int
 grow_buffers(struct block_device *bdev, sector_t block, int size, gfp_t gfp)
 {
@@ -1070,6 +1088,9 @@ grow_buffers(struct block_device *bdev, sector_t block, int size, gfp_t gfp)
 	return grow_dev_page(bdev, block, index, size, sizebits, gfp);
 }
 
+/* JYW:
+ * 获取对应的buffer_head，若不存在会分配page并加入页高速缓存，返回对应的buffer_head
+ */
 struct buffer_head *
 __getblk_slow(struct block_device *bdev, sector_t block,
 	     unsigned size, gfp_t gfp)
@@ -1090,10 +1111,12 @@ __getblk_slow(struct block_device *bdev, sector_t block,
 		struct buffer_head *bh;
 		int ret;
 
+		/* JYW: 搜索一个缓存块,若不存在，则返回NULL  */
 		bh = __find_get_block(bdev, block, size);
 		if (bh)
 			return bh;
 
+		/* JYW: 创建一个块缓冲区，并添加到页高速缓存中 */
 		ret = grow_buffers(bdev, block, size, gfp);
 		if (ret < 0)
 			return NULL;
@@ -1203,6 +1226,7 @@ void __bforget(struct buffer_head *bh)
 }
 EXPORT_SYMBOL(__bforget);
 
+/* JYW: 从磁盘读取I/O，返回缓冲区首部 */
 static struct buffer_head *__bread_slow(struct buffer_head *bh)
 {
 	lock_buffer(bh);
@@ -1212,7 +1236,10 @@ static struct buffer_head *__bread_slow(struct buffer_head *bh)
 	} else {
 		get_bh(bh);
 		bh->b_end_io = end_buffer_read_sync;
+		/* JYW: 把缓冲区首部提交到通用块层 */
 		submit_bh(READ, bh);
+		/* JYW:
+		 * 把当前进程插入等待队列，直到I/O完成，即缓冲区首部的BH_Lock标志被清0 */
 		wait_on_buffer(bh);
 		if (buffer_uptodate(bh))
 			return bh;
@@ -1237,10 +1264,12 @@ static struct buffer_head *__bread_slow(struct buffer_head *bh)
 
 #define BH_LRU_SIZE	16
 
+/* JYW: LRU高速缓存 */
 struct bh_lru {
 	struct buffer_head *bhs[BH_LRU_SIZE];
 };
 
+/* JYW: per-cpu类型 */
 static DEFINE_PER_CPU(struct bh_lru, bh_lrus) = {{ NULL }};
 
 #ifdef CONFIG_SMP
@@ -1261,6 +1290,7 @@ static inline void check_irqs_on(void)
 /*
  * The LRU management algorithm is dopey-but-simple.  Sorry.
  */
+/* JYW: 加入到LRU高速缓存中 */
 static void bh_lru_install(struct buffer_head *bh)
 {
 	struct buffer_head *evictee = NULL;
@@ -1302,6 +1332,7 @@ static void bh_lru_install(struct buffer_head *bh)
 /*
  * Look up the bh in this cpu's LRU.  If it's there, move it to the head.
  */
+/* JYW: 从CPU LRU高速缓存中搜索buffer head */
 static struct buffer_head *
 lookup_bh_lru(struct block_device *bdev, sector_t block, unsigned size)
 {
@@ -1337,15 +1368,19 @@ lookup_bh_lru(struct block_device *bdev, sector_t block, unsigned size)
  * it in the LRU and mark it as accessed.  If it is not present then return
  * NULL
  */
+/* JYW: 搜索一个缓存块,若不存在，则返回NULL  */
 struct buffer_head *
 __find_get_block(struct block_device *bdev, sector_t block, unsigned size)
 {
+	/* JYW: 从CPU LRU高速缓存中搜索buffer head */
 	struct buffer_head *bh = lookup_bh_lru(bdev, block, size);
 
 	if (bh == NULL) {
 		/* __find_get_block_slow will mark the page accessed */
+		/* JYW: 从页高速缓存中查找page关联的buffer_head */
 		bh = __find_get_block_slow(bdev, block);
 		if (bh)
+			/* JYW: 加入到LRU高速缓存中 */
 			bh_lru_install(bh);
 	} else
 		touch_buffer(bh);
@@ -1362,14 +1397,19 @@ EXPORT_SYMBOL(__find_get_block);
  * __getblk_gfp() will lock up the machine if grow_dev_page's
  * try_to_free_buffers() attempt is failing.  FIXME, perhaps?
  */
+/* JYW: 获取对应的buffer_head，若不存在会分配page并加入页高速缓存，返回对应buffer_head */
 struct buffer_head *
 __getblk_gfp(struct block_device *bdev, sector_t block,
 	     unsigned size, gfp_t gfp)
 {
+	/* JYW: 搜索一个缓存块,若不存在，则返回NULL  */
 	struct buffer_head *bh = __find_get_block(bdev, block, size);
 
 	might_sleep();
 	if (bh == NULL)
+		/* JYW:
+		 * 获取对应的buffer_head，若不存在会分配page并加入页高速缓存，返回对应buffer_head
+ 		 */
 		bh = __getblk_slow(bdev, block, size, gfp);
 	return bh;
 }
@@ -1380,6 +1420,7 @@ EXPORT_SYMBOL(__getblk_gfp);
  */
 void __breadahead(struct block_device *bdev, sector_t block, unsigned size)
 {
+	/* JYW: 获取对应的buffer_head，若不存在会分配page并加入页高速缓存，返回对应buffer_head */
 	struct buffer_head *bh = __getblk(bdev, block, size);
 	if (likely(bh)) {
 		ll_rw_block(READA, 1, &bh);
@@ -1400,13 +1441,17 @@ EXPORT_SYMBOL(__breadahead);
  *  not to prevent page migration if you set gfp to zero.
  *  It returns NULL if the block was unreadable.
  */
+/* JYW: 确保读取到buffer_head有效数据 */
 struct buffer_head *
 __bread_gfp(struct block_device *bdev, sector_t block,
 		   unsigned size, gfp_t gfp)
 {
+	/* JYW: 获取对应的buffer_head，若不存在会分配page并加入页高速缓存，返回对应buffer_head */
 	struct buffer_head *bh = __getblk_gfp(bdev, block, size, gfp);
 
+	/* JYW: 如果已经包含了有效数据，则直接返回，否则需要提交磁盘请求 */
 	if (likely(bh) && !buffer_uptodate(bh))
+		/* JYW: 从磁盘读取I/O，返回缓冲区首部 */
 		bh = __bread_slow(bh);
 	return bh;
 }
@@ -2997,6 +3042,7 @@ void guard_bio_eod(int rw, struct bio *bio)
 	}
 }
 
+/* JYW: 向通用块层提交一个缓冲区首部，并由此请求传输一个数据块 */
 int _submit_bh(int rw, struct buffer_head *bh, unsigned long bio_flags)
 {
 	struct bio *bio;
@@ -3018,8 +3064,10 @@ int _submit_bh(int rw, struct buffer_head *bh, unsigned long bio_flags)
 	 * from here on down, it's all bio -- do the initial mapping,
 	 * submit_bio -> generic_make_request may further map this bio around
 	 */
+	/* JYW: 分配一个新的bio */
 	bio = bio_alloc(GFP_NOIO, 1);
 
+	/* JYW: 根据缓冲区首部的内容初始化bio描述符的字段 */
 	bio->bi_iter.bi_sector = bh->b_blocknr * (bh->b_size >> 9);
 	bio->bi_bdev = bh->b_bdev;
 	bio->bi_io_vec[0].bv_page = bh->b_page;
@@ -3042,6 +3090,7 @@ int _submit_bh(int rw, struct buffer_head *bh, unsigned long bio_flags)
 		rw |= REQ_PRIO;
 
 	bio_get(bio);
+	/* JYW: 提交一个bio请求 */
 	submit_bio(rw, bio);
 
 	if (bio_flagged(bio, BIO_EOPNOTSUPP))
@@ -3052,6 +3101,7 @@ int _submit_bh(int rw, struct buffer_head *bh, unsigned long bio_flags)
 }
 EXPORT_SYMBOL_GPL(_submit_bh);
 
+/* JYW: 把缓冲区首部提交到通用块层 */
 int submit_bh(int rw, struct buffer_head *bh)
 {
 	return _submit_bh(rw, bh, 0);
@@ -3083,6 +3133,7 @@ EXPORT_SYMBOL(submit_bh);
  * All of the buffers must be for the same device, and must also be a
  * multiple of the current approved size for the device.
  */
+/* JYW: 触发几个数据块的数据传输，这些数据块不一定物理上相邻 */
 void ll_rw_block(int rw, int nr, struct buffer_head *bhs[])
 {
 	int i;
@@ -3112,6 +3163,7 @@ void ll_rw_block(int rw, int nr, struct buffer_head *bhs[])
 }
 EXPORT_SYMBOL(ll_rw_block);
 
+/* JYW: 写回脏的buffer_head */
 void write_dirty_buffer(struct buffer_head *bh, int rw)
 {
 	lock_buffer(bh);
@@ -3130,6 +3182,7 @@ EXPORT_SYMBOL(write_dirty_buffer);
  * and then start new I/O and then wait upon it.  The caller must have a ref on
  * the buffer_head.
  */
+/* JYW: 同步脏buffer_head */
 int __sync_dirty_buffer(struct buffer_head *bh, int rw)
 {
 	int ret = 0;
@@ -3320,6 +3373,7 @@ static void recalc_bh_state(void)
 	buffer_heads_over_limit = (tot > max_buffer_heads);
 }
 
+/* JYW: 分配buffer_head */
 struct buffer_head *alloc_buffer_head(gfp_t gfp_flags)
 {
 	struct buffer_head *ret = kmem_cache_zalloc(bh_cachep, gfp_flags);
@@ -3334,6 +3388,7 @@ struct buffer_head *alloc_buffer_head(gfp_t gfp_flags)
 }
 EXPORT_SYMBOL(alloc_buffer_head);
 
+/* JYW: 释放缓buffer_head */
 void free_buffer_head(struct buffer_head *bh)
 {
 	BUG_ON(!list_empty(&bh->b_assoc_buffers));

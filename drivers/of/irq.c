@@ -34,13 +34,20 @@
  * This function is a wrapper that chains of_irq_parse_one() and
  * irq_create_of_mapping() to make things easier to callers
  */
+/* JYW: 根据device_node解析硬件中断号，并映射为虚拟的软件中断号 */
+/* JYW: 对于一个使用Device
+ * tree的普通驱动程序（我们推荐这样做），基本上初始化需要调用irq_of_parse_and_map获取IRQ
+ * number，然后调用request_threaded_irq申请中断handler
+ */
 unsigned int irq_of_parse_and_map(struct device_node *dev, int index)
 {
 	struct of_phandle_args oirq;
 
+	/* JYW: 从dts中解析硬件中断号，输出到oriq中 */
 	if (of_irq_parse_one(dev, index, &oirq))
 		return 0;
 
+	/* JYW: 创建映射并返回对应的IRQ号 */
 	return irq_create_of_mapping(&oirq);
 }
 EXPORT_SYMBOL_GPL(irq_of_parse_and_map);
@@ -469,9 +476,13 @@ int of_irq_to_resource_table(struct device_node *dev, struct resource *res,
 }
 EXPORT_SYMBOL_GPL(of_irq_to_resource_table);
 
+/* JYW: 中断控制器描述符 */
 struct intc_desc {
+	/* JYW: 挂接到全局链表 intc_desc_list 中 */
 	struct list_head	list;
+	/* JYW: 对应的device_node */
 	struct device_node	*dev;
+	/* JYW: 如果是root中断控制器，则为NULL */
 	struct device_node	*interrupt_parent;
 };
 
@@ -482,6 +493,7 @@ struct intc_desc {
  * This function scans the device tree for matching interrupt controller nodes,
  * and calls their initialization functions in order with parents first.
  */
+/* JYW: 扫描设备列表，匹配和DT中一致的中断控制器 */
 void __init of_irq_init(const struct of_device_id *matches)
 {
 	struct device_node *np, *parent = NULL;

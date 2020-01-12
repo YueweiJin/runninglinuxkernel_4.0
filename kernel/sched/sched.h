@@ -82,6 +82,7 @@ static inline int fair_policy(int policy)
 	return policy == SCHED_NORMAL || policy == SCHED_BATCH;
 }
 
+/* JYW: 判断调度策略是否是实时策略 */
 static inline int rt_policy(int policy)
 {
 	return policy == SCHED_FIFO || policy == SCHED_RR;
@@ -92,6 +93,7 @@ static inline int dl_policy(int policy)
 	return policy == SCHED_DEADLINE;
 }
 
+/* JYW: 判断调度策略是否是实时策略 */
 static inline int task_has_rt_policy(struct task_struct *p)
 {
 	return rt_policy(p->policy);
@@ -1191,7 +1193,7 @@ struct sched_class {
 	void (*switched_to) (struct rq *this_rq, struct task_struct *task);
 	void (*prio_changed) (struct rq *this_rq, struct task_struct *task,
 			     int oldprio);
-
+    /* JYW: 获取时间片接口 */
 	unsigned int (*get_rr_interval) (struct rq *rq,
 					 struct task_struct *task);
 

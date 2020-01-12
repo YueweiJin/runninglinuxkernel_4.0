@@ -192,6 +192,7 @@ static int deferred_probe_initcall(void)
 }
 late_initcall(deferred_probe_initcall);
 
+/* JYW: 把设备链入驱动的设备列表klist_devices中 */
 static void driver_bound(struct device *dev)
 {
 	if (klist_node_attached(&dev->p->knode_driver)) {
@@ -203,6 +204,8 @@ static void driver_bound(struct device *dev)
 	pr_debug("driver: '%s': %s: bound to device '%s'\n", dev->driver->name,
 		 __func__, dev_name(dev));
 
+    /* JYW: 将设备private结构中的knode_driver节点加入到与该设备绑定的驱动private结构
+        中的klist_devices链表中 */
 	klist_add_tail(&dev->p->knode_driver, &dev->driver->p->klist_devices);
 
 	/*
@@ -217,6 +220,9 @@ static void driver_bound(struct device *dev)
 					     BUS_NOTIFY_BOUND_DRIVER, dev);
 }
 
+/* JYW: 互相在对方的sysfs目录下创建一个符号链接
+ * ，建立绑定的设备与驱动程序之间的符号链接文件
+ */
 static int driver_sysfs_add(struct device *dev)
 {
 	int ret;
@@ -261,6 +267,7 @@ static void driver_sysfs_remove(struct device *dev)
  *
  * This function must be called with the device lock held.
  */
+ /* JYW: 用来将该设备与它的驱动程序绑定起来 */
 int device_bind_driver(struct device *dev)
 {
 	int ret;
@@ -298,16 +305,19 @@ static int really_probe(struct device *dev, struct device_driver *drv)
 		goto probe_failed;
 	}
 
+    /* JYW: 调用总线的probe函数 */
 	if (dev->bus->probe) {
 		ret = dev->bus->probe(dev);
 		if (ret)
 			goto probe_failed;
+    /* JYW: 如果驱动提供了probe函数，则调用驱动的probe函数 */
 	} else if (drv->probe) {
 		ret = drv->probe(dev);
 		if (ret)
 			goto probe_failed;
 	}
 
+    /* JYW: 绑定设备和驱动 */
 	driver_bound(dev);
 	ret = 1;
 	pr_debug("bus: '%s': %s: bound device %s to driver %s\n",
@@ -385,10 +395,12 @@ EXPORT_SYMBOL_GPL(wait_for_device_probe);
  * This function must be called with @dev lock held.  When called for a
  * USB interface, @dev->parent lock must be held as well.
  */
+ /* JYW: 调用really_probe来绑定设备和它的驱动 */
 int driver_probe_device(struct device_driver *drv, struct device *dev)
 {
 	int ret = 0;
 
+    /* JYW: 该device是否已在sysfs中 */
 	if (!device_is_registered(dev))
 		return -ENODEV;
 
@@ -396,6 +408,7 @@ int driver_probe_device(struct device_driver *drv, struct device *dev)
 		 drv->bus->name, __func__, dev_name(dev), drv->name);
 
 	pm_runtime_barrier(dev);
+    /* JYW: device已在sysfs，调用really_probe */
 	ret = really_probe(dev, drv);
 	pm_request_idle(dev);
 
@@ -406,6 +419,7 @@ static int __device_attach(struct device_driver *drv, void *data)
 {
 	struct device *dev = data;
 
+    /* JYW: 进行匹配工作 */
 	if (!driver_match_device(drv, dev))
 		return 0;
 
@@ -426,12 +440,15 @@ static int __device_attach(struct device_driver *drv, void *data)
  *
  * When called for a USB interface, @dev->parent lock must be held.
  */
+/* JYW: 尝试获取驱动 */
 int device_attach(struct device *dev)
 {
 	int ret = 0;
 
 	device_lock(dev);
+	/* JYW: 如果已指定驱动，即已绑定 */   
 	if (dev->driver) {
+		 /* JYW: 在sysfs中建立链接关系 */
 		if (klist_node_attached(&dev->p->knode_driver)) {
 			ret = 1;
 			goto out_unlock;
@@ -443,6 +460,7 @@ int device_attach(struct device *dev)
 			dev->driver = NULL;
 			ret = 0;
 		}
+	/* JYW: 尚未绑定，尝试绑定，遍历该总线上的所有驱动 */
 	} else {
 		ret = bus_for_each_drv(dev->bus, NULL, dev, __device_attach);
 		pm_request_idle(dev);
@@ -466,7 +484,7 @@ static int __driver_attach(struct device *dev, void *data)
 	 * driver_probe_device() will spit a warning if there
 	 * is an error.
 	 */
-
+    /* JYW: 若有总线match方法，且匹配成功则直接返回 */
 	if (!driver_match_device(drv, dev))
 		return 0;
 
@@ -491,6 +509,10 @@ static int __driver_attach(struct device *dev, void *data)
  * returns 0 and the @dev->driver is set, we've found a
  * compatible pair.
  */
+ /*
+  * JYW: 尝试着把驱动绑定到设备上
+  * 		代表驱动程序的结构
+  */
 int driver_attach(struct device_driver *drv)
 {
 	return bus_for_each_dev(drv->bus, NULL, drv, __driver_attach);

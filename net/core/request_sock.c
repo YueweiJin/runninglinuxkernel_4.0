@@ -61,6 +61,7 @@ int reqsk_queue_alloc(struct request_sock_queue *queue,
 	rwlock_init(&queue->syn_wait_lock);
 	queue->rskq_accept_head = NULL;
 	lopt->nr_table_entries = nr_table_entries;
+    /* JYW: 这里可以看到max_qlen_log的设置(nr_table_entries, sysctl_max_syn_backlog) */
 	lopt->max_qlen_log = ilog2(nr_table_entries);
 
 	write_lock_bh(&queue->syn_wait_lock);

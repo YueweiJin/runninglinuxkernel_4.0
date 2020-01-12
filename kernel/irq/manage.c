@@ -1461,6 +1461,8 @@ EXPORT_SYMBOL(free_irq);
  *	IRQF_TRIGGER_*		Specify active edge(s) or level
  *
  */
+/* JYW: irq: 虚拟中断号，并不是硬件的中断号 */
+/* JYW: thread_fn: 在线程中执行下半部，降低系统延迟 */
 int request_threaded_irq(unsigned int irq, irq_handler_t handler,
 			 irq_handler_t thread_fn, unsigned long irqflags,
 			 const char *devname, void *dev_id)

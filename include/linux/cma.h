@@ -6,6 +6,7 @@
  * areas configured in kernel .config.
  */
 #ifdef CONFIG_CMA_AREAS
+/* JYW: 配置文件默认位 1 + 7 = 8个 */
 #define MAX_CMA_AREAS	(1 + CONFIG_CMA_AREAS)
 
 #else

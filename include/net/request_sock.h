@@ -92,6 +92,7 @@ extern int sysctl_max_syn_backlog;
  *
  * @max_qlen_log - log_2 of maximal queued SYNs/REQUESTs
  */
+/* JYW: 保存处于SYN_RECV状态的传输控制块 */
 struct listen_sock {
 	u8			max_qlen_log;
 	u8			synflood_warned;
@@ -101,6 +102,8 @@ struct listen_sock {
 	int			clock_hand;
 	u32			hash_rnd;
 	u32			nr_table_entries;
+    /* JYW: 这里syn_table的大小将会影响同时存在SYN_RECV状态的半连接的数量 */
+    /* JYW: 需要跟踪SYSCALL_DEFINE2(listen, int, fd, int, backlog)确认数值的限制 */
 	struct request_sock	*syn_table[0];
 };
 
@@ -149,11 +152,14 @@ struct fastopen_queue {
  * are always protected from the main sock lock.
  */
 struct request_sock_queue {
+    /* JYW: 保存已完成三次握手的传输控制块 */
 	struct request_sock	*rskq_accept_head;
+    /* JYW: 保存已完成三次握手的传输控制块 */
 	struct request_sock	*rskq_accept_tail;
 	rwlock_t		syn_wait_lock;
 	u8			rskq_defer_accept;
 	/* 3 bytes hole, try to pack */
+    /* JYW: 保存处于SYN_RECV状态的传输控制块 */
 	struct listen_sock	*listen_opt;
 	struct fastopen_queue	*fastopenq; /* This is non-NULL iff TFO has been
 					     * enabled on this listener. Check

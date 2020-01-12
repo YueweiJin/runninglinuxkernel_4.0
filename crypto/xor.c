@@ -25,8 +25,10 @@
 #include <asm/xor.h>
 
 /* The xor routines to use.  */
+/* JYW: 当前在用的xor算法 */
 static struct xor_block_template *active_template;
 
+/* JYW: 使用当前xor引擎完成xor计算 */
 void
 xor_blocks(unsigned int src_count, unsigned int bytes, void *dest, void **srcs)
 {
@@ -60,6 +62,7 @@ static struct xor_block_template *__initdata template_list;
 
 #define BENCH_SIZE (PAGE_SIZE)
 
+/* JYW: 计算xor速度 */
 static void __init
 do_xor_speed(struct xor_block_template *tmpl, void *b1, void *b2)
 {

@@ -30,9 +30,11 @@
 
 struct sk_buff;
 
+/* JYW: 包含了邻居相关信息，实现路由缓存与邻居子系统的关联 */
 struct dst_entry {
 	struct rcu_head		rcu_head;
 	struct dst_entry	*child;
+	/* JYW: 指向网络接口 */
 	struct net_device       *dev;
 	struct  dst_ops	        *ops;
 	unsigned long		_metrics;
@@ -44,7 +46,17 @@ struct dst_entry {
 #else
 	void			*__pad1;
 #endif
+	/* JYW: 对应ip层的输入和输出函数 */
+
+	/* JYW:
+	 * 本地接收：ip_local_deliver
+	 * 转发包：ip_forward
+	 */
 	int			(*input)(struct sk_buff *);
+	/* JYW:
+	 * 本地发送包：
+	 * 转发包：ip_output
+	 */
 	int			(*output)(struct sock *sk, struct sk_buff *skb);
 
 	unsigned short		flags;
@@ -60,6 +72,7 @@ struct dst_entry {
 
 	unsigned short		pending_confirm;
 
+	/* JYW: 当fib_lookup失败时，错误值被保存在error（用一个正值) */
 	short			error;
 
 	/* A non-zero value of dst->obsolete forces by-hand validation
@@ -96,6 +109,7 @@ struct dst_entry {
 	 */
 	atomic_t		__refcnt;	/* client references	*/
 	int			__use;
+	/* JYW: 该表项已经被使用的次数（即缓存查找返回该表项的次数） */
 	unsigned long		lastuse;
 	union {
 		struct dst_entry	*next;

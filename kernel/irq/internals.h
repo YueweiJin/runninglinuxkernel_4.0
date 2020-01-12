@@ -9,6 +9,7 @@
 #include <linux/kernel_stat.h>
 
 #ifdef CONFIG_SPARSE_IRQ
+/* JYW: Linux使用位图来管理所有的中断号 */
 # define IRQ_BITMAP_BITS	(NR_IRQS + 8196)
 #else
 # define IRQ_BITMAP_BITS	NR_IRQS

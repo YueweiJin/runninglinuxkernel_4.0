@@ -38,13 +38,17 @@ struct netns_ipv4 {
 #ifdef CONFIG_IP_MULTIPLE_TABLES
 	struct fib_rules_ops	*rules_ops;
 	bool			fib_has_custom_rules;
+	/* JYW: 指向local路由表 */
 	struct fib_table	*fib_local;
+	/* JYW: 指向main路由表 */
 	struct fib_table	*fib_main;
+	/* JYW: 指向默认路由表 */
 	struct fib_table	*fib_default;
 #endif
 #ifdef CONFIG_IP_ROUTE_CLASSID
 	int			fib_num_tclassid_users;
 #endif
+	/* JYW: 存放路由表的哈希数组，哈希数组的索引是路由表的id */
 	struct hlist_head	*fib_table_hash;
 	struct sock		*fibnl;
 

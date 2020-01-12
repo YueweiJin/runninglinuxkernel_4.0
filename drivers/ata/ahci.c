@@ -107,6 +107,7 @@ static struct ata_port_operations ahci_p5wdh_ops = {
 	.hardreset		= ahci_p5wdh_hardreset,
 };
 
+/* JYW: ahci端口信息结构体 */
 static const struct ata_port_info ahci_port_info[] = {
 	/* by features */
 	[board_ahci] = {
@@ -506,7 +507,7 @@ static const struct pci_device_id ahci_pci_tbl[] = {
 	{ }	/* terminate list */
 };
 
-
+/* JYW: ahci PCIE驱动 */
 static struct pci_driver ahci_pci_driver = {
 	.name			= DRV_NAME,
 	.id_table		= ahci_pci_tbl,
@@ -1249,6 +1250,7 @@ intx:
 	return 0;
 }
 
+/* JYW: PCIE AHCI驱动初始化入口 */
 static int ahci_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	unsigned int board_id = ent->driver_data;
@@ -1411,7 +1413,7 @@ static int ahci_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	n_ports = max(ahci_nr_ports(hpriv->cap), fls(hpriv->port_map));
 
 	ahci_init_interrupts(pdev, n_ports, hpriv);
-
+    /* JYW: 分配ata_host并初始化ata_port_info，传入host对应的端口个数 */
 	host = ata_host_alloc_pinfo(&pdev->dev, ppi, n_ports);
 	if (!host)
 		return -ENOMEM;
@@ -1462,6 +1464,7 @@ static int ahci_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	pci_set_master(pdev);
 
+    /* JYW: 激活AHCI控制器 */
 	return ahci_host_activate(host, pdev->irq, &ahci_sht);
 }
 

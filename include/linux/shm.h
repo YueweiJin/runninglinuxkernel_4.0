@@ -6,6 +6,7 @@
 #include <uapi/linux/shm.h>
 #include <asm/shmparam.h>
 
+/* JYW: 共享内存内核对象 */
 struct shmid_kernel /* private to the kernel */
 {	
 	struct kern_ipc_perm	shm_perm;

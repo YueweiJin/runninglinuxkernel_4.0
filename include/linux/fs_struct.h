@@ -11,6 +11,7 @@ struct fs_struct {
 	seqcount_t seq;
 	int umask;
 	int in_exec;
+	/* JYW: 本进程的根目录，进程当前所在的目录 */
 	struct path root, pwd;
 };
 

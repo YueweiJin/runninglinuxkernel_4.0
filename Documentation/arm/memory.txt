@@ -1,3 +1,5 @@
+		/* JYW: arm linux ÄÚ´æ²¼¾ÖÍ¼ */
+		
 		Kernel Memory Layout on ARM Linux
 
 		Russell King <rmk@arm.linux.org.uk>

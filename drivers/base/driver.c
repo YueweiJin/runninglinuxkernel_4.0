@@ -144,6 +144,7 @@ void driver_remove_groups(struct device_driver *drv,
  * since most of the things we have to do deal with the bus
  * structures.
  */
+ /* JYW: 驱动注册，最主要是调用bus_add_driver */ 
 int driver_register(struct device_driver *drv)
 {
 	int ret;
@@ -151,22 +152,27 @@ int driver_register(struct device_driver *drv)
 
 	BUG_ON(!drv->bus->p);
 
+    /* JYW: 不允许同时存在 */
 	if ((drv->bus->probe && drv->probe) ||
 	    (drv->bus->remove && drv->remove) ||
 	    (drv->bus->shutdown && drv->shutdown))
 		printk(KERN_WARNING "Driver '%s' needs updating - please use "
 			"bus_type methods\n", drv->name);
 
+    /* JYW: 用驱动名字来搜索在该总线上驱动是否已经存在 */
 	other = driver_find(drv->name, drv->bus);
+    /* JYW: 存在则报错 */
 	if (other) {
 		printk(KERN_ERR "Error: Driver '%s' is already registered, "
 			"aborting...\n", drv->name);
 		return -EBUSY;
 	}
 
+    /* JYW: 将驱动添加到一个总线中 */
 	ret = bus_add_driver(drv);
 	if (ret)
 		return ret;
+    /* JYW: 建立属性组文件 */
 	ret = driver_add_groups(drv, drv->groups);
 	if (ret) {
 		bus_remove_driver(drv);
@@ -209,6 +215,10 @@ EXPORT_SYMBOL_GPL(driver_unregister);
  */
 struct device_driver *driver_find(const char *name, struct bus_type *bus)
 {
+    /* JYW: 传入的实参bus->p->drivers_kset，
+        它对应的就是/sys/bus/platform/下的drivers目录，
+        然后通过链表，它将搜索该目录下的所有文件，
+        来寻找是否有名为s3c2410-spi的文件 */
 	struct kobject *k = kset_find_obj(bus->p->drivers_kset, name);
 	struct driver_private *priv;
 

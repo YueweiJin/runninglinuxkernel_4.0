@@ -1,0 +1,43 @@
+内存初始化流程：
+start_kernel()
+	-> setup_arch()
+		-> setup_machine_fdt()
+			-> early_init_dt_scan_nodes()
+				-> early_init_dt_scan_memory()
+					-> early_init_dt_add_memory_arch()
+						-> memblock_add()			/* 添加内存 */
+		-> sanity_check_meminfo()						/* 确定高端内存的起始地址，用全局变量high_memory表示 */
+		-> paging_init()
+			-> map_lowmem() 						/* 完成低端内存的映射 */
+			-> bootmem_init()
+				-> zone_sizes_init()
+					-> free_area_init_node
+						-> free_area_init_core
+	-> build_all_zonelists()
+		-> build_all_zonelists()
+			-> build_all_zonelists_init()
+				-> __build_all_zonelists()
+					-> build_zonelists()
+						-> build_zonelists_node()
+	-> mm_init()
+		-> mem_init()
+			-> free_all_bootmem()
+				-> free_low_memory_core_early()
+
+
+分配物理页面流程：
+alloc_pages()
+	-> alloc_pages_node()
+		-> __alloc_pages()
+			-> __alloc_pages_nodemask()					/* 伙伴系统核心函数 */
+				-> get_page_from_freelist()
+					-> __rmqueue()
+						-> __rmqueue_smallest()			/* 从指定的迁移类型链表中获取内存 */
+						-> __rmqueue_fallback()			/*  若指定的迁移类型中没有充足的内存来分配，则按fallbacks
+											  *  顺序从其他迁移表中寻找
+	  										  */
+				-> __alloc_pages_slowpath()				/* 如果分配失败，则进入慢速分配操作 */	
+
+释放页面流程：
+__free_page()
+	-> 

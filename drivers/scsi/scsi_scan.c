@@ -407,6 +407,7 @@ static void scsi_target_reap_ref_put(struct scsi_target *starget)
  * The target is returned with an incremented reference, so the caller
  * is responsible for both reaping and doing a last put
  */
+/* JYW: 分配scsi_target结构体 */
 static struct scsi_target *scsi_alloc_target(struct device *parent,
 					     int channel, uint id)
 {
@@ -758,6 +759,7 @@ static int scsi_probe_lun(struct scsi_device *sdev, unsigned char *inq_result,
  *     SCSI_SCAN_NO_RESPONSE: could not allocate or setup a scsi_device
  *     SCSI_SCAN_LUN_PRESENT: a new scsi_device was allocated and initialized
  **/
+/* JYW: 分配并初始化一个scsi_device */
 static int scsi_add_lun(struct scsi_device *sdev, unsigned char *inq_result,
 		int *bflags, int async)
 {
@@ -1036,6 +1038,7 @@ static unsigned char *scsi_inq_str(unsigned char *buf, unsigned char *inq,
  *         attached at the LUN
  *     SCSI_SCAN_LUN_PRESENT: a new scsi_device was allocated and initialized
  **/
+/* JYW: 探测scsi lun */
 static int scsi_probe_and_add_lun(struct scsi_target *starget,
 				  u64 lun, int *bflagsp,
 				  struct scsi_device **sdevp, int rescan,
@@ -1147,6 +1150,7 @@ static int scsi_probe_and_add_lun(struct scsi_target *starget,
 		goto out_free_result;
 	}
 
+    /* JYW: 分配并初始化一个scsi_device */
 	res = scsi_add_lun(sdev, result, &bflags, shost->async_scan);
 	if (res == SCSI_SCAN_LUN_PRESENT) {
 		if (bflags & BLIST_KEY) {
@@ -1529,6 +1533,7 @@ struct scsi_device *__scsi_add_device(struct Scsi_Host *shost, uint channel,
 	if (strncmp(scsi_scan_type, "none", 4) == 0)
 		return ERR_PTR(-ENODEV);
 
+    /* JYW: 分配scsi_target结构体 */
 	starget = scsi_alloc_target(parent, channel, id);
 	if (!starget)
 		return ERR_PTR(-ENOMEM);
@@ -1539,6 +1544,7 @@ struct scsi_device *__scsi_add_device(struct Scsi_Host *shost, uint channel,
 		scsi_complete_async_scans();
 
 	if (scsi_host_scan_allowed(shost) && scsi_autopm_get_host(shost) == 0) {
+        /* JYW: 探测scsi lun */
 		scsi_probe_and_add_lun(starget, lun, NULL, &sdev, 1, hostdata);
 		scsi_autopm_put_host(shost);
 	}

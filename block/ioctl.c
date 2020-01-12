@@ -231,12 +231,14 @@ static int put_u64(unsigned long arg, u64 val)
 	return put_user(val, (u64 __user *)arg);
 }
 
+/*JYW: sd_ioctl */
 int __blkdev_driver_ioctl(struct block_device *bdev, fmode_t mode,
 			unsigned cmd, unsigned long arg)
 {
 	struct gendisk *disk = bdev->bd_disk;
 
 	if (disk->fops->ioctl)
+        /*JYW: sd_ioctl */
 		return disk->fops->ioctl(bdev, mode, cmd, arg);
 
 	return -ENOTTY;
@@ -271,6 +273,7 @@ static inline int is_unrecognized_ioctl(int ret)
 /*
  * always keep this in sync with compat_blkdev_ioctl()
  */
+/* JYW: 块设备ioctl接口 */
 int blkdev_ioctl(struct block_device *bdev, fmode_t mode, unsigned cmd,
 			unsigned long arg)
 {
@@ -423,6 +426,7 @@ int blkdev_ioctl(struct block_device *bdev, fmode_t mode, unsigned cmd,
 		ret = blk_trace_ioctl(bdev, cmd, (char __user *) arg);
 		break;
 	default:
+        /*JYW: sd_ioctl */
 		ret = __blkdev_driver_ioctl(bdev, mode, cmd, arg);
 	}
 	return ret;

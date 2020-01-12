@@ -739,6 +739,7 @@ static inline void ftrace_dump(enum ftrace_dump_mode oops_dump_mode) { }
  * This macro does strict typechecking of lo/hi to make sure they are of the
  * same type as val.  See the unnecessary pointer comparisons.
  */
+/* JYW: 限定范围 */
 #define clamp(val, lo, hi) min((typeof(val))max(val, lo), hi)
 
 /*
@@ -747,6 +748,7 @@ static inline void ftrace_dump(enum ftrace_dump_mode oops_dump_mode) { }
  *
  * Or not use min/max/clamp at all, of course.
  */
+/* JYW: 防止传入宏的参数产生副作用，比如min(++a,++b)  */
 #define min_t(type, x, y) ({			\
 	type __min1 = (x);			\
 	type __min2 = (y);			\

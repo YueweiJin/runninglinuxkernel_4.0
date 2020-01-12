@@ -276,7 +276,9 @@ enum rt_class_t {
 /* User defined values */
 	RT_TABLE_COMPAT=252,
 	RT_TABLE_DEFAULT=253,
+	/* JYW: 存放的路由类型是RTN_UNICAST的所有路由项，即网关或直接连接的路由 */
 	RT_TABLE_MAIN=254,
+	/* JYW: 其类型为RTN_LOCAL */
 	RT_TABLE_LOCAL=255,
 	RT_TABLE_MAX=0xFFFFFFFF
 };

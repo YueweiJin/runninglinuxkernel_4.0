@@ -223,6 +223,7 @@ void __delete_from_page_cache(struct page *page, void *shadow)
  * cache and locked.  It will never put the page into the free list, the caller
  * has a reference on the page.
  */
+/* JYW: 删除page */
 void delete_from_page_cache(struct page *page)
 {
 	struct address_space *mapping = page->mapping;
@@ -287,6 +288,7 @@ int __filemap_fdatawrite_range(struct address_space *mapping, loff_t start,
 	return ret;
 }
 
+/* JYW: 非阻塞刷新块设备脏数据 */
 static inline int __filemap_fdatawrite(struct address_space *mapping,
 	int sync_mode)
 {
@@ -313,6 +315,7 @@ EXPORT_SYMBOL(filemap_fdatawrite_range);
  * This is a mostly non-blocking flush.  Not suitable for data-integrity
  * purposes - I/O may not be started against all dirty pages.
  */
+/* JYW: 非阻塞刷新块设备脏数据 */
 int filemap_flush(struct address_space *mapping)
 {
 	return __filemap_fdatawrite(mapping, WB_SYNC_NONE);
@@ -1217,6 +1220,7 @@ export:
  *
  * find_get_pages() returns the number of pages which were found.
  */
+/* JYW: 在高速缓存中查找一组具有相邻索引的页 */
 unsigned find_get_pages(struct address_space *mapping, pgoff_t start,
 			    unsigned int nr_pages, struct page **pages)
 {
@@ -1360,6 +1364,7 @@ EXPORT_SYMBOL(find_get_pages_contig);
  * Like find_get_pages, except we only return pages which are tagged with
  * @tag.   We update @index to index the next page for the traversal.
  */
+/* JYW: 快速返回用tag参数标记的页，对快速找到一个索引节点的所有脏页是非常关键的 */
 unsigned find_get_pages_tag(struct address_space *mapping, pgoff_t *index,
 			int tag, unsigned int nr_pages, struct page **pages)
 {

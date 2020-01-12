@@ -257,6 +257,7 @@ long __mlock_vma_pages_range(struct vm_area_struct *vma,
 	 * We made sure addr is within a VMA, so the following will
 	 * not result in a stack expansion that recurses back here.
 	 */
+    /* JYW: 为进程地址空间分配物理内存并且建立映射关系 */
 	return __get_user_pages(current, mm, start, nr_pages, gup_flags,
 				NULL, NULL, nonblocking);
 }
@@ -667,6 +668,7 @@ static int do_mlock(unsigned long start, size_t len, int on)
  * flags. VMAs must be already marked with the desired vm_flags, and
  * mmap_sem must not be held.
  */
+/* JYW: 分配物理内存 */
 int __mm_populate(unsigned long start, unsigned long len, int ignore_errors)
 {
 	struct mm_struct *mm = current->mm;
@@ -687,6 +689,7 @@ int __mm_populate(unsigned long start, unsigned long len, int ignore_errors)
 		if (!locked) {
 			locked = 1;
 			down_read(&mm->mmap_sem);
+            /* JYW: 先找到对应的vma结构 */
 			vma = find_vma(mm, nstart);
 		} else if (nstart >= vma->vm_end)
 			vma = vma->vm_next;
@@ -751,6 +754,7 @@ SYSCALL_DEFINE2(mlock, unsigned long, start, size_t, len)
 
 	up_write(&current->mm->mmap_sem);
 	if (!error)
+        /* JYW: 分配物理内存 */
 		error = __mm_populate(start, len, 0);
 	return error;
 }

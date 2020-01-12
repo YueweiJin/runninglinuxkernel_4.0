@@ -54,6 +54,7 @@ module_param(dump_oops, int, 0600);
 MODULE_PARM_DESC(dump_oops,
 		"set to 1 to dump oopses, 0 to only dump panics (default 1)");
 
+/* JYW: mtdoops上下文 */
 static struct mtdoops_context {
 	struct kmsg_dumper dump;
 
@@ -321,6 +322,7 @@ static void mtdoops_do_dump(struct kmsg_dumper *dumper,
 	schedule_work(&cxt->work_write);
 }
 
+/* JYW: 添加mtd时调用 */
 static void mtdoops_notify_add(struct mtd_info *mtd)
 {
 	struct mtdoops_context *cxt = &oops_cxt;
@@ -333,16 +335,19 @@ static void mtdoops_notify_add(struct mtd_info *mtd)
 	if (mtd->index != cxt->mtd_index || cxt->mtd_index < 0)
 		return;
 
+    /* JYW: 保存oops信息的mtd大小必须大于等于两个擦除块 */
 	if (mtd->size < mtd->erasesize * 2) {
 		printk(KERN_ERR "mtdoops: MTD partition %d not big enough for mtdoops\n",
 		       mtd->index);
 		return;
 	}
+    /* JYW: record_size必须小于等于一个擦除块的大小 */
 	if (mtd->erasesize < record_size) {
 		printk(KERN_ERR "mtdoops: eraseblock size of MTD partition %d too small\n",
 		       mtd->index);
 		return;
 	}
+    /* JYW: 保存oops的mtd设备的大小不能超过8M */
 	if (mtd->size > MTDOOPS_MAX_MTD_SIZE) {
 		printk(KERN_ERR "mtdoops: mtd%d is too large (limit is %d MiB)\n",
 		       mtd->index, MTDOOPS_MAX_MTD_SIZE / 1024 / 1024);
@@ -359,6 +364,7 @@ static void mtdoops_notify_add(struct mtd_info *mtd)
 
 	cxt->dump.max_reason = KMSG_DUMP_OOPS;
 	cxt->dump.dump = mtdoops_do_dump;
+    /* JYW: 注册一个dumper */
 	err = kmsg_dump_register(&cxt->dump);
 	if (err) {
 		printk(KERN_ERR "mtdoops: registering kmsg dumper failed, error %d\n", err);

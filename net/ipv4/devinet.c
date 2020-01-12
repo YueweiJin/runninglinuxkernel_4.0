@@ -105,8 +105,10 @@ static const struct nla_policy ifa_ipv4_policy[IFA_MAX+1] = {
 #define IN4_ADDR_HSIZE_SHIFT	8
 #define IN4_ADDR_HSIZE		(1U << IN4_ADDR_HSIZE_SHIFT)
 
+/* JYW: 全局哈希数组链表，存放ip地址 */
 static struct hlist_head inet_addr_lst[IN4_ADDR_HSIZE];
 
+/* JYW: 计算ip地址哈希值 */
 static u32 inet_addr_hash(struct net *net, __be32 addr)
 {
 	u32 val = (__force u32) addr ^ net_hash_mix(net);
@@ -136,14 +138,18 @@ static void inet_hash_remove(struct in_ifaddr *ifa)
  *
  * If a caller uses devref=false, it should be protected by RCU, or RTNL
  */
+/* JYW: 根据源ip选择正确的网络接口 */
 struct net_device *__ip_dev_find(struct net *net, __be32 addr, bool devref)
 {
+	/* JYW: 计算ip地址哈希值 */
 	u32 hash = inet_addr_hash(net, addr);
 	struct net_device *result = NULL;
 	struct in_ifaddr *ifa;
 
 	rcu_read_lock();
+	/* JYW: 遍历所有的ifaddr结构 */
 	hlist_for_each_entry_rcu(ifa, &inet_addr_lst[hash], hash) {
+		/* JYW: 匹配正确的网络接口 */
 		if (ifa->ifa_local == addr) {
 			struct net_device *dev = ifa->ifa_dev->dev;
 

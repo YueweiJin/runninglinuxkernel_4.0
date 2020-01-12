@@ -224,6 +224,7 @@ int blk_verify_command(unsigned char *cmd, fmode_t has_write_perm)
 }
 EXPORT_SYMBOL(blk_verify_command);
 
+/* JYW: 根据sg_io_hdr填充request结构 */
 static int blk_fill_sghdr_rq(struct request_queue *q, struct request *rq,
 			     struct sg_io_hdr *hdr, fmode_t mode)
 {
@@ -283,6 +284,7 @@ static int blk_complete_sghdr_rq(struct request *rq, struct sg_io_hdr *hdr,
 	return ret;
 }
 
+/* JYW */
 static int sg_io(struct request_queue *q, struct gendisk *bd_disk,
 		struct sg_io_hdr *hdr, fmode_t mode)
 {
@@ -315,6 +317,7 @@ static int sg_io(struct request_queue *q, struct gendisk *bd_disk,
 		at_head = 1;
 
 	ret = -ENOMEM;
+    /* JYW: 申请一个request描述符 */
 	rq = blk_get_request(q, writing ? WRITE : READ, GFP_KERNEL);
 	if (IS_ERR(rq))
 		return PTR_ERR(rq);
@@ -327,10 +330,12 @@ static int sg_io(struct request_queue *q, struct gendisk *bd_disk,
 	}
 
 	ret = -EFAULT;
+    /* JYW: 根据sg_io_hdr填充request结构 */
 	if (blk_fill_sghdr_rq(q, rq, hdr, mode))
 		goto out_free_cdb;
 
 	ret = 0;
+    /* JYW: 将用户数据映射进请求的bio内 */
 	if (hdr->iovec_count) {
 		struct iov_iter i;
 		struct iovec *iov = NULL;
@@ -367,6 +372,7 @@ static int sg_io(struct request_queue *q, struct gendisk *bd_disk,
 	 * (if he doesn't check that is his problem).
 	 * N.B. a non-zero SCSI status is _not_ necessarily an error.
 	 */
+	/* JYW: 执行请求 */
 	blk_execute_rq(q, bd_disk, rq, at_head);
 
 	hdr->duration = jiffies_to_msecs(jiffies - start_time);
@@ -594,16 +600,18 @@ int scsi_cmd_ioctl(struct request_queue *q, struct gendisk *bd_disk, fmode_t mod
 		case SG_EMULATED_HOST:
 			err = sg_emulated_host(q, arg);
 			break;
+        /* JYW */
 		case SG_IO: {
 			struct sg_io_hdr hdr;
 
 			err = -EFAULT;
+            /* JYW: 获取应用层下发的参数 */
 			if (copy_from_user(&hdr, arg, sizeof(hdr)))
 				break;
 			err = sg_io(q, bd_disk, &hdr, mode);
 			if (err == -EFAULT)
 				break;
-
+            /* JYW: 将执行结果拷贝至用户态 */
 			if (copy_to_user(arg, &hdr, sizeof(hdr)))
 				err = -EFAULT;
 			break;

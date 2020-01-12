@@ -543,6 +543,7 @@ enum sw_activity {
 	BLINK_OFF,
 };
 
+/* JYW: ? */
 struct ata_taskfile {
 	unsigned long		flags;		/* ATA_TFLAG_xxx */
 	u8			protocol;	/* ATA_PROT_xxx */
@@ -598,6 +599,7 @@ struct ata_host {
 	void __iomem * const	*iomap;
 	unsigned int		n_ports;
 	unsigned int		n_tags;			/* nr of NCQ tags */
+    /* JYW: struct ahci_host_priv * */
 	void			*private_data;
 	struct ata_port_operations *ops;
 	unsigned long		flags;
@@ -609,19 +611,23 @@ struct ata_host {
 	struct ata_port		*ports[0];
 };
 
+/* JYW: ？ */
 struct ata_queued_cmd {
 	struct ata_port		*ap;
 	struct ata_device	*dev;
-
 	struct scsi_cmnd	*scsicmd;
+    /* JYW: scsi命令完成后的回调， scsi_done() */
 	void			(*scsidone)(struct scsi_cmnd *);
 
 	struct ata_taskfile	tf;
 	u8			cdb[ATAPI_CDB_LEN];
 
 	unsigned long		flags;		/* ATA_QCFLAG_xxx */
+    /* JYW: 对应命令槽序号 */
 	unsigned int		tag;
+    /* JYW: 合并后块数 */
 	unsigned int		n_elem;
+    /* JYW: 原始合并前块数 */
 	unsigned int		orig_n_elem;
 
 	int			dma_dir;
@@ -633,7 +639,7 @@ struct ata_queued_cmd {
 	unsigned int		curbytes;
 
 	struct scatterlist	sgent;
-
+    /* JYW: 分散聚合链表 */
 	struct scatterlist	*sg;
 
 	struct scatterlist	*cursg;
@@ -641,6 +647,7 @@ struct ata_queued_cmd {
 
 	unsigned int		err_mask;
 	struct ata_taskfile	result_tf;
+    /* JYW: ata命令完成后的回调函数， ata_scsi_qc_complete */
 	ata_qc_cb_t		complete_fn;
 
 	void			*private_data;
@@ -768,7 +775,9 @@ struct ata_acpi_gtm {
 } __packed;
 
 struct ata_link {
+    /* JYW: 所属ata端口，ata_link_init */
 	struct ata_port		*ap;
+    /* JYW: PMP端口号, ata_link_init */
 	int			pmp;		/* port multiplier port # */
 
 	struct device		tdev;
@@ -802,6 +811,7 @@ struct ata_port {
 	unsigned long		flags;	/* ATA_FLAG_xxx */
 	/* Flags that change dynamically, protected by ap->lock */
 	unsigned int		pflags; /* ATA_PFLAG_xxx */
+    /* JYW: 唯一的port编号 */
 	unsigned int		print_id; /* user visible unique port ID */
 	unsigned int            local_port_no; /* host local port num */
 	unsigned int		port_no; /* 0 based port no. inside the host */
@@ -830,8 +840,9 @@ struct ata_port {
 	unsigned int		sas_last_tag;	/* track next tag hw expects */
 
 	struct ata_link		link;		/* host default link */
+    /* JYW: 一般为空 */
 	struct ata_link		*slave_link;	/* see ata_slave_link_init() */
-
+    /* JYW: 下行端口的个数 */
 	int			nr_pmp_links;	/* nr of available PMP links */
 	struct ata_link		*pmp_link;	/* array of PMP links */
 	struct ata_link		*excl_link;	/* for PMP qc exclusion */
@@ -1378,6 +1389,7 @@ static inline bool sata_pmp_supported(struct ata_port *ap)
 	return ap->flags & ATA_FLAG_PMP;
 }
 
+/* JYW: 判断sata_port上是否挂了pmp芯片 */
 static inline bool sata_pmp_attached(struct ata_port *ap)
 {
 	return ap->nr_pmp_links != 0;
@@ -1660,6 +1672,7 @@ static inline unsigned int ata_qc_raw_nbytes(struct ata_queued_cmd *qc)
 	return qc->nbytes - min(qc->extrabytes, qc->nbytes);
 }
 
+/* JYW: 初始化一个ata_taskfile结构体 */
 static inline void ata_tf_init(struct ata_device *dev, struct ata_taskfile *tf)
 {
 	memset(tf, 0, sizeof(*tf));
@@ -1723,6 +1736,7 @@ static inline struct ata_port *ata_shost_to_port(struct Scsi_Host *host)
 	return *(struct ata_port **)&host->hostdata[0];
 }
 
+/* JYW: 检查设备是否就绪，1表示就绪 */
 static inline int ata_check_ready(u8 status)
 {
 	if (!(status & ATA_BUSY))

@@ -35,6 +35,7 @@
 
 #include "mtdcore.h"
 
+/* JYW: 链表头，用于管理所有的mtd转换操作符struct mtd_blktrans_ops，如mtdblock_tr */
 static LIST_HEAD(blktrans_majors);
 static DEFINE_MUTEX(blktrans_ref_mutex);
 
@@ -50,6 +51,7 @@ static void blktrans_dev_release(struct kref *kref)
 	kfree(dev);
 }
 
+/* JYW: 根据通用磁盘对象获取blk转换层设备 */
 static struct mtd_blktrans_dev *blktrans_dev_get(struct gendisk *disk)
 {
 	struct mtd_blktrans_dev *dev;
@@ -72,7 +74,10 @@ static void blktrans_dev_put(struct mtd_blktrans_dev *dev)
 	mutex_unlock(&blktrans_ref_mutex);
 }
 
-
+/*
+ * JYW: 处理每个mtd请求
+ * 		mtdblock: mtdblock_tr
+ */
 static int do_blktrans_request(struct mtd_blktrans_ops *tr,
 			       struct mtd_blktrans_dev *dev,
 			       struct request *req)
@@ -100,6 +105,7 @@ static int do_blktrans_request(struct mtd_blktrans_ops *tr,
 	switch(rq_data_dir(req)) {
 	case READ:
 		for (; nsect > 0; nsect--, block++, buf += tr->blksize)
+            /* JYW: mtdblock: mtdblock_readsect */
 			if (tr->readsect(dev, block, buf))
 				return -EIO;
 		rq_flush_dcache_pages(req);
@@ -110,6 +116,7 @@ static int do_blktrans_request(struct mtd_blktrans_ops *tr,
 
 		rq_flush_dcache_pages(req);
 		for (; nsect > 0; nsect--, block++, buf += tr->blksize)
+            /* JYW: mtdblock: mtdblock_writesect */
 			if (tr->writesect(dev, block, buf))
 				return -EIO;
 		return 0;
@@ -125,6 +132,7 @@ int mtd_blktrans_cease_background(struct mtd_blktrans_dev *dev)
 }
 EXPORT_SYMBOL_GPL(mtd_blktrans_cease_background);
 
+/* JYW: 被mtd_blktrans_request唤醒，直到处理完成每个mtd请求 */
 static void mtd_blktrans_work(struct work_struct *work)
 {
 	struct mtd_blktrans_dev *dev =
@@ -140,7 +148,11 @@ static void mtd_blktrans_work(struct work_struct *work)
 		int res;
 
 		dev->bg_stop = false;
+		/* JYW: 从请求队列中获取一个请求 */
 		if (!req && !(req = blk_fetch_request(rq))) {
+			/*
+			 * JYW: mtdblock: mtdblock_tr未实现，不走当前分支
+			 */
 			if (tr->background && !background_done) {
 				spin_unlock_irq(rq->queue_lock);
 				mutex_lock(&dev->lock);
@@ -160,6 +172,7 @@ static void mtd_blktrans_work(struct work_struct *work)
 		spin_unlock_irq(rq->queue_lock);
 
 		mutex_lock(&dev->lock);
+        	/* JYW: 处理每个mtd请求 */
 		res = do_blktrans_request(dev->tr, dev, req);
 		mutex_unlock(&dev->lock);
 
@@ -177,6 +190,7 @@ static void mtd_blktrans_work(struct work_struct *work)
 	spin_unlock_irq(rq->queue_lock);
 }
 
+/* JYW: 唤醒之前创建的请求处理线程 mtd_blktrans_work */
 static void mtd_blktrans_request(struct request_queue *rq)
 {
 	struct mtd_blktrans_dev *dev;
@@ -188,9 +202,11 @@ static void mtd_blktrans_request(struct request_queue *rq)
 		while ((req = blk_fetch_request(rq)) != NULL)
 			__blk_end_request_all(req, -ENODEV);
 	else
+		/* JYW: mtd_blktrans_work */
 		queue_work(dev->wq, &dev->work);
 }
 
+/* JYW: blk转换层的open方法 */
 static int blktrans_open(struct block_device *bdev, fmode_t mode)
 {
 	struct mtd_blktrans_dev *dev = blktrans_dev_get(bdev->bd_disk);
@@ -210,6 +226,7 @@ static int blktrans_open(struct block_device *bdev, fmode_t mode)
 	if (!dev->mtd)
 		goto unlock;
 
+	/* JYW:  mtdblock: mtdblock_tr->mtdblock_open */
 	if (dev->tr->open) {
 		ret = dev->tr->open(dev);
 		if (ret)
@@ -283,9 +300,11 @@ unlock:
 	return ret;
 }
 
+/* JYW: blk转换层的ioctl方法 */
 static int blktrans_ioctl(struct block_device *bdev, fmode_t mode,
 			      unsigned int cmd, unsigned long arg)
 {
+	/* JYW: 根据通用磁盘对象获取blk转换层设备 */
 	struct mtd_blktrans_dev *dev = blktrans_dev_get(bdev->bd_disk);
 	int ret = -ENXIO;
 
@@ -299,6 +318,7 @@ static int blktrans_ioctl(struct block_device *bdev, fmode_t mode,
 
 	switch (cmd) {
 	case BLKFLSBUF:
+		/* JYW: mtdblock, mtdblock_flush */
 		ret = dev->tr->flush ? dev->tr->flush(dev) : 0;
 		break;
 	default:
@@ -310,6 +330,7 @@ unlock:
 	return ret;
 }
 
+/* JYW: block设备操作方法 */
 static const struct block_device_operations mtd_block_ops = {
 	.owner		= THIS_MODULE,
 	.open		= blktrans_open,
@@ -318,6 +339,7 @@ static const struct block_device_operations mtd_block_ops = {
 	.getgeo		= blktrans_getgeo,
 };
 
+/* JYW: 添加mtd转换层设备 */
 int add_mtd_blktrans_dev(struct mtd_blktrans_dev *new)
 {
 	struct mtd_blktrans_ops *tr = new->tr;
@@ -438,6 +460,7 @@ int add_mtd_blktrans_dev(struct mtd_blktrans_dev *new)
 	if (new->readonly)
 		set_disk_ro(gd, 1);
 
+	/* JYW: 向block层添加块设备主要发生在下面函数add_disk中 */
 	add_disk(gd);
 
 	if (new->disk_attributes) {
@@ -516,6 +539,7 @@ static void blktrans_notify_add(struct mtd_info *mtd)
 		return;
 
 	list_for_each_entry(tr, &blktrans_majors, list)
+		/* JYW: mtdblock_add_mtd */
 		tr->add_mtd(tr, mtd);
 }
 
@@ -524,6 +548,7 @@ static struct mtd_notifier blktrans_notifier = {
 	.remove = blktrans_notify_remove,
 };
 
+/* JYW: 注册mtd转换层 */
 int register_mtd_blktrans(struct mtd_blktrans_ops *tr)
 {
 	struct mtd_info *mtd;
@@ -538,6 +563,9 @@ int register_mtd_blktrans(struct mtd_blktrans_ops *tr)
 
 	mutex_lock(&mtd_table_mutex);
 
+       /*
+	* JYW: mtdblock_tr: 注册了一个major为31的mtd块设备
+	*/
 	ret = register_blkdev(tr->major, tr->name);
 	if (ret < 0) {
 		printk(KERN_WARNING "Unable to register %s block device on major %d: %d\n",
@@ -554,8 +582,10 @@ int register_mtd_blktrans(struct mtd_blktrans_ops *tr)
 	INIT_LIST_HEAD(&tr->devs);
 	list_add(&tr->list, &blktrans_majors);
 
+	/* JYW: 遍历每个mtd设备 */
 	mtd_for_each_device(mtd)
 		if (mtd->type != MTD_ABSENT)
+            		/* JYW: mtdblock_tr: mtdblock_add_mtd,将mtd硬件设备抽象成mtd block设备 */
 			tr->add_mtd(tr, mtd);
 
 	mutex_unlock(&mtd_table_mutex);

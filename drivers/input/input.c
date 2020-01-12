@@ -139,6 +139,7 @@ static void input_pass_values(struct input_dev *dev,
 
 	rcu_read_lock();
 
+    /* JYW: 获取该设备的handle */
 	handle = rcu_dereference(dev->grab);
 	if (handle) {
 		count = input_to_handler(handle, vals, count);
@@ -168,6 +169,8 @@ static void input_pass_values(struct input_dev *dev,
 	}
 }
 
+/* JYW: 当有数据上传时，数据通过input_pass_event()函数向handle发送 */
+/* JYW: 核心内容: 根据input_dev设备的h_list链表查找与他相关的handle, 然后调用event(evdev: evdev_event)处理方法，将数据传递给上层的client */
 static void input_pass_event(struct input_dev *dev,
 			     unsigned int type, unsigned int code, int value)
 {
@@ -181,6 +184,7 @@ static void input_pass_event(struct input_dev *dev,
  * dev->event_lock here to avoid racing with input_event
  * which may cause keys get "stuck".
  */
+/* JYW: 产生自动重复事件 */
 static void input_repeat_key(unsigned long data)
 {
 	struct input_dev *dev = (void *) data;
@@ -206,10 +210,11 @@ static void input_repeat_key(unsigned long data)
 }
 
 #define INPUT_IGNORE_EVENT	0
-#define INPUT_PASS_TO_HANDLERS	1
-#define INPUT_PASS_TO_DEVICE	2
+#define INPUT_PASS_TO_HANDLERS	1           /* JYW: 该事件需要handler来处理 */
+#define INPUT_PASS_TO_DEVICE	2           /* JYW: 该事件需要input设备来处理 */
 #define INPUT_SLOT		4
 #define INPUT_FLUSH		8
+/* JYW: handler和input 设备都需要参与 */
 #define INPUT_PASS_TO_ALL	(INPUT_PASS_TO_HANDLERS | INPUT_PASS_TO_DEVICE)
 
 static int input_handle_abs_event(struct input_dev *dev,
@@ -268,9 +273,11 @@ static int input_get_disposition(struct input_dev *dev,
 	int disposition = INPUT_IGNORE_EVENT;
 	int value = *pval;
 
+    /* JYW: 首先判断事件的类型 */
 	switch (type) {
-
+    /* JYW: 如果是同步事件 */
 	case EV_SYN:
+        /* JYW: 再判断同步事件的类型 */
 		switch (code) {
 		case SYN_CONFIG:
 			disposition = INPUT_PASS_TO_ALL;
@@ -284,8 +291,9 @@ static int input_get_disposition(struct input_dev *dev,
 			break;
 		}
 		break;
-
+    /* JYW: 如果是按键事件 */
 	case EV_KEY:
+        /* JYW: 若该设备是支持当前的按键类型 */
 		if (is_event_supported(code, dev->keybit, KEY_MAX)) {
 
 			/* auto-repeat bypasses state updates */
@@ -426,11 +434,13 @@ static void input_handle_event(struct input_dev *dev,
  * to 'seed' initial state of a switch or initial position of absolute
  * axis, etc.
  */
+/* JYW: 报告一个输入事件 */
 void input_event(struct input_dev *dev,
 		 unsigned int type, unsigned int code, int value)
 {
 	unsigned long flags;
 
+    /* JYW: 判断设备是否支持这类事件 */
 	if (is_event_supported(type, dev->evbit, EV_MAX)) {
 
 		spin_lock_irqsave(&dev->event_lock, flags);
@@ -931,11 +941,13 @@ int input_set_keycode(struct input_dev *dev,
 }
 EXPORT_SYMBOL(input_set_keycode);
 
+/* JYW: 检查input设备能否和注册的handler匹配, 匹配返回1 */
 static const struct input_device_id *input_match_device(struct input_handler *handler,
 							struct input_dev *dev)
 {
 	const struct input_device_id *id;
 
+    /* JYW: 检查设备的ID表和handler的ID表是否相同 */
 	for (id = handler->id_table; id->flags || id->driver_info; id++) {
 
 		if (id->flags & INPUT_DEVICE_ID_MATCH_BUS)
@@ -954,6 +966,7 @@ static const struct input_device_id *input_match_device(struct input_handler *ha
 			if (id->version != dev->id.version)
 				continue;
 
+        /* JYW: 逐一检查事件类型是否匹配 */
 		if (!bitmap_subset(id->evbit, dev->evbit, EV_MAX))
 			continue;
 
@@ -981,6 +994,7 @@ static const struct input_device_id *input_match_device(struct input_handler *ha
 		if (!bitmap_subset(id->swbit, dev->swbit, SW_MAX))
 			continue;
 
+        /* JYW: 最后调用驱动自定义的匹配函数 */
 		if (!handler->match || handler->match(handler, dev))
 			return id;
 	}
@@ -988,15 +1002,19 @@ static const struct input_device_id *input_match_device(struct input_handler *ha
 	return NULL;
 }
 
+/* JYW: 尝试将驱动程序绑定到input设备上 */
 static int input_attach_handler(struct input_dev *dev, struct input_handler *handler)
 {
 	const struct input_device_id *id;
 	int error;
 
+    /* JYW: 检查input设备能否和注册的handler匹配 */
 	id = input_match_device(handler, dev);
 	if (!id)
 		return -ENODEV;
 
+    /* JYW: 如果handler和设备匹配，调用handler提供的connect函数和设备建立连接 */
+    /* JYW: 对于edev驱动，调用evdev_connect */
 	error = handler->connect(handler, dev, id);
 	if (error && error != -ENODEV)
 		pr_err("failed to attach handler %s to device %s, error: %d\n",
@@ -1223,6 +1241,7 @@ static void *input_handlers_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 	return seq_list_next(v, &input_handler_list, pos);
 }
 
+/* JYW: cat /proc/bus/input/handler */
 static int input_handlers_seq_show(struct seq_file *seq, void *v)
 {
 	struct input_handler *handler = container_of(v, struct input_handler, node);
@@ -1258,19 +1277,23 @@ static const struct file_operations input_handlers_fileops = {
 	.release	= seq_release,
 };
 
+/* JYW: 在proc下创建input相关的文件 */
 static int __init input_proc_init(void)
 {
 	struct proc_dir_entry *entry;
 
+    /* JYW: 创建/proc/bus/input目录 */
 	proc_bus_input_dir = proc_mkdir("bus/input", NULL);
 	if (!proc_bus_input_dir)
 		return -ENOMEM;
 
+    /* JYW: 在/proc/bus/input下创建devices项 */
 	entry = proc_create("devices", 0, proc_bus_input_dir,
 			    &input_devices_fileops);
 	if (!entry)
 		goto fail1;
 
+    /* JYW: 在/proc/bus/input下创建handlers项 */
 	entry = proc_create("handlers", 0, proc_bus_input_dir,
 			    &input_handlers_fileops);
 	if (!entry)
@@ -1779,6 +1802,7 @@ EXPORT_SYMBOL_GPL(input_class);
  * registered; input_unregister_device() should be used for already
  * registered devices.
  */
+/* JYW: 分配一个输入设备 */
 struct input_dev *input_allocate_device(void)
 {
 	static atomic_t input_no = ATOMIC_INIT(-1);
@@ -1960,6 +1984,7 @@ void input_set_capability(struct input_dev *dev, unsigned int type, unsigned int
 }
 EXPORT_SYMBOL(input_set_capability);
 
+/* JYW: 估算设备产生的每个包的事件数 */
 static unsigned int input_estimate_events_per_packet(struct input_dev *dev)
 {
 	int mt_slots;
@@ -2077,6 +2102,7 @@ static void devm_input_device_unregister(struct device *dev, void *res)
  * happen later, when devres stack is unwound to the point where device
  * allocation was made.
  */
+/* JYW: 注册一个输入设备，设备需要通过input_allocate_device()分配得到，并提前注册了相应的能力 */
 int input_register_device(struct input_dev *dev)
 {
 	struct input_devres *devres = NULL;
@@ -2103,10 +2129,12 @@ int input_register_device(struct input_dev *dev)
 	/* Make sure that bitmasks not mentioned in dev->evbit are clean. */
 	input_cleanse_bitmasks(dev);
 
+    /* JYW: 估算设备产生的每个包的事件数 */
 	packet_size = input_estimate_events_per_packet(dev);
 	if (dev->hint_events_per_packet < packet_size)
 		dev->hint_events_per_packet = packet_size;
 
+    /* JYW: 根据估算的结果，预分配数组空间 */
 	dev->max_vals = dev->hint_events_per_packet + 2;
 	dev->vals = kcalloc(dev->max_vals, sizeof(*dev->vals), GFP_KERNEL);
 	if (!dev->vals) {
@@ -2145,8 +2173,10 @@ int input_register_device(struct input_dev *dev)
 	if (error)
 		goto err_device_del;
 
+    /* JYW: 设备加入总的input设备链表，这样通过链表就可以遍历所有的input设备 */
 	list_add_tail(&dev->node, &input_dev_list);
 
+    /* JYW: 遍历所有的驱动，检查是否和设备匹配。若匹配则将驱动程序绑定到input设备上。 */
 	list_for_each_entry(handler, &input_handler_list, node)
 		input_attach_handler(dev, handler);
 
@@ -2206,6 +2236,7 @@ EXPORT_SYMBOL(input_unregister_device);
  * devices in the system and attaches it to all input devices that
  * are compatible with the handler.
  */
+/* JYW: 注册input设备的驱动 */
 int input_register_handler(struct input_handler *handler)
 {
 	struct input_dev *dev;
@@ -2219,6 +2250,7 @@ int input_register_handler(struct input_handler *handler)
 
 	list_add_tail(&handler->node, &input_handler_list);
 
+    /* JYW: 遍历所有注册的input设备，尝试将驱动程序绑定到input设备上 */
 	list_for_each_entry(dev, &input_dev_list, node)
 		input_attach_handler(dev, handler);
 
@@ -2411,20 +2443,24 @@ void input_free_minor(unsigned int minor)
 }
 EXPORT_SYMBOL(input_free_minor);
 
+/* JYW: 把input设备注册到系统 */
 static int __init input_init(void)
 {
 	int err;
 
+    /* JYW: 首先注册input类，所有input设备都属于这个类，所有input device所代表的目录都位于/dev/class/input下面 */
 	err = class_register(&input_class);
 	if (err) {
 		pr_err("unable to register input_dev class\n");
 		return err;
 	}
 
+    /* JYW: 在proc下创建input相关的文件 */
 	err = input_proc_init();
 	if (err)
 		goto fail1;
 
+    /* JYW: 注册一个字符设备 */
 	err = register_chrdev_region(MKDEV(INPUT_MAJOR, 0),
 				     INPUT_MAX_CHAR_DEVICES, "input");
 	if (err) {

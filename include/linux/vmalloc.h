@@ -33,6 +33,7 @@ struct vm_struct {
 	void			*addr;
 	unsigned long		size;
 	unsigned long		flags;
+    /* JYW: 指向page地址的指针数组，用于获取每个页面的物理地址 */
 	struct page		**pages;
 	unsigned int		nr_pages;
 	phys_addr_t		phys_addr;

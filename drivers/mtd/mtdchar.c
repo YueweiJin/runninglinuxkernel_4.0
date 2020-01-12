@@ -58,6 +58,16 @@ static loff_t mtdchar_lseek(struct file *file, loff_t offset, int orig)
 	return fixed_size_llseek(file, offset, orig, mfi->mtd->size);
 }
 
+/* JYW: MTD字符设备打开例程 */
+/*
+ * JYW:
+ *  90 char    Memory Technology Device (RAM, ROM, Flash)
+ *          0 = /dev/mtd0     First MTD (rw)        
+ *          1 = /dev/mtdr0    First MTD (ro)
+ *              ...      
+ *          30 = /dev/mtd15    16th MTD (rw)
+ *          31 = /dev/mtdr15   16th MTD (ro)
+ */
 static int mtdchar_open(struct inode *inode, struct file *file)
 {
 	int minor = iminor(inode);
@@ -69,10 +79,12 @@ static int mtdchar_open(struct inode *inode, struct file *file)
 	pr_debug("MTD_open\n");
 
 	/* You can't open the RO devices RW */
+    /* JYW: 不能以写的方式打开只读设备 */
 	if ((file->f_mode & FMODE_WRITE) && (minor & 1))
 		return -EACCES;
 
 	mutex_lock(&mtd_mutex);
+    /* JYW: 获取/dev/mtdN所对应的mtd结构 */
 	mtd = get_mtd_device(NULL, devnum);
 
 	if (IS_ERR(mtd)) {
@@ -160,12 +172,15 @@ static ssize_t mtdchar_read(struct file *file, char __user *buf, size_t count,
 
 	pr_debug("MTD_read\n");
 
+    /* JYW: 防止读越界 */
 	if (*ppos + count > mtd->size)
 		count = mtd->size - *ppos;
 
+    /* JYW: 若count为0，直接返回 */
 	if (!count)
 		return 0;
 
+    /* JYW: 分配足够的空间，具体的内存分配策略???? */
 	kbuf = mtd_kmalloc_up_to(mtd, &size);
 	if (!kbuf)
 		return -ENOMEM;
@@ -228,6 +243,7 @@ static ssize_t mtdchar_read(struct file *file, char __user *buf, size_t count,
 
 	}
 
+    /* JYW: 释放空间 */
 	kfree(kbuf);
 	return total_retlen;
 } /* mtdchar_read */
@@ -324,6 +340,7 @@ static ssize_t mtdchar_write(struct file *file, const char __user *buf, size_t c
     IOCTL calls for getting device parameters.
 
 ======================================================================*/
+/* JYW: 擦除完成后，mtd会调用erase->callback来唤醒进程 */
 static void mtdchar_erase_callback (struct erase_info *instr)
 {
 	wake_up((wait_queue_head_t *)instr->priv);
@@ -609,11 +626,12 @@ static int mtdchar_ioctl(struct file *file, u_int cmd, u_long arg)
 	}
 
 	switch (cmd) {
+    /* JYW: 获取擦除分区的数量 */
 	case MEMGETREGIONCOUNT:
 		if (copy_to_user(argp, &(mtd->numeraseregions), sizeof(int)))
 			return -EFAULT;
 		break;
-
+    /* JYW: 获取索引号对应的擦除分区信息 */
 	case MEMGETREGIONINFO:
 	{
 		uint32_t ur_idx;
@@ -635,7 +653,7 @@ static int mtdchar_ioctl(struct file *file, u_int cmd, u_long arg)
 
 		break;
 	}
-
+    /* JYW: 获取基本的MTD字符设备信息 */
 	case MEMGETINFO:
 		memset(&info, 0, sizeof(info));
 		info.type	= mtd->type;
@@ -649,15 +667,17 @@ static int mtdchar_ioctl(struct file *file, u_int cmd, u_long arg)
 		if (copy_to_user(argp, &info, sizeof(struct mtd_info_user)))
 			return -EFAULT;
 		break;
-
+    /* JYW: MTD片段擦除 */
 	case MEMERASE:
 	case MEMERASE64:
 	{
 		struct erase_info *erase;
 
+        /* JYW: 若不是以写模式打开，则没有权限操作 */
 		if(!(file->f_mode & FMODE_WRITE))
 			return -EPERM;
 
+        /* JYW: 分配并初始化一个erase_info结构体 */
 		erase=kzalloc(sizeof(struct erase_info),GFP_KERNEL);
 		if (!erase)
 			ret = -ENOMEM;
@@ -689,6 +709,7 @@ static int mtdchar_ioctl(struct file *file, u_int cmd, u_long arg)
 				erase->len = einfo32.length;
 			}
 			erase->mtd = mtd;
+            /* JYW: 擦除完成后，mtd会调用erase->callback来唤醒进程 */
 			erase->callback = mtdchar_erase_callback;
 			erase->priv = (unsigned long)&waitq;
 
@@ -701,13 +722,17 @@ static int mtdchar_ioctl(struct file *file, u_int cmd, u_long arg)
 			  wq_head is no longer there when the
 			  callback routine tries to wake us up.
 			*/
+			/* JYW: 由于FLASH的擦除时间有点长，所以程序中使用了系统调度 */
 			ret = mtd_erase(mtd, erase);
 			if (!ret) {
+                /* JYW: 设置进程状态，将当前进程加入等待队列，准备休眠 */
 				set_current_state(TASK_UNINTERRUPTIBLE);
 				add_wait_queue(&waitq, &wait);
+                /* JYW: 若擦除失败或者擦除操作还没完成，则让出CPU */
 				if (erase->state != MTD_ERASE_DONE &&
 				    erase->state != MTD_ERASE_FAILED)
 					schedule();
+                /* JYW: 当有信号中断或者擦除完成执行回调唤醒后，将当前进程移除于等待队列，设置进程状态为TASK_RUNNING */
 				remove_wait_queue(&waitq, &wait);
 				set_current_state(TASK_RUNNING);
 
@@ -717,7 +742,7 @@ static int mtdchar_ioctl(struct file *file, u_int cmd, u_long arg)
 		}
 		break;
 	}
-
+    /* JYW: 写MTD的OOB信息 */
 	case MEMWRITEOOB:
 	{
 		struct mtd_oob_buf buf;
@@ -731,7 +756,7 @@ static int mtdchar_ioctl(struct file *file, u_int cmd, u_long arg)
 				buf.ptr, &buf_user->length);
 		break;
 	}
-
+    /* JYW: 读MTD的OOB信息 */
 	case MEMREADOOB:
 	{
 		struct mtd_oob_buf buf;
@@ -780,7 +805,7 @@ static int mtdchar_ioctl(struct file *file, u_int cmd, u_long arg)
 		      (struct mtd_write_req __user *)arg);
 		break;
 	}
-
+    /* JYW: 上锁 */
 	case MEMLOCK:
 	{
 		struct erase_info_user einfo;
@@ -791,7 +816,7 @@ static int mtdchar_ioctl(struct file *file, u_int cmd, u_long arg)
 		ret = mtd_lock(mtd, einfo.start, einfo.length);
 		break;
 	}
-
+    /* JYW: 解锁 */
 	case MEMUNLOCK:
 	{
 		struct erase_info_user einfo;
@@ -802,7 +827,7 @@ static int mtdchar_ioctl(struct file *file, u_int cmd, u_long arg)
 		ret = mtd_unlock(mtd, einfo.start, einfo.length);
 		break;
 	}
-
+    /* JYW: 检查是否上锁 */
 	case MEMISLOCKED:
 	{
 		struct erase_info_user einfo;
@@ -815,6 +840,7 @@ static int mtdchar_ioctl(struct file *file, u_int cmd, u_long arg)
 	}
 
 	/* Legacy interface */
+    /* JYW: 获取OOB模式信息 */
 	case MEMGETOOBSEL:
 	{
 		struct nand_oobinfo oi;
@@ -834,7 +860,7 @@ static int mtdchar_ioctl(struct file *file, u_int cmd, u_long arg)
 			return -EFAULT;
 		break;
 	}
-
+    /* JYW: 检查某个擦除块是否是坏块 */
 	case MEMGETBADBLOCK:
 	{
 		loff_t offs;
@@ -844,7 +870,7 @@ static int mtdchar_ioctl(struct file *file, u_int cmd, u_long arg)
 		return mtd_block_isbad(mtd, offs);
 		break;
 	}
-
+    /* JYW: 标记某个擦除块是坏块 */
 	case MEMSETBADBLOCK:
 	{
 		loff_t offs;
@@ -854,7 +880,7 @@ static int mtdchar_ioctl(struct file *file, u_int cmd, u_long arg)
 		return mtd_block_markbad(mtd, offs);
 		break;
 	}
-
+    /* JYW: 设置OPT模式 */
 	case OTPSELECT:
 	{
 		int mode;
@@ -913,6 +939,7 @@ static int mtdchar_ioctl(struct file *file, u_int cmd, u_long arg)
 	}
 
 	/* This ioctl is being deprecated - it truncates the ECC layout */
+    /* JYW: 获取ECC状态 */
 	case ECCGETLAYOUT:
 	{
 		struct nand_ecclayout_user *usrlay;
@@ -931,7 +958,7 @@ static int mtdchar_ioctl(struct file *file, u_int cmd, u_long arg)
 		kfree(usrlay);
 		break;
 	}
-
+    /* JYW: 获取ECC状态 */
 	case ECCGETSTATS:
 	{
 		if (copy_to_user(argp, &mtd->ecc_stats,
@@ -939,7 +966,7 @@ static int mtdchar_ioctl(struct file *file, u_int cmd, u_long arg)
 			return -EFAULT;
 		break;
 	}
-
+    /* JYW: 设置读写模式 */
 	case MTDFILEMODE:
 	{
 		mfi->mode = 0;
@@ -1123,6 +1150,7 @@ static int mtdchar_mmap(struct file *file, struct vm_area_struct *vma)
 #endif
 }
 
+/* JYW: MTD字符设备操作集 */
 static const struct file_operations mtd_fops = {
 	.owner		= THIS_MODULE,
 	.llseek		= mtdchar_lseek,
@@ -1145,6 +1173,7 @@ int __init init_mtdchar(void)
 {
 	int ret;
 
+    /* JYW: 注册mtd字符设备 */
 	ret = __register_chrdev(MTD_CHAR_MAJOR, 0, 1 << MINORBITS,
 				   "mtd", &mtd_fops);
 	if (ret < 0) {

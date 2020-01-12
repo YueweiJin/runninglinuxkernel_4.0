@@ -18,6 +18,7 @@
 #include <asm/barrier.h>
 #include <asm/cmpxchg.h>
 
+/* JYW: 定义原子变量，并初始化 */
 #define ATOMIC_INIT(i)	{ (i) }
 
 #ifdef __KERNEL__
@@ -27,6 +28,7 @@
  * strex/ldrex monitor on some implementations. The reason we can use it for
  * atomic_set() is the clrex or dummy strex done on every exception return.
  */
+/* JYW: 返回原子变量的值 */
 #define atomic_read(v)	ACCESS_ONCE((v)->counter)
 #define atomic_set(v,i)	(((v)->counter) = (i))
 
@@ -80,6 +82,7 @@ static inline int atomic_##op##_return(int i, atomic_t *v)		\
 	return result;							\
 }
 
+/* JYW:原子比较并交换计数值。 */
 static inline int atomic_cmpxchg(atomic_t *ptr, int old, int new)
 {
 	int oldval;
@@ -199,11 +202,13 @@ ATOMIC_OPS(sub, -=, sub)
 #undef ATOMIC_OP
 
 #define atomic_xchg(v, new) (xchg(&((v)->counter), new))
-
+/* JYW: 原子变量加1 */
 #define atomic_inc(v)		atomic_add(1, v)
+/* JYW: 原子变量减1 */
 #define atomic_dec(v)		atomic_sub(1, v)
 
 #define atomic_inc_and_test(v)	(atomic_add_return(1, v) == 0)
+/* JYW: 自减后测试其值是否为0，为0返回真 */
 #define atomic_dec_and_test(v)	(atomic_sub_return(1, v) == 0)
 #define atomic_inc_return(v)    (atomic_add_return(1, v))
 #define atomic_dec_return(v)    (atomic_sub_return(1, v))

@@ -39,6 +39,7 @@ struct stmmac_tx_info {
 	bool map_as_page;
 };
 
+/* JYW: 描述一张STMMAC的网卡 */
 struct stmmac_priv {
 	/* Frequently used values are kept adjacent for cache effect */
 	struct dma_extended_desc *dma_etx ____cacheline_aligned_in_smp;

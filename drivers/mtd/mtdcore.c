@@ -57,6 +57,7 @@ static struct class mtd_class = {
 	.resume = mtd_cls_resume,
 };
 
+/* JYW: 用于管理所有的mtd_info对象 */
 static DEFINE_IDR(mtd_idr);
 
 /* These are exported solely for the purpose of mtd_blkdevs.c. You
@@ -377,7 +378,8 @@ static int mtd_reboot_notifier(struct notifier_block *n, unsigned long state,
  *	zero on success or 1 on failure, which currently will only happen
  *	if there is insufficient memory or a sysfs error.
  */
-
+/* JYW: 注册一个MTD设备 */
+/* JYW: 如果MTD设备只有一个分区，则使用该函数注册MTD分区 */
 int add_mtd_device(struct mtd_info *mtd)
 {
 	struct mtd_notifier *not;
@@ -388,11 +390,13 @@ int add_mtd_device(struct mtd_info *mtd)
 	BUG_ON(mtd->writesize == 0);
 	mutex_lock(&mtd_table_mutex);
 
+    /* JYW: 在mtd_idr树中分配一个ID号，并关联mtd对象 */
 	i = idr_alloc(&mtd_idr, mtd, 0, 0, GFP_KERNEL);
 	if (i < 0)
 		goto fail_locked;
-
+    /* JYW: 设备号 */
 	mtd->index = i;
+    /* JYW: 初始化使用计数为0 */
 	mtd->usecount = 0;
 
 	/* default value if not set by driver */
@@ -429,6 +433,7 @@ int add_mtd_device(struct mtd_info *mtd)
 	mtd->dev.devt = MTD_DEVT(i);
 	dev_set_name(&mtd->dev, "mtd%d", i);
 	dev_set_drvdata(&mtd->dev, mtd);
+    /* JYW: 注册MTD设备到系统 */
 	if (device_register(&mtd->dev) != 0)
 		goto fail_added;
 
@@ -438,6 +443,9 @@ int add_mtd_device(struct mtd_info *mtd)
 	pr_debug("mtd: Giving out device %d to %s\n", i, mtd->name);
 	/* No need to get a refcount on the module containing
 	   the notifier, since we hold the mtd_table_mutex */
+	/* JYW: 遍历的调用通知链mtd_notifiers中的所有注册函数 */
+    /* JYW: Mtd_blkdevs.c (z:\hi3536\trunk\kernel\drivers\mtd): register_mtd_user(&blktrans_notifier); */
+    /* JYW: 通知所有注册的用户，执行add事件 */
 	list_for_each_entry(not, &mtd_notifiers, list)
 		not->add(mtd);
 
@@ -465,7 +473,7 @@ fail_locked:
  *	Returns zero on success or 1 on failure, which currently will happen
  *	if the requested device does not appear to be present in the list.
  */
-
+/* => JYW: 注销一个MTD设备 */
 int del_mtd_device(struct mtd_info *mtd)
 {
 	int ret;
@@ -473,6 +481,7 @@ int del_mtd_device(struct mtd_info *mtd)
 
 	mutex_lock(&mtd_table_mutex);
 
+    /* JYW: 根据设备号查找设备 */
 	if (idr_find(&mtd_idr, mtd->index) != mtd) {
 		ret = -ENODEV;
 		goto out_error;
@@ -480,13 +489,16 @@ int del_mtd_device(struct mtd_info *mtd)
 
 	/* No need to get a refcount on the module containing
 		the notifier, since we hold the mtd_table_mutex */
+    /* JYW: 通知所有注册用户，执行remove操作 */
 	list_for_each_entry(not, &mtd_notifiers, list)
 		not->remove(mtd);
 
+    /* JYW: 若引用计数不为0，则说明还有用户在使用 */
 	if (mtd->usecount) {
 		printk(KERN_NOTICE "Removing MTD device #%d (%s) with use count %d\n",
 		       mtd->index, mtd->name, mtd->usecount);
 		ret = -EBUSY;
+    /* JYW: 若引用计数为0，则注销设备 */
 	} else {
 		device_unregister(&mtd->dev);
 
@@ -529,6 +541,9 @@ out_error:
  *
  * Returns zero in case of success and a negative error code in case of failure.
  */
+/* JYW: mtd_device_parse_register(mtd, NULL, NULL, hikmtd_nand_parts_128M
+        , ARRAY_SIZE(hikmtd_nand_parts_128M) */
+/* JYW: 解析分区并注册一个mtd设备 */
 int mtd_device_parse_register(struct mtd_info *mtd, const char * const *types,
 			      struct mtd_part_parser_data *parser_data,
 			      const struct mtd_partition *parts,
@@ -659,6 +674,7 @@ EXPORT_SYMBOL_GPL(unregister_mtd_user);
  *	both, return the num'th driver only if its address matches. Return
  *	error code if not.
  */
+/* JYW: 获得一个MTD设备 */
 struct mtd_info *get_mtd_device(struct mtd_info *mtd, int num)
 {
 	struct mtd_info *ret = NULL, *other;
@@ -666,6 +682,7 @@ struct mtd_info *get_mtd_device(struct mtd_info *mtd, int num)
 
 	mutex_lock(&mtd_table_mutex);
 
+    /* JYW: 若参数中没有指定设备号，则搜索遍历 */
 	if (num == -1) {
 		mtd_for_each_device(other) {
 			if (other == mtd) {
@@ -673,8 +690,11 @@ struct mtd_info *get_mtd_device(struct mtd_info *mtd, int num)
 				break;
 			}
 		}
+    /* JYW: 若指定了设备号，则从idr中查找 */
 	} else if (num >= 0) {
+	    /* JYW: 根据索引号，获得对应的mtd_info对象 */
 		ret = idr_find(&mtd_idr, num);
+        /* JYW: 若参数中指定了mtd地址，则必须匹配 */
 		if (mtd && mtd != ret)
 			ret = NULL;
 	}
@@ -693,7 +713,7 @@ out:
 }
 EXPORT_SYMBOL_GPL(get_mtd_device);
 
-
+/* JYW: 获得一个设备(增加引用计数等) */
 int __get_mtd_device(struct mtd_info *mtd)
 {
 	int err;
@@ -709,6 +729,7 @@ int __get_mtd_device(struct mtd_info *mtd)
 			return err;
 		}
 	}
+    /* JYW: 增加引用计数 */
 	mtd->usecount++;
 	return 0;
 }
@@ -752,6 +773,7 @@ out_unlock:
 }
 EXPORT_SYMBOL_GPL(get_mtd_device_nm);
 
+/* JYW: 归还（put）一个使用完的MTD设备, 设备层函数，通常在设备层的release函数中调用。 */
 void put_mtd_device(struct mtd_info *mtd)
 {
 	mutex_lock(&mtd_table_mutex);
@@ -780,18 +802,27 @@ EXPORT_SYMBOL_GPL(__put_mtd_device);
  * Callers are supposed to pass a callback function and wait for it
  * to be called before writing to the block.
  */
+/* JYW: MTD通用的擦除接口 */
 int mtd_erase(struct mtd_info *mtd, struct erase_info *instr)
 {
 	if (instr->addr >= mtd->size || instr->len > mtd->size - instr->addr)
 		return -EINVAL;
+    /* JYW: 必须确保该MTD分区是可写的 */
 	if (!(mtd->flags & MTD_WRITEABLE))
 		return -EROFS;
 	instr->fail_addr = MTD_FAIL_ADDR_UNKNOWN;
+    /* JYW: 若擦除的长度为0，则执行回调函数唤醒，然后退出 */
 	if (!instr->len) {
 		instr->state = MTD_ERASE_DONE;
 		mtd_erase_callback(instr);
 		return 0;
 	}
+    /* 
+     * JYW: 调用擦除函数，支持异步擦除
+     * 		HIFMC: mtd->_erase: hifmc100_reg_erase
+     * 		遗憾的是hifmc100_reg_erase没有利用好支持异步擦除的功能，
+     * 		而是直接同步等待擦除，这样会使用户空间阻塞,所以后续底层驱动最好使用中断通知
+     */
 	return mtd->_erase(mtd, instr);
 }
 EXPORT_SYMBOL_GPL(mtd_erase);
@@ -869,16 +900,21 @@ int mtd_read(struct mtd_info *mtd, loff_t from, size_t len, size_t *retlen,
 }
 EXPORT_SYMBOL_GPL(mtd_read);
 
+/* JYW: mtd写函数 */
 int mtd_write(struct mtd_info *mtd, loff_t to, size_t len, size_t *retlen,
 	      const u_char *buf)
 {
 	*retlen = 0;
+    /* JYW: 进行参数检查 */
 	if (to < 0 || to >= mtd->size || len > mtd->size - to)
 		return -EINVAL;
+    /* JYW: 若没有写方法或不可写，则返回 */
 	if (!mtd->_write || !(mtd->flags & MTD_WRITEABLE))
 		return -EROFS;
+    /* JYW: 若为0，则直接返回 */
 	if (!len)
 		return 0;
+    /* JYW: 执行硬件驱动层的写方法 */
 	return mtd->_write(mtd, to, len, retlen, buf);
 }
 EXPORT_SYMBOL_GPL(mtd_write);
@@ -906,6 +942,7 @@ int mtd_panic_write(struct mtd_info *mtd, loff_t to, size_t len, size_t *retlen,
 }
 EXPORT_SYMBOL_GPL(mtd_panic_write);
 
+/* JYW: MTD层通用的带OOB读接口 */
 int mtd_read_oob(struct mtd_info *mtd, loff_t from, struct mtd_oob_ops *ops)
 {
 	int ret_code;
@@ -918,6 +955,7 @@ int mtd_read_oob(struct mtd_info *mtd, loff_t from, struct mtd_oob_ops *ops)
 	 * representing max bitflips. In other cases, mtd->_read_oob() may
 	 * return -EUCLEAN. In all cases, perform similar logic to mtd_read().
 	 */
+	/* JYW: nand: mtd->_read_oob = nand_read_oob */
 	ret_code = mtd->_read_oob(mtd, from, ops);
 	if (unlikely(ret_code < 0))
 		return ret_code;
@@ -1057,6 +1095,7 @@ int mtd_block_isreserved(struct mtd_info *mtd, loff_t ofs)
 }
 EXPORT_SYMBOL_GPL(mtd_block_isreserved);
 
+/* JYW: MTD通用的坏块检测接口 */
 int mtd_block_isbad(struct mtd_info *mtd, loff_t ofs)
 {
 	if (ofs < 0 || ofs >= mtd->size)
@@ -1067,6 +1106,7 @@ int mtd_block_isbad(struct mtd_info *mtd, loff_t ofs)
 }
 EXPORT_SYMBOL_GPL(mtd_block_isbad);
 
+/* JYW: MTD通用的坏块标记接口 */
 int mtd_block_markbad(struct mtd_info *mtd, loff_t ofs)
 {
 	if (!mtd->_block_markbad)
@@ -1240,6 +1280,7 @@ static int __init init_mtd(void)
 {
 	int ret;
 
+    /* JYW: 首先注册mtd类 */
 	ret = class_register(&mtd_class);
 	if (ret)
 		goto err_reg;
@@ -1248,8 +1289,10 @@ static int __init init_mtd(void)
 	if (ret)
 		goto err_bdi;
 
+    /* JYW: 创建/proc/mtd接口 */
 	proc_mtd = proc_create("mtd", 0, NULL, &mtd_proc_ops);
 
+    /* JYW: 初始化mtd字符驱动 */
 	ret = init_mtdchar();
 	if (ret)
 		goto out_procfs;

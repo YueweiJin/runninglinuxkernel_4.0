@@ -98,6 +98,7 @@ unsigned long vm_dirty_bytes;
 /*
  * The interval between `kupdate'-style writebacks
  */
+/* JYW: 回写线程的循环周期，当然，循环的前提是块设备存在脏数据 */
 unsigned int dirty_writeback_interval = 5 * 100; /* centiseconds */
 
 EXPORT_SYMBOL_GPL(dirty_writeback_interval);
@@ -105,6 +106,7 @@ EXPORT_SYMBOL_GPL(dirty_writeback_interval);
 /*
  * The longest time for which data is allowed to remain dirty
  */
+/* JYW: 脏数据的超时时间，超过这个时间的脏数据将会马上放入回写队列 */
 unsigned int dirty_expire_interval = 30 * 100; /* centiseconds */
 
 /*

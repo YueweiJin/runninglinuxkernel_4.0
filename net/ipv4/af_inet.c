@@ -189,6 +189,7 @@ static int inet_autobind(struct sock *sk)
 /*
  *	Move a socket into listening state.
  */
+/* JYW: TCP listen流程 */
 int inet_listen(struct socket *sock, int backlog)
 {
 	struct sock *sk = sock->sk;

@@ -1151,6 +1151,7 @@ static inline bool sk_under_memory_pressure(const struct sock *sk)
 	return !!*sk->sk_prot->memory_pressure;
 }
 
+/* JYW: 小于sysctl_mem[0]离开内存压力区 */
 static inline void sk_leave_memory_pressure(struct sock *sk)
 {
 	int *memory_pressure = sk->sk_prot->memory_pressure;
@@ -1171,6 +1172,7 @@ static inline void sk_leave_memory_pressure(struct sock *sk)
 
 }
 
+/* JYW: 超过sysctl_mem[1]进入内存压力区 */
 static inline void sk_enter_memory_pressure(struct sock *sk)
 {
 	if (!sk->sk_prot->enter_memory_pressure)

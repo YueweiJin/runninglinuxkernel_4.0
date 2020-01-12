@@ -52,6 +52,7 @@ void nf_unregister_afinfo(const struct nf_afinfo *afinfo)
 }
 EXPORT_SYMBOL_GPL(nf_unregister_afinfo);
 
+/* JYW: 全局链表，支持32个协议(目前用了5个)，每个协议支持8个hook点 */
 struct list_head nf_hooks[NFPROTO_NUMPROTO][NF_MAX_HOOKS] __read_mostly;
 EXPORT_SYMBOL(nf_hooks);
 
@@ -62,6 +63,7 @@ EXPORT_SYMBOL(nf_hooks_needed);
 
 static DEFINE_MUTEX(nf_hook_mutex);
 
+/* JYW: 注册一个hook */
 int nf_register_hook(struct nf_hook_ops *reg)
 {
 	struct nf_hook_ops *elem;
@@ -71,6 +73,7 @@ int nf_register_hook(struct nf_hook_ops *reg)
 		if (reg->priority < elem->priority)
 			break;
 	}
+	/* JYW: 优先级高的hook挂在链表的前面*/
 	list_add_rcu(&reg->list, elem->list.prev);
 	mutex_unlock(&nf_hook_mutex);
 #ifdef HAVE_JUMP_LABEL
@@ -80,6 +83,7 @@ int nf_register_hook(struct nf_hook_ops *reg)
 }
 EXPORT_SYMBOL(nf_register_hook);
 
+/* JYW: 注销一个hook */
 void nf_unregister_hook(struct nf_hook_ops *reg)
 {
 	mutex_lock(&nf_hook_mutex);

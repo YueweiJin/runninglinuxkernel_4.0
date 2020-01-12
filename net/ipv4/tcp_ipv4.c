@@ -878,6 +878,14 @@ bool tcp_syn_flood_action(struct sock *sk,
 	lopt = inet_csk(sk)->icsk_accept_queue.listen_opt;
 	if (!lopt->synflood_warned && sysctl_tcp_syncookies != 2) {
 		lopt->synflood_warned = 1;
+        /*
+         * JYW: 经过上下文分析，要想增大并发syn值需要同时调整如下三个参数：
+         *      1、net.core.somaxconn
+         *      2、net.ipv4.tcp_max_syn_backlog
+         *      3、listen系统调用的backlog参数
+         *
+         *  listen系统调用的backlog参数不仅影响已完成三次握手等待accept的最大连接数，还影响SYN_RECV状态的链接数
+         */
 		pr_info("%s: Possible SYN flooding on port %d. %s.  Check SNMP counters.\n",
 			proto, ntohs(tcp_hdr(skb)->dest), msg);
 	}

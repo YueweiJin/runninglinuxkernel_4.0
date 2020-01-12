@@ -311,7 +311,9 @@ static const struct file_operations ptype_seq_fops = {
 	.release = seq_release_net,
 };
 
-
+/*
+ * JYW: 创建/proc/dev/ptype节点
+ */
 static int __net_init dev_proc_net_init(struct net *net)
 {
 	int rc = -ENOMEM;

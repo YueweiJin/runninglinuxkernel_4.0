@@ -3,7 +3,9 @@
 
 #include <asm/kmap_types.h>
 
+/* JYW: PAGE_OFFSET下面2MB */
 #define PKMAP_BASE		(PAGE_OFFSET - PMD_SIZE)
+/* JYW: 总计2MB */
 #define LAST_PKMAP		PTRS_PER_PTE
 #define LAST_PKMAP_MASK		(LAST_PKMAP - 1)
 #define PKMAP_NR(virt)		(((virt) - PKMAP_BASE) >> PAGE_SHIFT)

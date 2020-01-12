@@ -732,15 +732,20 @@ static int __init early_mem(char *p)
 			memblock_end_of_DRAM() - memblock_start_of_DRAM());
 	}
 
+    /* JYW: 默认从内存起始地址开始 */
 	start = PHYS_OFFSET;
+    /* JYW: 解析size大小 */
 	size  = memparse(p, &endp);
+    /* JYW: 若后面带'@'表示重新定义start */
 	if (*endp == '@')
 		start = memparse(endp + 1, NULL);
 
+    /* JYW: 添加内存块 */
 	arm_add_memory(start, size);
 
 	return 0;
 }
+/* JYW: mem=size@start */
 early_param("mem", early_mem);
 
 static void __init request_standard_resources(const struct machine_desc *mdesc)
@@ -812,11 +817,13 @@ static int __init customize_machine(void)
 		machine_desc->init_machine();
 #ifdef CONFIG_OF
 	else
+		/* JYW: 根据设备树展开平台设备 */
 		of_platform_populate(NULL, of_default_bus_match_table,
 					NULL, NULL);
 #endif
 	return 0;
 }
+/* JYW: 枚举dtb中的设备 */
 arch_initcall(customize_machine);
 
 static int __init init_machine_late(void)
@@ -892,12 +899,18 @@ void __init hyp_mode_check(void)
 #endif
 }
 
+/* JYW: 设置架构相关 */
 void __init setup_arch(char **cmdline_p)
 {
 	const struct machine_desc *mdesc;
 
 	setup_processor();
+	/* JYW: 查找和设备树匹配的machine
+	 *      dtb若为arch/arm/boot/dts/vexpress-v2p-ca9.dts:
+	 * 	compatible = "arm,vexpress,v2p-ca9", "arm,vexpress"; 
+	 */
 	mdesc = setup_machine_fdt(__atags_pointer);
+    /* JYW: 若没有找到，则去解析tag */
 	if (!mdesc)
 		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
 	machine_desc = mdesc;
@@ -911,18 +924,27 @@ void __init setup_arch(char **cmdline_p)
 	init_mm.end_code   = (unsigned long) _etext;
 	init_mm.end_data   = (unsigned long) _edata;
 	init_mm.brk	   = (unsigned long) _end;
+	/* JYW: 打印vexpress-v2p-ca9的段信息 */
+	printk("JYW=> init_mm.start_code = %#lx\n", (unsigned long) _text);
+	printk("JYW=> init_mm.end_code = %#lx\n", (unsigned long) _etext);
+	printk("JYW=> init_mm.end_data = %#lx\n", (unsigned long)_edata);
+	printk("JYW=> init_mm.brk = %#lx\n", (unsigned long) _end);
 
 	/* populate cmd_line too for later use, preserving boot_command_line */
 	strlcpy(cmd_line, boot_command_line, COMMAND_LINE_SIZE);
 	*cmdline_p = cmd_line;
 
+    /* JYW: 解析early参数 */
 	parse_early_param();
 
 	early_paging_init(mdesc, lookup_processor_type(read_cpuid_id()));
 	setup_dma_zone(mdesc);
+	/* JYW: 检查meminfo，计算arm_lowmem_limit等 */
 	sanity_check_meminfo();
+    /* JYW: 内存块初始化 */
 	arm_memblock_init(mdesc);
 
+	/* JYW: 初始化页表，初始化zone memory映射等 */
 	paging_init(mdesc);
 	request_standard_resources(mdesc);
 

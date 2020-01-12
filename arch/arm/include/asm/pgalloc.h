@@ -80,6 +80,7 @@ static inline void clean_pte_table(pte_t *pte)
  *  |  h/w pt 1  |
  *  +------------+
  */
+/* JYW: 分配一张页表 */
 static inline pte_t *
 pte_alloc_one_kernel(struct mm_struct *mm, unsigned long addr)
 {
@@ -92,6 +93,7 @@ pte_alloc_one_kernel(struct mm_struct *mm, unsigned long addr)
 	return pte;
 }
 
+/* JYW: 分配一张页表 */
 static inline pgtable_t
 pte_alloc_one(struct mm_struct *mm, unsigned long addr)
 {
@@ -116,6 +118,7 @@ pte_alloc_one(struct mm_struct *mm, unsigned long addr)
 /*
  * Free one PTE table.
  */
+/* => JYW: 释放一张页表 (但是一张页表只有512*4B=2KB ?? ) */
 static inline void pte_free_kernel(struct mm_struct *mm, pte_t *pte)
 {
 	if (pte)
@@ -128,6 +131,7 @@ static inline void pte_free(struct mm_struct *mm, pgtable_t pte)
 	__free_page(pte);
 }
 
+/* JYW: 灏哖TE椤佃〃鐨勫熀鍦板潃鏀惧埌PMD椤佃〃椤逛腑 */
 static inline void __pmd_populate(pmd_t *pmdp, phys_addr_t pte,
 				  pmdval_t prot)
 {
@@ -145,6 +149,7 @@ static inline void __pmd_populate(pmd_t *pmdp, phys_addr_t pte,
  *
  * Ensure that we always set both PMD entries.
  */
+/* JYW: 将PTE页面表的基地址设置到内核PMD页目录表项中 */
 static inline void
 pmd_populate_kernel(struct mm_struct *mm, pmd_t *pmdp, pte_t *ptep)
 {
@@ -154,6 +159,7 @@ pmd_populate_kernel(struct mm_struct *mm, pmd_t *pmdp, pte_t *ptep)
 	__pmd_populate(pmdp, __pa(ptep), _PAGE_KERNEL_TABLE);
 }
 
+/* JYW: 将PTE页面表的基地址设置到用户PMD页目录表项中 */
 static inline void
 pmd_populate(struct mm_struct *mm, pmd_t *pmdp, pgtable_t ptep)
 {

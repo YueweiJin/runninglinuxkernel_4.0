@@ -183,6 +183,7 @@ void __init arm64_memblock_init(void)
 	memblock_dump_all();
 }
 
+/* JYW: 主要完成zone的初始化 */
 void __init bootmem_init(void)
 {
 	unsigned long min, max;
@@ -197,6 +198,7 @@ void __init bootmem_init(void)
 	arm64_memory_present();
 
 	sparse_init();
+	/* JYW: 内存zone的初始化 */
 	zone_sizes_init(min, max);
 
 	high_memory = __va((max << PAGE_SHIFT) - 1) + 1;
@@ -318,6 +320,7 @@ void __init mem_init(void)
 		  MLK(FIXADDR_START, FIXADDR_TOP),
 		  MLM(PCI_IO_START, PCI_IO_END),
 		  MLM(MODULES_VADDR, MODULES_END),
+		  /* JYW: 打印低端内存区域（虚拟地址区域） */
 		  MLM(PAGE_OFFSET, (unsigned long)high_memory),
 		  MLK_ROUNDUP(__init_begin, __init_end),
 		  MLK_ROUNDUP(_text, _etext),

@@ -275,6 +275,7 @@ void ata_tport_delete(struct ata_port *ap)
  *
  * Returns %0 on success
  */
+/* JYW:  向系统添加ATA port */
 int ata_tport_add(struct device *parent,
 		  struct ata_port *ap)
 {
@@ -286,6 +287,7 @@ int ata_tport_add(struct device *parent,
 
 	dev->parent = get_device(parent);
 	dev->release = ata_tport_release;
+    /* JYW: 将ata_port注册到系统 */
 	dev_set_name(dev, "ata%d", ap->print_id);
 	transport_setup_device(dev);
 	ata_acpi_bind_port(ap);
@@ -690,7 +692,7 @@ struct scsi_transport_template *ata_attach_transport(void)
 	i = kzalloc(sizeof(struct ata_internal), GFP_KERNEL);
 	if (!i)
 		return NULL;
-
+    /* JYW: 绑定ata scsi的错误处理线程 */
 	i->t.eh_strategy_handler	= ata_scsi_error;
 	i->t.eh_timed_out		= ata_scsi_timed_out;
 	i->t.user_scan			= ata_scsi_user_scan;

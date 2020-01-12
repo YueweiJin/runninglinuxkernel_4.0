@@ -73,16 +73,16 @@
  */
 enum pageflags {
 	PG_locked,		/* Page is locked. Don't touch. */
-	PG_error,
-	PG_referenced,
-	PG_uptodate,
-	PG_dirty,
-	PG_lru,
-	PG_active,
-	PG_slab,
+	PG_error,		/* JYW: 页面发生了IO错误 */
+	PG_referenced,		/* JYW: 用于实现LRU算法中的第二次机会法 */
+	PG_uptodate,		/* JYW: 页面内容是有效的，当该页面上的读操作完成后，设置该标志位 */
+	PG_dirty,		/* JYW: 表示页面内容有修改过，为脏页 */
+	PG_lru,			/* JYW: 表示页在LRU链表中 */
+	PG_active,		/* JYW: 表示页在活跃LRU链表中 */
+	PG_slab,		/* JYW: 表示页属于由slab分配器创建的slab */
 	PG_owner_priv_1,	/* Owner use. If pagecache, fs may use*/
-	PG_arch_1,
-	PG_reserved,
+	PG_arch_1,		/* JYW: 与体系结构相关的页面状态位 */
+	PG_reserved,		/* JYW: 表示该页面不可被换出 */
 	PG_private,		/* If pagecache, has fs-private data */
 	PG_private_2,		/* If pagecache, has fs aux data */
 	PG_writeback,		/* Page is under writeback */

@@ -472,6 +472,7 @@ void __init __weak thread_info_cache_init(void)
 /*
  * Set up kernel memory allocators
  */
+/* JYW: 内存分配器初始化 */
 static void __init mm_init(void)
 {
 	/*
@@ -480,12 +481,14 @@ static void __init mm_init(void)
 	 */
 	page_ext_init_flatmem();
 	mem_init();
+    /* JYW: slab初始化 */
 	kmem_cache_init();
 	percpu_init_late();
 	pgtable_init();
 	vmalloc_init();
 }
 
+/* JYW:内核启动时的第一个C语言入口 */
 asmlinkage __visible void __init start_kernel(void)
 {
 	char *command_line;
@@ -517,6 +520,7 @@ asmlinkage __visible void __init start_kernel(void)
 	boot_cpu_init();
 	page_address_init();
 	pr_notice("%s", linux_banner);
+	/* JYW: 设置架构相关 */
 	setup_arch(&command_line);
 	mm_init_cpumask(&init_mm);
 	setup_command_line(command_line);
@@ -524,6 +528,7 @@ asmlinkage __visible void __init start_kernel(void)
 	setup_per_cpu_areas();
 	smp_prepare_boot_cpu();	/* arch-specific boot-cpu hooks */
 
+	/* JYW: 初始化定义伙伴系统的分配顺序 */
 	build_all_zonelists(NULL, NULL);
 	page_alloc_init();
 
@@ -548,6 +553,7 @@ asmlinkage __visible void __init start_kernel(void)
 	vfs_caches_init_early();
 	sort_main_extable();
 	trap_init();
+	/* JYW: 内存相关初始化 */
 	mm_init();
 
 	/*

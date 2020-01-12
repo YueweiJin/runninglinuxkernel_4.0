@@ -209,6 +209,7 @@ static inline int ubifs_idx_node_sz(const struct ubifs_info *c, int child_cnt)
  * @idx: index node
  * @bnum: branch number
  */
+/* JYW: 根据索引节点及分支号找到对应的struct ubifs_branch */
 static inline
 struct ubifs_branch *ubifs_idx_branch(const struct ubifs_info *c,
 				      const struct ubifs_idx_node *idx,
@@ -250,9 +251,11 @@ static inline struct timespec ubifs_current_time(struct inode *inode)
  * of success, %-ENOENT if the node was not found, and a negative error code in
  * case of failure.
  */
+/* JYW: 根据key，读取节点 */
 static inline int ubifs_tnc_lookup(struct ubifs_info *c,
 				   const union ubifs_key *key, void *node)
 {
+	/* JYW: 根据key，读取节点 */
 	return ubifs_tnc_locate(c, key, node, NULL, NULL);
 }
 

@@ -185,11 +185,14 @@ struct gendisk {
 	struct disk_part_tbl __rcu *part_tbl;
 	struct hd_struct part0;
 
+	/* JYW: mtd_block_ops */
 	const struct block_device_operations *fops;
 	struct request_queue *queue;
+	/* JYW: struct mtd_blktrans_dev */
 	void *private_data;
 
 	int flags;
+	/* JYW: mtdblock, mtd->dev */
 	struct device *driverfs_dev;  // FIXME: remove
 	struct kobject *slave_dir;
 

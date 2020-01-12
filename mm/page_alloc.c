@@ -193,6 +193,7 @@ int sysctl_lowmem_reserve_ratio[MAX_NR_ZONES-1] = {
 
 EXPORT_SYMBOL(totalram_pages);
 
+/* JYW: 用于索引zone的名字 */
 static char * const zone_names[MAX_NR_ZONES] = {
 #ifdef CONFIG_ZONE_DMA
 	 "DMA",
@@ -207,6 +208,10 @@ static char * const zone_names[MAX_NR_ZONES] = {
 	 "Movable",
 };
 
+/* JYW:
+ * 让每个zone保留一个预留的内存，作为min水位，代表系统所保留空闲内存的最低限
+ * 在系统启动时通过init_per_zone_wmark_min()计算来的
+ */
 int min_free_kbytes = 1024;
 int user_min_free_kbytes = -1;
 
@@ -235,6 +240,7 @@ EXPORT_SYMBOL(nr_online_nodes);
 
 int page_group_by_mobility_disabled __read_mostly;
 
+/* JYW: 用来指定pageblock的MIGRATE_TYPES类型 */
 void set_pageblock_migratetype(struct page *page, int migratetype)
 {
 	if (unlikely(page_group_by_mobility_disabled &&
@@ -854,6 +860,7 @@ void __init __free_pages_bootmem(struct page *page, unsigned int order)
 
 #ifdef CONFIG_CMA
 /* Free whole pageblock and set its migration type to MIGRATE_CMA. */
+/* JYW: 初始化保留的cma区域 */
 void __init init_cma_reserved_pageblock(struct page *page)
 {
 	unsigned i = pageblock_nr_pages;
@@ -897,13 +904,16 @@ void __init init_cma_reserved_pageblock(struct page *page)
  *
  * -- nyc
  */
+/* JYW: 切蛋糕,把剩余的内存块重新放回伙伴系统中 */
 static inline void expand(struct zone *zone, struct page *page,
 	int low, int high, struct free_area *area,
 	int migratetype)
 {
 	unsigned long size = 1 << high;
 
+	/* JYW: 如果high大于low则要将大块进行拆分 */
 	while (high > low) {
+		/* JYW: 得到下一级order对应的area */
 		area--;
 		high--;
 		size >>= 1;
@@ -921,6 +931,8 @@ static inline void expand(struct zone *zone, struct page *page,
 			set_page_guard(zone, &page[size], high, migratetype);
 			continue;
 		}
+		/* JYW: 通过size来定位拆分后的伙伴块的起始页框描述符，
+		 * 		并将其作为第一个块添加到下一级order的块链表中 */
 		list_add(&page[size].lru, &area->free_list[migratetype]);
 		area->nr_free++;
 		set_page_order(&page[size], high);
@@ -997,6 +1009,7 @@ static int prep_new_page(struct page *page, unsigned int order, gfp_t gfp_flags,
  * Go through the free lists for the given migratetype and remove
  * the smallest available page from the freelists
  */
+/* JYW: 从指定的迁移类型链表中获取内存 */
 static inline
 struct page *__rmqueue_smallest(struct zone *zone, unsigned int order,
 						int migratetype)
@@ -1006,8 +1019,10 @@ struct page *__rmqueue_smallest(struct zone *zone, unsigned int order,
 	struct page *page;
 
 	/* Find a page of the appropriate size in the preferred list */
+	/* JYW: 首先从order中尝试分配，如果没有空闲的，则找下一个order */
 	for (current_order = order; current_order < MAX_ORDER; ++current_order) {
 		area = &(zone->free_area[current_order]);
+		/* JYW: 如果当前order没有，则找下一个order */
 		if (list_empty(&area->free_list[migratetype]))
 			continue;
 
@@ -1016,6 +1031,7 @@ struct page *__rmqueue_smallest(struct zone *zone, unsigned int order,
 		list_del(&page->lru);
 		rmv_page_order(page);
 		area->nr_free--;
+		/* JYW: 切蛋糕,把剩余的内存块重新放回伙伴系统中 */
 		expand(zone, page, order, current_order, area, migratetype);
 		set_freepage_migratetype(page, migratetype);
 		return page;
@@ -1049,6 +1065,7 @@ static int fallbacks[MIGRATE_TYPES][4] = {
  * Note that start_page and end_pages are not aligned on a pageblock
  * boundary. If alignment is required, use move_freepages_block()
  */
+/* JYW: 迁移到指定的迁移链表上，并标记为新的迁移类型 */
 int move_freepages(struct zone *zone,
 			  struct page *start_page, struct page *end_page,
 			  int migratetype)
@@ -1083,8 +1100,10 @@ int move_freepages(struct zone *zone,
 		}
 
 		order = page_order(page);
+		/* JYW: 从falltype迁移到starttype迁移链表上 */
 		list_move(&page->lru,
 			  &zone->free_area[order].free_list[migratetype]);
+		/* JYW: 设置迁移类型 */
 		set_freepage_migratetype(page, migratetype);
 		page += 1 << order;
 		pages_moved += 1 << order;
@@ -1093,6 +1112,7 @@ int move_freepages(struct zone *zone,
 	return pages_moved;
 }
 
+/* JYW: 迁移到指定的迁移链表上，并标记为新的迁移类型 */
 int move_freepages_block(struct zone *zone, struct page *page,
 				int migratetype)
 {
@@ -1111,6 +1131,7 @@ int move_freepages_block(struct zone *zone, struct page *page,
 	if (!zone_spans_pfn(zone, end_pfn))
 		return 0;
 
+	/* JYW: 迁移到指定的迁移链表上，并标记为新的迁移类型 */
 	return move_freepages(zone, start_page, end_page, migratetype);
 }
 
@@ -1140,23 +1161,29 @@ static void change_pageblock_range(struct page *pageblock_page,
  * If we claim more than half of the pageblock, change pageblock's migratetype
  * as well.
  */
+/* JYW: 主要实现内存页面的迁移类型的改变,将借到的页面的迁移类型转为申请的类型 */
 static void try_to_steal_freepages(struct zone *zone, struct page *page,
 				  int start_type, int fallback_type)
 {
 	int current_order = page_order(page);
 
 	/* Take ownership for orders >= pageblock_order */
+	/* 若借到的页面所在的阶数大于pageblock_order则不做类型转换 */
 	if (current_order >= pageblock_order) {
 		change_pageblock_range(page, current_order, start_type);
 		return;
 	}
 
+	/* JYW:
+	 * 若借到的页面所属的阶数小于5且申请的类型既不是可回收也不是可移动且开启了可移动机制，则不做类型转换；主要是为了不引入更多的碎片；
+	 */
 	if (current_order >= pageblock_order / 2 ||
 	    start_type == MIGRATE_RECLAIMABLE ||
 	    start_type == MIGRATE_UNMOVABLE ||
 	    page_group_by_mobility_disabled) {
 		int pages;
 
+		/* JYW: 迁移到指定的迁移链表上，并标记为新的迁移类型 */
 		pages = move_freepages_block(zone, page, start_type);
 
 		/* Claim the whole block if over half of it is free */
@@ -1167,6 +1194,8 @@ static void try_to_steal_freepages(struct zone *zone, struct page *page,
 }
 
 /* Remove an element from the buddy allocator from the fallback list */
+/* JYW:
+ * 若指定的迁移类型中没有充足的内存来分配，则按fallbacks顺序从其他迁移表中寻找 */
 static inline struct page *
 __rmqueue_fallback(struct zone *zone, unsigned int order, int start_migratetype)
 {
@@ -1175,10 +1204,12 @@ __rmqueue_fallback(struct zone *zone, unsigned int order, int start_migratetype)
 	struct page *page;
 
 	/* Find the largest possible block of pages in the other list */
+	/* JYW: 从其他迁移类型的最大的内存块链表开始遍历阶数 */
 	for (current_order = MAX_ORDER-1;
 				current_order >= order && current_order <= MAX_ORDER-1;
 				--current_order) {
 		int i;
+		/* JYW: 根据fallbacks中定义的顺序遍历后面的迁移类型 */
 		for (i = 0;; i++) {
 			int migratetype = fallbacks[start_migratetype][i];
 			int buddy_type = start_migratetype;
@@ -1195,6 +1226,8 @@ __rmqueue_fallback(struct zone *zone, unsigned int order, int start_migratetype)
 					struct page, lru);
 			area->nr_free--;
 
+			/* JYW:
+			 * 如果借到的不是CMA类型,需要评估迁移类型是否需要改变 */
 			if (!is_migrate_cma(migratetype)) {
 				try_to_steal_freepages(zone, page,
 							start_migratetype,
@@ -1206,6 +1239,9 @@ __rmqueue_fallback(struct zone *zone, unsigned int order, int start_migratetype)
 				 * itself, and we do not try to steal extra
 				 * free pages.
 				 */
+				/* JYW:
+				 * 从CMA借到的page，不做类型转换，仍然为CMA类型;
+				 * 否则的话，unmovable页面可能会污染到CMA区域 */
 				buddy_type = migratetype;
 			}
 
@@ -1240,15 +1276,18 @@ __rmqueue_fallback(struct zone *zone, unsigned int order, int start_migratetype)
  * Do the hard work of removing an element from the buddy allocator.
  * Call me with the zone->lock already held.
  */
+/* JYW: 从伙伴系统中获取内存块 */
 static struct page *__rmqueue(struct zone *zone, unsigned int order,
 						int migratetype)
 {
 	struct page *page;
 
 retry_reserve:
+	/* JYW: 从指定的迁移类型链表中获取内存 */
 	page = __rmqueue_smallest(zone, order, migratetype);
 
 	if (unlikely(!page) && migratetype != MIGRATE_RESERVE) {
+		/* JYW: 若指定的迁移类型中没有充足的内存来分配，则按fallbacks顺序从其他迁移表中寻找 */
 		page = __rmqueue_fallback(zone, order, migratetype);
 
 		/*
@@ -1482,11 +1521,13 @@ void mark_free_pages(struct zone *zone)
  * Free a 0-order page
  * cold == true ? free a cold page : free a hot page
  */
+/* JYW: 释放0阶page */
 void free_hot_cold_page(struct page *page, bool cold)
 {
 	struct zone *zone = page_zone(page);
 	struct per_cpu_pages *pcp;
 	unsigned long flags;
+	/* JYW: 根据page找到对应的页帧号 */
 	unsigned long pfn = page_to_pfn(page);
 	int migratetype;
 
@@ -1514,13 +1555,17 @@ void free_hot_cold_page(struct page *page, bool cold)
 	}
 
 	pcp = &this_cpu_ptr(zone->pageset)->pcp;
+	/* JYW: 如果是热page，则添加到头部 */
 	if (!cold)
 		list_add(&page->lru, &pcp->lists[migratetype]);
 	else
+		/* JYW: 如果是热page，则添加到头部 */
 		list_add_tail(&page->lru, &pcp->lists[migratetype]);
 	pcp->count++;
+	/* JYW: 当缓存的页面高于这个水位，回收到伙伴系统 */
 	if (pcp->count >= pcp->high) {
 		unsigned long batch = ACCESS_ONCE(pcp->batch);
+		/* JYW: 回收batch个页面到伙伴系统 */
 		free_pcppages_bulk(zone, batch, pcp);
 		pcp->count -= batch;
 	}
@@ -1644,6 +1689,7 @@ int split_free_page(struct page *page)
 /*
  * Allocate a page from the given zone. Use pcplists for order-0 allocations.
  */
+/* JYW: 从一个指定的zone分配一个page */
 static inline
 struct page *buffered_rmqueue(struct zone *preferred_zone,
 			struct zone *zone, unsigned int order,
@@ -1653,6 +1699,7 @@ struct page *buffered_rmqueue(struct zone *preferred_zone,
 	struct page *page;
 	bool cold = ((gfp_flags & __GFP_COLD) != 0);
 
+	/* JYW: 如果order为0，则从pcplist中分配 */
 	if (likely(order == 0)) {
 		struct per_cpu_pages *pcp;
 		struct list_head *list;
@@ -1660,16 +1707,19 @@ struct page *buffered_rmqueue(struct zone *preferred_zone,
 		local_irq_save(flags);
 		pcp = &this_cpu_ptr(zone->pageset)->pcp;
 		list = &pcp->lists[migratetype];
+		/* JYW: 如果链表为空，表示没有可分配的页面 */
 		if (list_empty(list)) {
+			/* JYW: 从伙伴系统中分配2^batch个页面 */
 			pcp->count += rmqueue_bulk(zone, 0,
 					pcp->batch, list,
 					migratetype, cold);
 			if (unlikely(list_empty(list)))
 				goto failed;
 		}
-
+		/* JYW: 如果需要冷页，则从链表的尾部获取 */
 		if (cold)
 			page = list_entry(list->prev, struct page, lru);
+		/* JYW: 如果需要热页，则从链表的头部获取 */
 		else
 			page = list_entry(list->next, struct page, lru);
 
@@ -1690,6 +1740,7 @@ struct page *buffered_rmqueue(struct zone *preferred_zone,
 			WARN_ON_ONCE(order > 1);
 		}
 		spin_lock_irqsave(&zone->lock, flags);
+		/* JYW: 从伙伴系统中获取内存块 */
 		page = __rmqueue(zone, order, migratetype);
 		spin_unlock(&zone->lock);
 		if (!page)
@@ -1796,6 +1847,15 @@ static inline bool should_fail_alloc_page(gfp_t gfp_mask, unsigned int order)
  * Return true if free pages are above 'mark'. This takes into account the order
  * of the allocation.
  */
+/*
+ *  JYW:
+ *  	参数z: 表示要判断的zone
+ *  	order: 分配内存的阶数
+ *  	mark： 检查的水位
+ *  判断zone的空闲页面是否小于某个水位值和zone的最低保留值(lowmem_reserve)之和
+ *
+ *  返回true: 空闲页面在某个水位之上
+ */
 static bool __zone_watermark_ok(struct zone *z, unsigned int order,
 			unsigned long mark, int classzone_idx, int alloc_flags,
 			long free_pages)
@@ -1831,6 +1891,7 @@ static bool __zone_watermark_ok(struct zone *z, unsigned int order,
 	return true;
 }
 
+/* JYW: 判断zone的空闲页面是否小于某个水位值和zone的最低保留值(lowmem_reserve)之和 */
 bool zone_watermark_ok(struct zone *z, unsigned int order, unsigned long mark,
 		      int classzone_idx, int alloc_flags)
 {
@@ -2050,6 +2111,7 @@ zonelist_scan:
 	 * Scan zonelist, looking for a zone with enough free.
 	 * See also __cpuset_node_allowed() comment in kernel/cpuset.c.
 	 */
+	/* JYW: 扫描内存节点中的zonelist，查找合适分配内存的zone */
 	for_each_zone_zonelist_nodemask(zone, z, zonelist, ac->high_zoneidx,
 								ac->nodemask) {
 		unsigned long mark;
@@ -2138,6 +2200,8 @@ zonelist_scan:
 				!zlc_zone_worth_trying(zonelist, z, allowednodes))
 				continue;
 
+			/* JYW:
+			 * 若当前zone的空闲页面低于WMARK_LOW水位，则调用下面的接口来回收页面 */
 			ret = zone_reclaim(zone, gfp_mask, order);
 			switch (ret) {
 			case ZONE_RECLAIM_NOSCAN:
@@ -2170,6 +2234,7 @@ zonelist_scan:
 		}
 
 try_this_zone:
+		/* JYW: 从一个指定的zone分配一个page */
 		page = buffered_rmqueue(ac->preferred_zone, zone, order,
 						gfp_mask, ac->migratetype);
 		if (page) {
@@ -2797,6 +2862,7 @@ got_pg:
 /*
  * This is the 'heart' of the zoned buddy allocator.
  */
+/* JYW: 基于zone的伙伴分配核心函数 */
 struct page *
 __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order,
 			struct zonelist *zonelist, nodemask_t *nodemask)
@@ -2807,6 +2873,7 @@ __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order,
 	int alloc_flags = ALLOC_WMARK_LOW|ALLOC_CPUSET|ALLOC_FAIR;
 	gfp_t alloc_mask; /* The gfp_t that was actually used for allocation */
 	struct alloc_context ac = {
+		/* JYW：从分配掩码中计算出zone的zoneidx */
 		.high_zoneidx = gfp_zone(gfp_mask),
 		.nodemask = nodemask,
 		.migratetype = gfpflags_to_migratetype(gfp_mask),
@@ -2847,6 +2914,7 @@ retry_cpuset:
 
 	/* First allocation attempt */
 	alloc_mask = gfp_mask|__GFP_HARDWALL;
+	/* JYW: 首次尝试分配内存 */
 	page = get_page_from_freelist(alloc_mask, order, alloc_flags, &ac);
 	if (unlikely(!page)) {
 		/*
@@ -2855,7 +2923,7 @@ retry_cpuset:
 		 * complete.
 		 */
 		alloc_mask = memalloc_noio_flags(gfp_mask);
-
+		/* JYW: 如果分配失败，进入慢速分配 */
 		page = __alloc_pages_slowpath(alloc_mask, order, &ac);
 	}
 
@@ -2904,10 +2972,14 @@ unsigned long get_zeroed_page(gfp_t gfp_mask)
 }
 EXPORT_SYMBOL(get_zeroed_page);
 
+/* JYW: 释放page */
 void __free_pages(struct page *page, unsigned int order)
 {
+	/* JYW: 释放page引用计数，并判断是否引用计数为0 */
 	if (put_page_testzero(page)) {
+		/* JYW: 如果释放的是0阶 */
 		if (order == 0)
+			/* JYW: 释放0阶page */
 			free_hot_cold_page(page, false);
 		else
 			__free_pages_ok(page, order);
@@ -3827,6 +3899,7 @@ static void setup_zone_pageset(struct zone *zone);
 DEFINE_MUTEX(zonelists_mutex);
 
 /* return values int ....just for stop_machine() */
+/* JYW: 初始化zonelist */
 static int __build_all_zonelists(void *data)
 {
 	int nid;
@@ -3882,9 +3955,11 @@ static int __build_all_zonelists(void *data)
 	return 0;
 }
 
+/* JYW: 初始化zonelist */
 static noinline void __init
 build_all_zonelists_init(void)
 {
+	/* JYW: 初始化zonelist */
 	__build_all_zonelists(NULL);
 	mminit_verify_zonelist();
 	cpuset_init_current_mems_allowed();
@@ -3899,6 +3974,7 @@ build_all_zonelists_init(void)
  * (2) call of __init annotated helper build_all_zonelists_init
  * [protected by SYSTEM_BOOTING].
  */
+/* JYW: 初始化定义伙伴系统的分配顺序 */
 void __ref build_all_zonelists(pg_data_t *pgdat, struct zone *zone)
 {
 	set_zonelist_order();
@@ -3923,13 +3999,15 @@ void __ref build_all_zonelists(pg_data_t *pgdat, struct zone *zone)
 	 * made on memory-hotadd so a system can start with mobility
 	 * disabled and enable it later
 	 */
+	/* JYW: 如果可用内存非常小，则关闭迁移机制 */
 	if (vm_total_pages < (pageblock_nr_pages * MIGRATE_TYPES))
 		page_group_by_mobility_disabled = 1;
 	else
 		page_group_by_mobility_disabled = 0;
 
-	pr_info("Built %i zonelists in %s order, mobility grouping %s.  "
+	pr_info("JYW=> %s: Built %i zonelists in %s order, mobility grouping %s.  "
 		"Total pages: %ld\n",
+			__func__,
 			nr_online_nodes,
 			zonelist_order_name[current_zonelist_order],
 			page_group_by_mobility_disabled ? "off" : "on",
@@ -4194,6 +4272,7 @@ static void __meminit zone_init_free_lists(struct zone *zone)
 	memmap_init_zone((size), (nid), (zone), (start_pfn), MEMMAP_EARLY)
 #endif
 
+/* JYW: 计算pcp池的大小 */
 static int zone_batchsize(struct zone *zone)
 {
 #ifdef CONFIG_MMU
@@ -4392,6 +4471,7 @@ int zone_wait_table_init(struct zone *zone, unsigned long zone_size_pages)
 	return 0;
 }
 
+/* JYW: zone pcp初始化 */
 static __meminit void zone_pcp_init(struct zone *zone)
 {
 	/*
@@ -4402,8 +4482,8 @@ static __meminit void zone_pcp_init(struct zone *zone)
 	zone->pageset = &boot_pageset;
 
 	if (populated_zone(zone))
-		printk(KERN_DEBUG "  %s zone: %lu pages, LIFO batch:%u\n",
-			zone->name, zone->present_pages,
+		printk("JYW=> %s:  %s zone: %lu pages, LIFO batch:%u\n",
+			__func__, zone->name, zone->present_pages,
 					 zone_batchsize(zone));
 }
 
@@ -4697,6 +4777,7 @@ static unsigned long __meminit zone_absent_pages_in_node(int nid,
 }
 
 #else /* CONFIG_HAVE_MEMBLOCK_NODE_MAP */
+/* JYW: 返回zone size */
 static inline unsigned long __meminit zone_spanned_pages_in_node(int nid,
 					unsigned long zone_type,
 					unsigned long node_start_pfn,
@@ -4720,6 +4801,7 @@ static inline unsigned long __meminit zone_absent_pages_in_node(int nid,
 
 #endif /* CONFIG_HAVE_MEMBLOCK_NODE_MAP */
 
+/* JYW: 计算node上的页面数量及实际存在的页面数量 */
 static void __meminit calculate_node_totalpages(struct pglist_data *pgdat,
 						unsigned long node_start_pfn,
 						unsigned long node_end_pfn,
@@ -4730,10 +4812,12 @@ static void __meminit calculate_node_totalpages(struct pglist_data *pgdat,
 	enum zone_type i;
 
 	for (i = 0; i < MAX_NR_ZONES; i++)
+		/* JYW: 计算zone包含的页面数量 */
 		totalpages += zone_spanned_pages_in_node(pgdat->node_id, i,
 							 node_start_pfn,
 							 node_end_pfn,
 							 zones_size);
+	/* JYW: 计算内存节点包含的页面数量，包括空洞 */
 	pgdat->node_spanned_pages = totalpages;
 
 	realtotalpages = totalpages;
@@ -4743,8 +4827,8 @@ static void __meminit calculate_node_totalpages(struct pglist_data *pgdat,
 						  node_start_pfn, node_end_pfn,
 						  zholes_size);
 	pgdat->node_present_pages = realtotalpages;
-	printk(KERN_DEBUG "On node %d totalpages: %lu\n", pgdat->node_id,
-							realtotalpages);
+	printk("JYW=> %s: On node %d spanned_pages: %lu, present_pages: %lu\n", __func__
+			, pgdat->node_id, pgdat->node_spanned_pages, pgdat->node_present_pages);
 }
 
 #ifndef CONFIG_SPARSEMEM
@@ -4755,6 +4839,7 @@ static void __meminit calculate_node_totalpages(struct pglist_data *pgdat,
  * round what is now in bits to nearest long in bits, then return it in
  * bytes.
  */
+/* JYW: 计算和分配pageblock_flags所需要的大小 */
 static unsigned long __init usemap_size(unsigned long zone_start_pfn, unsigned long zonesize)
 {
 	unsigned long usemapsize;
@@ -4850,6 +4935,7 @@ static unsigned long __paginginit calc_memmap_size(unsigned long spanned_pages,
  *
  * NOTE: pgdat should get zeroed by caller.
  */
+/* JYW: 完成zone数据结构的初始化 */
 static void __paginginit free_area_init_core(struct pglist_data *pgdat,
 		unsigned long node_start_pfn, unsigned long node_end_pfn,
 		unsigned long *zones_size, unsigned long *zholes_size)
@@ -4886,6 +4972,7 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat,
 		 * and per-cpu initialisations
 		 */
 		memmap_pages = calc_memmap_size(size, realsize);
+		/* JYW: 判断是否是高端内存区域 */
 		if (!is_highmem_idx(j)) {
 			if (freesize >= memmap_pages) {
 				freesize -= memmap_pages;
@@ -4927,11 +5014,13 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat,
 						/ 100;
 		zone->min_slab_pages = (freesize * sysctl_min_slab_ratio) / 100;
 #endif
+		/* JYW: 用于索引zone的名字 */
 		zone->name = zone_names[j];
 		spin_lock_init(&zone->lock);
 		spin_lock_init(&zone->lru_lock);
 		zone_seqlock_init(zone);
 		zone->zone_pgdat = pgdat;
+		/* JYW: zone pcp初始化 */
 		zone_pcp_init(zone);
 
 		/* For bootup, initialized properly in watermark setup */
@@ -4942,6 +5031,7 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat,
 			continue;
 
 		set_pageblock_order();
+		/* JYW: 计算和分配pageblock_flags所需要的大小 */
 		setup_usemap(pgdat, zone, zone_start_pfn, size);
 		ret = init_currently_empty_zone(zone, zone_start_pfn,
 						size, MEMMAP_EARLY);
@@ -4993,6 +5083,7 @@ static void __init_refok alloc_node_mem_map(struct pglist_data *pgdat)
 #endif /* CONFIG_FLAT_NODE_MEM_MAP */
 }
 
+/* JYW: 初始化内存节点 */
 void __paginginit free_area_init_node(int nid, unsigned long *zones_size,
 		unsigned long node_start_pfn, unsigned long *zholes_size)
 {
@@ -5010,6 +5101,7 @@ void __paginginit free_area_init_node(int nid, unsigned long *zones_size,
 	pr_info("Initmem setup node %d [mem %#018Lx-%#018Lx]\n", nid,
 		(u64)start_pfn << PAGE_SHIFT, ((u64)end_pfn << PAGE_SHIFT) - 1);
 #endif
+	/* JYW: 计算node上的页面数量及实际存在的页面数量 */
 	calculate_node_totalpages(pgdat, start_pfn, end_pfn,
 				  zones_size, zholes_size);
 
@@ -5468,6 +5560,7 @@ void adjust_managed_page_count(struct page *page, long count)
 }
 EXPORT_SYMBOL(adjust_managed_page_count);
 
+/* JYW: 释放保留的内存到伙伴系统 */
 unsigned long free_reserved_area(void *start, void *end, int poison, char *s)
 {
 	void *pos;
@@ -5691,8 +5784,11 @@ static void setup_per_zone_lowmem_reserve(void)
 	calculate_totalreserve_pages();
 }
 
+/* JYW: 标记每个zone的水位 */
 static void __setup_per_zone_wmarks(void)
 {
+	/* JYW:
+	 * 用到min_free_kbytes这个全局变量，在系统启动时通过init_per_zone_wmark_min()计算来的 */
 	unsigned long pages_min = min_free_kbytes >> (PAGE_SHIFT - 10);
 	unsigned long lowmem_pages = 0;
 	struct zone *zone;
@@ -5755,6 +5851,7 @@ static void __setup_per_zone_wmarks(void)
  * Ensures that the watermark[min,low,high] values for each zone are set
  * correctly with respect to min_free_kbytes.
  */
+/* JYW: 标记每个zone的水位 */
 void setup_per_zone_wmarks(void)
 {
 	mutex_lock(&zonelists_mutex);
@@ -5805,6 +5902,8 @@ static void __meminit setup_per_zone_inactive_ratio(void)
 		calculate_zone_inactive_ratio(zone);
 }
 
+/* JYW:
+* 让每个zone保留一个预留的内存，作为min水位，代表系统所保留空闲内存的最低限 */
 /*
  * Initialise min_free_kbytes.
  *
@@ -6082,6 +6181,7 @@ void *__init alloc_large_system_hash(const char *tablename,
 }
 
 /* Return a pointer to the bitmap storing bits affecting a block of pages */
+/* JYW: 获取zone的pageblock_flags */
 static inline unsigned long *get_pageblock_bitmap(struct zone *zone,
 							unsigned long pfn)
 {
@@ -6092,6 +6192,7 @@ static inline unsigned long *get_pageblock_bitmap(struct zone *zone,
 #endif /* CONFIG_SPARSEMEM */
 }
 
+/* JYW: 根据pfn获取zone的pageblock_flags中的bit索引 */
 static inline int pfn_to_bitidx(struct zone *zone, unsigned long pfn)
 {
 #ifdef CONFIG_SPARSEMEM
@@ -6140,6 +6241,7 @@ unsigned long get_pfnblock_flags_mask(struct page *page, unsigned long pfn,
  * @end_bitidx: The last bit of interest
  * @mask: mask of bits that the caller is interested in
  */
+/* JYW: 设置pageblock_flags */
 void set_pfnblock_flags_mask(struct page *page, unsigned long flags,
 					unsigned long pfn,
 					unsigned long end_bitidx,
@@ -6153,7 +6255,9 @@ void set_pfnblock_flags_mask(struct page *page, unsigned long flags,
 	BUILD_BUG_ON(NR_PAGEBLOCK_BITS != 4);
 
 	zone = page_zone(page);
+	/* JYW: 获取zone的pageblock_flags */
 	bitmap = get_pageblock_bitmap(zone, pfn);
+	/* JYW: 根据pfn获取zone的pageblock_flags中的bit索引 */
 	bitidx = pfn_to_bitidx(zone, pfn);
 	word_bitidx = bitidx / BITS_PER_LONG;
 	bitidx &= (BITS_PER_LONG-1);
@@ -6294,6 +6398,7 @@ static unsigned long pfn_max_align_up(unsigned long pfn)
 }
 
 /* [start, end) must belong to a single zone. */
+/* JYW: 进行页面隔离和迁移 */
 static int __alloc_contig_migrate_range(struct compact_control *cc,
 					unsigned long start, unsigned long end)
 {
@@ -6328,6 +6433,7 @@ static int __alloc_contig_migrate_range(struct compact_control *cc,
 							&cc->migratepages);
 		cc->nr_migratepages -= nr_reclaimed;
 
+		/* JYW: 完成页面的迁移 */
 		ret = migrate_pages(&cc->migratepages, alloc_migrate_target,
 				    NULL, 0, cc->mode, MR_CMA);
 	}
@@ -6403,6 +6509,7 @@ int alloc_contig_range(unsigned long start, unsigned long end,
 	if (ret)
 		return ret;
 
+	/* JYW: 进行页面隔离和迁移 */
 	ret = __alloc_contig_migrate_range(&cc, start, end);
 	if (ret)
 		goto done;

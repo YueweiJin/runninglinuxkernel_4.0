@@ -63,9 +63,11 @@ struct fat_mount_options {
  * MS-DOS file system in-core superblock data
  */
 struct msdos_sb_info {
+	/* JYW: 每个簇的扇区数 */
 	unsigned short sec_per_clus;  /* sectors/cluster */
 	unsigned short cluster_bits;  /* log2(cluster_size) */
 	unsigned int cluster_size;    /* cluster size */
+	/* JYW: 代表一个簇的编号占用多少bit，FAT32占用4字节 */
 	unsigned char fats, fat_bits; /* number of FATs, FAT bits (12 or 16) */
 	unsigned short fat_start;
 	unsigned long fat_length;     /* FAT start & length (sec.) */
@@ -73,11 +75,13 @@ struct msdos_sb_info {
 	unsigned short dir_entries;   /* root dir start & entries */
 	unsigned long data_start;     /* first data sector */
 	unsigned long max_cluster;    /* maximum cluster number */
+	/* JYW: 根目录起始簇, 一般为2 */
 	unsigned long root_cluster;   /* first cluster of the root directory */
 	unsigned long fsinfo_sector;  /* sector number of FAT32 fsinfo */
 	struct mutex fat_lock;
 	struct mutex nfs_build_inode_lock;
 	struct mutex s_lock;
+	/* JYW: */
 	unsigned int prev_free;      /* previously allocated cluster number */
 	unsigned int free_clusters;  /* -1 if undefined */
 	unsigned int free_clus_valid; /* is free_clusters valid? */
@@ -90,6 +94,7 @@ struct msdos_sb_info {
 	unsigned int vol_id;		/*volume ID*/
 
 	int fatent_shift;
+	/* JYW: FAT32:fat32_ops */
 	struct fatent_operations *fatent_ops;
 	struct inode *fat_inode;
 	struct inode *fsinfo_inode;
@@ -121,6 +126,7 @@ struct msdos_inode_info {
 	/* NOTE: mmu_private is 64bits, so must hold ->i_mutex to access */
 	loff_t mmu_private;	/* physically allocated size */
 
+	/* JYW: 根目录起始簇, 一般为2 */
 	int i_start;		/* first cluster or 0 */
 	int i_logstart;		/* logical first cluster */
 	int i_attrs;		/* unused attribute bits */
@@ -216,12 +222,14 @@ static inline unsigned char fat_checksum(const __u8 *name)
 	return s;
 }
 
+/* JYW: 根据簇号计算所在的物理位置 */
 static inline sector_t fat_clus_to_blknr(struct msdos_sb_info *sbi, int clus)
 {
 	return ((sector_t)clus - FAT_START_ENT) * sbi->sec_per_clus
 		+ sbi->data_start;
 }
 
+/* JYW: 根据 i_pos 计算blknr及偏移 */
 static inline void fat_get_blknr_offset(struct msdos_sb_info *sbi,
 				loff_t i_pos, sector_t *blknr, int *offset)
 {
@@ -229,6 +237,7 @@ static inline void fat_get_blknr_offset(struct msdos_sb_info *sbi,
 	*offset = i_pos & (sbi->dir_per_block - 1);
 }
 
+/* JYW: 获取位置 */
 static inline loff_t fat_i_pos_read(struct msdos_sb_info *sbi,
 					struct inode *inode)
 {
@@ -255,6 +264,7 @@ static inline void fat16_towchar(wchar_t *dst, const __u8 *src, size_t len)
 #endif
 }
 
+/* JYW: 获取文件或目录的起始簇号 */
 static inline int fat_get_start(const struct msdos_sb_info *sbi,
 				const struct msdos_dir_entry *de)
 {
@@ -264,6 +274,7 @@ static inline int fat_get_start(const struct msdos_sb_info *sbi,
 	return cluster;
 }
 
+/* JYW: 设置文件或目录的起始簇号 */
 static inline void fat_set_start(struct msdos_dir_entry *de, int cluster)
 {
 	de->start   = cpu_to_le16(cluster);
@@ -309,15 +320,21 @@ extern int fat_add_entries(struct inode *dir, void *slots, int nr_slots,
 extern int fat_remove_entries(struct inode *dir, struct fat_slot_info *sinfo);
 
 /* fat/fatent.c */
+/* JYW: 描述fat表 */
 struct fat_entry {
+	/* JYW: 代表当前的簇索引 */
 	int entry;
 	union {
+		/* JYW: 簇索引表 */
 		u8 *ent12_p[2];
 		__le16 *ent16_p;
 		__le32 *ent32_p;
 	} u;
+	/* JYW: buffer_head数目，可能是1也可能是2，FAT32是1 */
 	int nr_bhs;
+	/* JYW: fat表的扇区的buffer head */
 	struct buffer_head *bhs[2];
+	/* JYW: 超级块的inode */
 	struct inode *fat_inode;
 };
 

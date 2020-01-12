@@ -1042,6 +1042,7 @@ static void usb_debugfs_cleanup(void)
 /*
  * Init
  */
+/* JYW: USB子系统初始化 */
 static int __init usb_init(void)
 {
 	int retval;
@@ -1071,6 +1072,7 @@ static int __init usb_init(void)
 	retval = usb_devio_init();
 	if (retval)
 		goto usb_devio_init_failed;
+	/* JYW: USB hub初始化 */
 	retval = usb_hub_init();
 	if (retval)
 		goto hub_init_failed;

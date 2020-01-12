@@ -31,6 +31,7 @@
 #define UL(x) _AC(x, UL)
 
 /* PAGE_OFFSET - the virtual address of the start of the kernel image */
+/* JYW: 内核镜像起始虚拟地址，通常是3GB(0xC0000000) */
 #define PAGE_OFFSET		UL(CONFIG_PAGE_OFFSET)
 
 #ifdef CONFIG_MMU
@@ -52,6 +53,7 @@
  * and PAGE_OFFSET - it must be within 32MB of the kernel text.
  */
 #ifndef CONFIG_THUMB2_KERNEL
+/* JYW: 存放内核模块的起始虚拟地址 */
 #define MODULES_VADDR		(PAGE_OFFSET - SZ_16M)
 #else
 /* smaller range for Thumb-2 symbols relocation (2^24)*/
@@ -123,7 +125,9 @@
 /*
  * Convert a physical address to a Page Frame Number and back
  */
+/* JYW: 将物理地址转换为物理页帧号 */
 #define	__phys_to_pfn(paddr)	((unsigned long)((paddr) >> PAGE_SHIFT))
+/* JYW: 将页帧号转换位物理地址 */
 #define	__pfn_to_phys(pfn)	((phys_addr_t)(pfn) << PAGE_SHIFT)
 
 /*
@@ -252,16 +256,19 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
 #define PHYS_OFFSET	PLAT_PHYS_OFFSET
 #define PHYS_PFN_OFFSET	((unsigned long)(PHYS_OFFSET >> PAGE_SHIFT))
 
+/* JYW: 将虚拟地址转换位物理地址 */
 static inline phys_addr_t __virt_to_phys(unsigned long x)
 {
 	return (phys_addr_t)x - PAGE_OFFSET + PHYS_OFFSET;
 }
 
+/* JYW: 将物理地址转换位虚拟地址 */
 static inline unsigned long __phys_to_virt(phys_addr_t x)
 {
 	return x - PHYS_OFFSET + PAGE_OFFSET;
 }
 
+/* JYW: 将虚拟地址转换位页帧号 */
 #define virt_to_pfn(kaddr) \
 	((((unsigned long)(kaddr) - PAGE_OFFSET) >> PAGE_SHIFT) + \
 	 PHYS_PFN_OFFSET)
@@ -274,12 +281,14 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
  * translation for translating DMA addresses.  Use the driver
  * DMA support - see dma-mapping.h.
  */
+/* JYW: 将虚拟地址转换为物理地址 */
 #define virt_to_phys virt_to_phys
 static inline phys_addr_t virt_to_phys(const volatile void *x)
 {
 	return __virt_to_phys((unsigned long)(x));
 }
 
+/* JYW: 将物理地址转换位虚拟地址 */
 #define phys_to_virt phys_to_virt
 static inline void *phys_to_virt(phys_addr_t x)
 {
@@ -289,8 +298,11 @@ static inline void *phys_to_virt(phys_addr_t x)
 /*
  * Drivers should NOT use these either.
  */
+/* JYW: 将虚拟地址转换为物理地址 */
 #define __pa(x)			__virt_to_phys((unsigned long)(x))
+/* JYW: 将物理地址转换位虚拟地址 */
 #define __va(x)			((void *)__phys_to_virt((phys_addr_t)(x)))
+/* JYW: 将页帧转换位虚拟地址 */
 #define pfn_to_kaddr(pfn)	__va((pfn) << PAGE_SHIFT)
 
 extern phys_addr_t (*arch_virt_to_idmap)(unsigned long x);

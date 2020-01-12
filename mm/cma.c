@@ -35,23 +35,29 @@
 #include <linux/highmem.h>
 #include <linux/io.h>
 
+/* JYW: 描述保留的CMA区域 */
 struct cma {
 	unsigned long	base_pfn;
+	/* JYW: 以page size为单位 */
 	unsigned long	count;
 	unsigned long	*bitmap;
 	unsigned int order_per_bit; /* Order of pages represented by one bit */
 	struct mutex	lock;
 };
 
+/* JYW: 支持若干个CMA区域 */
+/* JYW: 配置文件默认位 1 + 7 = 8个 */
 static struct cma cma_areas[MAX_CMA_AREAS];
 static unsigned cma_area_count;
 static DEFINE_MUTEX(cma_mutex);
 
+/* JYW: 获取cma区域的起始物理地址 */
 phys_addr_t cma_get_base(struct cma *cma)
 {
 	return PFN_PHYS(cma->base_pfn);
 }
 
+/* JYW: 获取cma区域的大小 */
 unsigned long cma_get_size(struct cma *cma)
 {
 	return cma->count << PAGE_SHIFT;
@@ -77,6 +83,7 @@ static unsigned long cma_bitmap_aligned_offset(struct cma *cma, int align_order)
 		- cma->base_pfn) >> cma->order_per_bit;
 }
 
+/* JYW: 获取bitmap的最大位数 */
 static unsigned long cma_bitmap_maxno(struct cma *cma)
 {
 	return cma->count >> cma->order_per_bit;
@@ -100,6 +107,7 @@ static void cma_clear_bitmap(struct cma *cma, unsigned long pfn, int count)
 	mutex_unlock(&cma->lock);
 }
 
+/* JYW: 初始化CMA区域 */
 static int __init cma_activate_area(struct cma *cma)
 {
 	int bitmap_size = BITS_TO_LONGS(cma_bitmap_maxno(cma)) * sizeof(long);
@@ -142,6 +150,7 @@ err:
 	return -EINVAL;
 }
 
+/* JYW: 初始化保留内存 */
 static int __init cma_init_reserved_areas(void)
 {
 	int i;
@@ -224,6 +233,7 @@ int __init cma_init_reserved_mem(phys_addr_t base, phys_addr_t size,
  * If @fixed is true, reserve contiguous area at exactly @base.  If false,
  * reserve in range from @base to @limit.
  */
+/* JYW: 保留一块连续的cma区域 */
 int __init cma_declare_contiguous(phys_addr_t base,
 			phys_addr_t size, phys_addr_t limit,
 			phys_addr_t alignment, unsigned int order_per_bit,
@@ -258,9 +268,7 @@ int __init cma_declare_contiguous(phys_addr_t base,
 
 	if (alignment && !is_power_of_2(alignment))
 		return -EINVAL;
-
 	/*
-	 * Sanitise input arguments.
 	 * Pages both ends in CMA area could be merged into adjacent unmovable
 	 * migratetype page by page allocator's buddy algorithm. In the case,
 	 * you couldn't get a contiguous memory, which is not what we want.
@@ -340,6 +348,7 @@ int __init cma_declare_contiguous(phys_addr_t base,
 	if (ret)
 		goto err;
 
+	/* JYW: 保留信息打印 */
 	pr_info("Reserved %ld MiB at %pa\n", (unsigned long)size / SZ_1M,
 		&base);
 	return 0;
@@ -358,6 +367,7 @@ err:
  * This function allocates part of contiguous memory on specific
  * contiguous memory area.
  */
+/* JYW: 分配CMA内存 */
 struct page *cma_alloc(struct cma *cma, int count, unsigned int align)
 {
 	unsigned long mask, offset, pfn, start = 0;

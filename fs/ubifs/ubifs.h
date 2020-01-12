@@ -399,6 +399,7 @@ struct ubifs_gced_idx_leb {
  * could consider to rework locking and base it on "shadow" fields.
  */
 struct ubifs_inode {
+        /* JYW: VFS inode */
 	struct inode vfs_inode;
 	unsigned long long creat_sqnum;
 	unsigned long long del_cmtno;
@@ -744,11 +745,15 @@ struct ubifs_jhead {
 struct ubifs_zbranch {
 	union ubifs_key key;
 	union {
+		/* JYW: 指向znode的位置 */
 		struct ubifs_znode *znode;
 		void *leaf;
 	};
+	/* JYW: 表示节点在哪个逻辑擦除块中 */
 	int lnum;
+	/* JYW: 表示在逻辑擦除块中的偏移 */
 	int offs;
+	/* JYW: 节点的长度 */
 	int len;
 };
 
@@ -770,6 +775,7 @@ struct ubifs_zbranch {
  * Note! The @lnum, @offs, and @len fields are not really needed - we have them
  * only for internal consistency check. They could be removed to save some RAM.
  */
+/* JYW: 索引节点在内存中的表示 */
 struct ubifs_znode {
 	struct ubifs_znode *parent;
 	struct ubifs_znode *cnext;
@@ -782,6 +788,7 @@ struct ubifs_znode {
 	int lnum;
 	int offs;
 	int len;
+	/* JYW: 表示znode分支数组 */
 	struct ubifs_zbranch zbranch[];
 };
 
@@ -1273,6 +1280,7 @@ struct ubifs_info {
 	unsigned int rw_incompat:1;
 
 	struct mutex tnc_mutex;
+	/* JYW: 表示root znode */
 	struct ubifs_zbranch zroot;
 	struct ubifs_znode *cnext;
 	struct ubifs_znode *enext;

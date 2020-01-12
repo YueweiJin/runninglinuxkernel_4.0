@@ -162,6 +162,7 @@ static void klist_class_dev_put(struct klist_node *n)
 	put_device(dev);
 }
 
+/* JYW: 将class注册到内核中，同时会在/sys/class下创建class对应的节点 */
 int __class_register(struct class *cls, struct lock_class_key *key)
 {
 	struct subsys_private *cp;
@@ -215,6 +216,7 @@ void class_unregister(struct class *cls)
 	kset_unregister(&cls->p->subsys);
 }
 
+/* JYW: 释放之前申请的class结构体 */
 static void class_create_release(struct class *cls)
 {
 	pr_debug("%s called for %s\n", __func__, cls->name);
@@ -235,12 +237,14 @@ static void class_create_release(struct class *cls)
  * Note, the pointer created here is to be destroyed when finished by
  * making a call to class_destroy().
  */
+/* JYW: 创建一个class，并注册到内核，在/sys/class下创建class对应的节点 */
 struct class *__class_create(struct module *owner, const char *name,
 			     struct lock_class_key *key)
 {
 	struct class *cls;
 	int retval;
 
+    /* JYW: 首先分配一个class结构体 */
 	cls = kzalloc(sizeof(*cls), GFP_KERNEL);
 	if (!cls) {
 		retval = -ENOMEM;
@@ -249,8 +253,10 @@ struct class *__class_create(struct module *owner, const char *name,
 
 	cls->name = name;
 	cls->owner = owner;
+    /* JYW: 注销class时的回调函数，用于释放上面申请的class结构体 */
 	cls->class_release = class_create_release;
 
+    /* JYW: 将class注册到内核中，同时会在/sys/class下创建class对应的节点 */
 	retval = __class_register(cls, key);
 	if (retval)
 		goto error;
