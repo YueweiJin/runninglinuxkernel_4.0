@@ -64,6 +64,9 @@ int arch_show_interrupts(struct seq_file *p, int prec)
  * own 'handler'.  Used by platform code implementing C-based 1st
  * level decoding.
  */
+/* JYW: irq:  通用处理函数从PIC中得到的软件中断号 
+ * JYW: regs: 保存下来的被中断任务的执行现场，不同的处理器有不同的执行现场，也就是有不同的寄存器    
+ */
 void handle_IRQ(unsigned int irq, struct pt_regs *regs)
 {
 	__handle_domain_irq(NULL, irq, false, regs);
@@ -72,6 +75,7 @@ void handle_IRQ(unsigned int irq, struct pt_regs *regs)
 /*
  * asm_do_IRQ is the interface to be used from assembly code.
  */
+/* JYW: ARM架构，中断处理函数总入口函数 */
 asmlinkage void __exception_irq_entry
 asm_do_IRQ(unsigned int irq, struct pt_regs *regs)
 {
@@ -98,6 +102,7 @@ void set_irq_flags(unsigned int irq, unsigned int iflags)
 }
 EXPORT_SYMBOL_GPL(set_irq_flags);
 
+/* JYW: 初始化中断的处理框架 */
 void __init init_IRQ(void)
 {
 	int ret;

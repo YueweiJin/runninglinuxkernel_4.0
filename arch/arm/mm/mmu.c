@@ -242,6 +242,7 @@ __setup("noalign", noalign_setup);
 #define PROT_PTE_S2_DEVICE	PROT_PTE_DEVICE
 #define PROT_SECT_DEVICE	PMD_TYPE_SECT|PMD_SECT_AP_WRITE
 
+/* JYW: 描述所有的内存区间类型 */
 static struct mem_type mem_types[] = {
 	[MT_DEVICE] = {		  /* Strongly ordered / ARMv6 shared device */
 		.prot_pte	= PROT_PTE_DEVICE | L_PTE_MT_DEV_SHARED |
@@ -351,6 +352,7 @@ static struct mem_type mem_types[] = {
 	},
 };
 
+/* JYW: 获取内存区间类型 */
 const struct mem_type *get_mem_type(unsigned int type)
 {
 	return type < ARRAY_SIZE(mem_types) ? &mem_types[type] : NULL;
@@ -682,22 +684,27 @@ static void __init *early_alloc(unsigned long sz)
 	return early_alloc_aligned(sz, sz);
 }
 
+/* JYW: 初始化页表项 */
 static pte_t * __init early_pte_alloc(pmd_t *pmd, unsigned long addr, unsigned long prot)
 {
+	/* JYW: 首先判断PTE页表项是否存在，若不存在则需要新建PTE页表项 */
 	if (pmd_none(*pmd)) {
 		pte_t *pte = early_alloc(PTE_HWTABLE_OFF + PTE_HWTABLE_SIZE);
 		__pmd_populate(pmd, __pa(pte), prot);
 	}
 	BUG_ON(pmd_bad(*pmd));
+	/* JYW: 返回相应的PTE页面表项 */
 	return pte_offset_kernel(pmd, addr);
 }
 
+/* JYW: 初始化PTE页表项内容 */
 static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
 				  unsigned long end, unsigned long pfn,
 				  const struct mem_type *type)
 {
 	pte_t *pte = early_pte_alloc(pmd, addr, type->prot_l1);
 	do {
+		/* JYW: 设置页表项内容到硬件 */
 		set_pte_ext(pte, pfn_pte(pfn, __pgprot(type->prot_pte)), 0);
 		pfn++;
 	} while (pte++, addr += PAGE_SIZE, addr != end);
@@ -730,10 +737,12 @@ static void __init __map_init_section(pmd_t *pmd, unsigned long addr,
 	flush_pmd_entry(p);
 }
 
+/* JYW: 初始化PMD页表项内容和下一级页表PUD */
 static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
 				      unsigned long end, phys_addr_t phys,
 				      const struct mem_type *type)
 {
+	/* JYW: 返回进程页表对应的pmd目录项 */
 	pmd_t *pmd = pmd_offset(pud, addr);
 	unsigned long next;
 
@@ -752,6 +761,7 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
 				((addr | next | phys) & ~SECTION_MASK) == 0) {
 			__map_init_section(pmd, addr, next, phys, type);
 		} else {
+			/* JYW: 初始化PTE页表项内容 */
 			alloc_init_pte(pmd, addr, next,
 						__phys_to_pfn(phys), type);
 		}
@@ -761,6 +771,7 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
 	} while (pmd++, addr = next, addr != end);
 }
 
+/* JYW: 初始化PGD页表项内容和下一级页表PUD */
 static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
 				  unsigned long end, phys_addr_t phys,
 				  const struct mem_type *type)
@@ -770,6 +781,7 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
 
 	do {
 		next = pud_addr_end(addr, end);
+		/* JYW: 初始化PMD页表项内容和下一级页表PUD */
 		alloc_init_pmd(pud, addr, next, phys, type);
 		phys += next - addr;
 	} while (pud++, addr = next, addr != end);
@@ -841,6 +853,7 @@ static void __init create_36bit_mapping(struct map_desc *md,
  * offsets, and we take full advantage of sections and
  * supersections.
  */
+/* JYW: 对物理内存线性映射 */
 static void __init create_mapping(struct map_desc *md)
 {
 	unsigned long addr, length, end;
@@ -883,11 +896,13 @@ static void __init create_mapping(struct map_desc *md)
 		return;
 	}
 
+	/* JYW: 返回内核页表对应的PGD目录项 */
 	pgd = pgd_offset_k(addr);
 	end = addr + length;
 	do {
 		unsigned long next = pgd_addr_end(addr, end);
 
+		/* JYW: 初始化PGD页表项内容和下一级页表PUD */
 		alloc_init_pud(pgd, addr, next, phys, type);
 
 		phys += next - addr;
@@ -1035,6 +1050,7 @@ void __init debug_ll_io_init(void)
 }
 #endif
 
+/* JYW: 默认为 0xff000000UL - 240MB - 8MB */
 static void * __initdata vmalloc_min =
 	(void *)(VMALLOC_END - (240 << 20) - VMALLOC_OFFSET);
 
@@ -1066,10 +1082,22 @@ early_param("vmalloc", early_vmalloc);
 
 phys_addr_t arm_lowmem_limit __initdata = 0;
 
+/*
+ * 练习：划出以下的内存拓扑：
+ *      2：2，mem=63M，vmalloc=944M
+ *      2：2，mem=
+ *
+ */
+
+/* JYW: 检查meminfo，计算arm_lowmem_limit等 */
 void __init sanity_check_meminfo(void)
 {
 	phys_addr_t memblock_limit = 0;
 	int highmem = 0;
+    /*
+     * JYW: 默认为 0xff000000UL - 240MB - 8MB
+     *      可通过early_param("vmalloc", early_vmalloc);进行调整
+     */
 	phys_addr_t vmalloc_limit = __pa(vmalloc_min - 1) + 1;
 	struct memblock_region *reg;
 
@@ -1085,7 +1113,7 @@ void __init sanity_check_meminfo(void)
 
 
 		if (!IS_ENABLED(CONFIG_HIGHMEM) || cache_is_vipt_aliasing()) {
-
+			/* JYW: 如果未开启高端内存，但添加了高端内存块，则忽略 */
 			if (highmem) {
 				pr_notice("Ignoring RAM at %pa-%pa (!CONFIG_HIGHMEM)\n",
 					  &block_start, &block_end);
@@ -1093,6 +1121,8 @@ void __init sanity_check_meminfo(void)
 				continue;
 			}
 
+			/* JYW:
+			 * 如果未开启高端内存，但size超过了高端内存起始地址，则删除 */
 			if (reg->size > size_limit) {
 				phys_addr_t overlap_size = reg->size - size_limit;
 
@@ -1133,7 +1163,7 @@ void __init sanity_check_meminfo(void)
 
 		}
 	}
-
+    /* JYW: high_memory来源arm_lowmem_limit */
 	high_memory = __va(arm_lowmem_limit - 1) + 1;
 
 	/*
@@ -1146,9 +1176,12 @@ void __init sanity_check_meminfo(void)
 	if (!memblock_limit)
 		memblock_limit = arm_lowmem_limit;
 
+	printk("JYW=> %s: memblock_limit: 0x%lx, vmalloc_limit: 0x%lx\n"
+			, __func__, memblock_limit, vmalloc_limit);
 	memblock_set_current_limit(memblock_limit);
 }
 
+/* JYW: 初始化前清除页表项 */
 static inline void prepare_page_table(void)
 {
 	unsigned long addr;
@@ -1158,6 +1191,7 @@ static inline void prepare_page_table(void)
 	 * Clear out all the mappings below the kernel image.
 	 */
 	for (addr = 0; addr < MODULES_VADDR; addr += PMD_SIZE)
+		/* JYW: 清除pmd目录项 */
 		pmd_clear(pmd_off_k(addr));
 
 #ifdef CONFIG_XIP_KERNEL
@@ -1326,6 +1360,7 @@ static void __init kmap_init(void)
 			_PAGE_KERNEL_TABLE);
 }
 
+/* JYW: 映射低端内存 */
 static void __init map_lowmem(void)
 {
 	struct memblock_region *reg;
@@ -1342,13 +1377,13 @@ static void __init map_lowmem(void)
 			end = arm_lowmem_limit;
 		if (start >= end)
 			break;
-
 		if (end < kernel_x_start) {
 			map.pfn = __phys_to_pfn(start);
 			map.virtual = __phys_to_virt(start);
 			map.length = end - start;
 			map.type = MT_MEMORY_RWX;
 
+			/* JYW: 对物理内存线性映射 */
 			create_mapping(&map);
 		} else if (start >= kernel_x_end) {
 			map.pfn = __phys_to_pfn(start);
@@ -1368,6 +1403,7 @@ static void __init map_lowmem(void)
 				create_mapping(&map);
 			}
 
+			/* JYW: 映射kernel_image区域 */
 			map.pfn = __phys_to_pfn(kernel_x_start);
 			map.virtual = __phys_to_virt(kernel_x_start);
 			map.length = kernel_x_end - kernel_x_start;
@@ -1512,12 +1548,15 @@ void __init early_paging_init(const struct machine_desc *mdesc,
  * paging_init() sets up the page tables, initialises the zone memory
  * maps, and sets up the zero page, bad page and bad page tables.
  */
+/* JYW: 初始化页表，初始化zone memory映射等 */
 void __init paging_init(const struct machine_desc *mdesc)
 {
 	void *zero_page;
 
 	build_mem_type_table();
+	/* JYW: 初始化前清除页表项 */
 	prepare_page_table();
+	/* JYW: 映射低端内存 */
 	map_lowmem();
 	dma_contiguous_remap();
 	devicemaps_init(mdesc);
@@ -1529,6 +1568,7 @@ void __init paging_init(const struct machine_desc *mdesc)
 	/* allocate the zero page. */
 	zero_page = early_alloc(PAGE_SIZE);
 
+	/* JYW: 主要完成zone的初始化 */
 	bootmem_init();
 
 	empty_zero_page = virt_to_page(zero_page);

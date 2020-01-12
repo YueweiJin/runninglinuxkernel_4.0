@@ -11,8 +11,11 @@
 #define _ASMARM_PAGE_H
 
 /* PAGE_SHIFT determines the page size */
+/* JYW: 决定了一个page的大小 */
 #define PAGE_SHIFT		12
+/* JYW: 一个page的大小，注意_AC的使用 */
 #define PAGE_SIZE		(_AC(1,UL) << PAGE_SHIFT)
+/* JYW: page的掩码，用于对齐等操作 */
 #define PAGE_MASK		(~((1 << PAGE_SHIFT) - 1))
 
 #ifndef __ASSEMBLY__

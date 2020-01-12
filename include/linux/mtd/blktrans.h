@@ -31,7 +31,9 @@ struct mtd_blktrans_ops;
 struct file;
 struct inode;
 
+/* JYW: mtd转换设备 */
 struct mtd_blktrans_dev {
+	/* JYW: mtdblock,mtdblock_tr */
 	struct mtd_blktrans_ops *tr;
 	struct list_head list;
 	struct mtd_info *mtd;
@@ -42,10 +44,14 @@ struct mtd_blktrans_dev {
 	int readonly;
 	int open;
 	struct kref ref;
+	/* JYW: 通用磁盘对象 */
 	struct gendisk *disk;
 	struct attribute_group *disk_attributes;
+	/* JYW: 工作队列 */
 	struct workqueue_struct *wq;
+	/* JYW: mtd_blktrans_work */
 	struct work_struct work;
+	/* JYW: 请求队列 */
 	struct request_queue *rq;
 	spinlock_t queue_lock;
 	void *priv;
@@ -81,6 +87,7 @@ struct mtd_blktrans_ops {
 	void (*add_mtd)(struct mtd_blktrans_ops *tr, struct mtd_info *mtd);
 	void (*remove_dev)(struct mtd_blktrans_dev *dev);
 
+	/* JYW: 管理所有的struct mtd_blktrans_dev */
 	struct list_head devs;
 	struct list_head list;
 	struct module *owner;

@@ -586,6 +586,7 @@ static void ata_eh_unload(struct ata_port *ap)
  *	RETURNS:
  *	Zero.
  */
+/* JYW: ata scsi错误处理 */
 void ata_scsi_error(struct Scsi_Host *host)
 {
 	struct ata_port *ap = ata_shost_to_port(host);
@@ -598,10 +599,12 @@ void ata_scsi_error(struct Scsi_Host *host)
 	list_splice_init(&host->eh_cmd_q, &eh_work_q);
 	spin_unlock_irqrestore(host->host_lock, flags);
 
+    /* JYW: ata scsi 命令错误处理 */
 	ata_scsi_cmd_error_handler(host, ap, &eh_work_q);
 
 	/* If we timed raced normal completion and there is nothing to
 	   recover nr_timedout == 0 why exactly are we doing error recovery ? */
+    /* JYW: ata scsi port 错误处理 */
 	ata_scsi_port_error_handler(host, ap);
 
 	/* finish or retry handled scmd's and clean up */
@@ -620,6 +623,7 @@ void ata_scsi_error(struct Scsi_Host *host)
  * ap->eh_done_q.  This function is the first part of the libata error
  * handler which processes a given list of failed commands.
  */
+/* JYW: ata scsi 命令错误处理 */
 void ata_scsi_cmd_error_handler(struct Scsi_Host *host, struct ata_port *ap,
 				struct list_head *eh_work_q)
 {
@@ -716,6 +720,7 @@ EXPORT_SYMBOL(ata_scsi_cmd_error_handler);
  * Handle the recovery of the port @ap after all the commands
  * have been recovered.
  */
+/* JYW: ata scsi port 错误处理 */
 void ata_scsi_port_error_handler(struct Scsi_Host *host, struct ata_port *ap)
 {
 	unsigned long flags;
@@ -761,6 +766,7 @@ void ata_scsi_port_error_handler(struct Scsi_Host *host, struct ata_port *ap)
 
 		/* invoke EH, skip if unloading or suspended */
 		if (!(ap->pflags & (ATA_PFLAG_UNLOADING | ATA_PFLAG_SUSPENDED)))
+            /* JYW: ahci_error_handler */
 			ap->ops->error_handler(ap);
 		else {
 			/* if unloading, commence suicide */
@@ -816,6 +822,7 @@ void ata_scsi_port_error_handler(struct Scsi_Host *host, struct ata_port *ap)
 	if (ap->pflags & ATA_PFLAG_LOADING)
 		ap->pflags &= ~ATA_PFLAG_LOADING;
 	else if (ap->pflags & ATA_PFLAG_SCSI_HOTPLUG)
+        /* JYW: ata_scsi_hotplug */
 		schedule_delayed_work(&ap->hotplug_task, 0);
 
 	if (ap->pflags & ATA_PFLAG_RECOVERED)
@@ -2399,6 +2406,7 @@ EXPORT_SYMBOL_GPL(ata_get_cmd_descript);
  *	LOCKING:
  *	None.
  */
+/* JYW: 报告每个link的错误 */
 static void ata_eh_link_report(struct ata_link *link)
 {
 	struct ata_port *ap = link->ap;
@@ -2576,14 +2584,20 @@ static void ata_eh_link_report(struct ata_link *link)
  *	LOCKING:
  *	None.
  */
+/* JYW: 向用户态报告错误 */
 void ata_eh_report(struct ata_port *ap)
 {
 	struct ata_link *link;
 
 	ata_for_each_link(link, ap, HOST_FIRST)
+        /* JYW: 报告每个link的错误 */
 		ata_eh_link_report(link);
 }
 
+/* JYW: 
+*      硬复位：        ahci_softreset
+*      软复位：        sata_std_hardreset
+*/
 static int ata_do_reset(struct ata_link *link, ata_reset_fn_t reset,
 			unsigned int *classes, unsigned long deadline,
 			bool clear_classes)
@@ -2593,7 +2607,10 @@ static int ata_do_reset(struct ata_link *link, ata_reset_fn_t reset,
 	if (clear_classes)
 		ata_for_each_dev(dev, link, ALL)
 			classes[dev->devno] = ATA_DEV_UNKNOWN;
-
+    /* JYW: 
+     *      硬复位：        ahci_softreset
+     *      软复位：        sata_std_hardreset
+     */
 	return reset(link, classes, deadline);
 }
 
@@ -2608,6 +2625,7 @@ static int ata_eh_followup_srst_needed(struct ata_link *link, int rc)
 	return 0;
 }
 
+/* JYW: 复位处理 */
 int ata_eh_reset(struct ata_link *link, int classify,
 		 ata_prereset_fn_t prereset, ata_reset_fn_t softreset,
 		 ata_reset_fn_t hardreset, ata_postreset_fn_t postreset)
@@ -2762,7 +2780,10 @@ int ata_eh_reset(struct ata_link *link, int classify,
 			ehc->i.flags |= ATA_EHI_DID_HARDRESET;
 		else
 			ehc->i.flags |= ATA_EHI_DID_SOFTRESET;
-
+       /* JYW: 
+        *      硬复位：        ahci_softreset
+        *      软复位：        sata_std_hardreset
+        */
 		rc = ata_do_reset(link, reset, classes, deadline, true);
 		if (rc && rc != -EAGAIN) {
 			failed_link = link;
@@ -3072,6 +3093,7 @@ static void ata_eh_park_issue_cmd(struct ata_device *dev, int park)
 	}
 }
 
+/* JYW: ? */
 static int ata_eh_revalidate_and_attach(struct ata_link *link,
 					struct ata_device **r_failed_dev)
 {
@@ -3178,6 +3200,7 @@ static int ata_eh_revalidate_and_attach(struct ata_link *link,
 			continue;
 
 		ehc->i.flags |= ATA_EHI_PRINTINFO;
+        /* JYW: ? */
 		rc = ata_dev_configure(dev);
 		ehc->i.flags &= ~ATA_EHI_PRINTINFO;
 		if (rc) {
@@ -3216,6 +3239,7 @@ static int ata_eh_revalidate_and_attach(struct ata_link *link,
  *	RETURNS:
  *	0 on success, negative errno otherwise
  */
+/* JYW: ? */
 int ata_set_mode(struct ata_link *link, struct ata_device **r_failed_dev)
 {
 	struct ata_port *ap = link->ap;
@@ -3237,6 +3261,7 @@ int ata_set_mode(struct ata_link *link, struct ata_device **r_failed_dev)
 	if (ap->ops->set_mode)
 		rc = ap->ops->set_mode(link, r_failed_dev);
 	else
+        /* JYW: ? */
 		rc = ata_do_set_mode(link, r_failed_dev);
 
 	/* if transfer mode has changed, set DUBIOUS_XFER on device */
@@ -3696,6 +3721,7 @@ static int ata_eh_handle_dev_fail(struct ata_device *dev, int err)
  *	RETURNS:
  *	0 on success, -errno on failure.
  */
+/* JYW: ata端口错误处理 */
 int ata_eh_recover(struct ata_port *ap, ata_prereset_fn_t prereset,
 		   ata_reset_fn_t softreset, ata_reset_fn_t hardreset,
 		   ata_postreset_fn_t postreset,
@@ -3764,10 +3790,10 @@ int ata_eh_recover(struct ata_port *ap, ata_prereset_fn_t prereset,
 	/* reset */
 	ata_for_each_link(link, ap, EDGE) {
 		struct ata_eh_context *ehc = &link->eh_context;
-
+        /* JYW: 跳过未标记ATA_EH_RESET的link */
 		if (!(ehc->i.action & ATA_EH_RESET))
 			continue;
-
+        /* JYW: 复位处理 */
 		rc = ata_eh_reset(link, ata_link_nr_vacant(link),
 				  prereset, softreset, hardreset, postreset);
 		if (rc) {
@@ -3838,6 +3864,7 @@ int ata_eh_recover(struct ata_port *ap, ata_prereset_fn_t prereset,
 			goto config_lpm;
 
 		/* revalidate existing devices and attach new ones */
+        /* JYW: ? */
 		rc = ata_eh_revalidate_and_attach(link, &dev);
 		if (rc)
 			goto rest_fail;
@@ -3850,6 +3877,7 @@ int ata_eh_recover(struct ata_port *ap, ata_prereset_fn_t prereset,
 
 		/* configure transfer mode if necessary */
 		if (ehc->i.flags & ATA_EHI_SETMODE) {
+            /* JYW: ? */
 			rc = ata_set_mode(link, &dev);
 			if (rc)
 				goto rest_fail;

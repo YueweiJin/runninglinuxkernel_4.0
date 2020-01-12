@@ -92,6 +92,7 @@ static inline int device_is_not_partition(struct device *dev)
  * it is attached to.  If it is not attached to a bus either, an empty
  * string will be returned.
  */
+/* JYW: 返回设备的驱动名称 */
 const char *dev_driver_string(const struct device *dev)
 {
 	struct device_driver *drv;
@@ -529,13 +530,14 @@ static ssize_t dev_show(struct device *dev, struct device_attribute *attr,
 }
 static DEVICE_ATTR_RO(dev);
 
-/* /sys/devices/ */
+/* JYW: 本质代表的是/sys/devices/目录 */
 struct kset *devices_kset;
 
 /**
  * device_create_file - create sysfs attribute file for device.
  * @dev: device.
  * @attr: device attribute descriptor.
+ * JYW: 在/sys/devices/xxx/目录下创建device属性文件
  */
 int device_create_file(struct device *dev,
 		       const struct device_attribute *attr)
@@ -560,6 +562,7 @@ EXPORT_SYMBOL_GPL(device_create_file);
  * device_remove_file - remove sysfs attribute file.
  * @dev: device.
  * @attr: device attribute descriptor.
+ * JYW: 在/sys/devices/xxx/目录下移除device属性文件
  */
 void device_remove_file(struct device *dev,
 			const struct device_attribute *attr)
@@ -650,16 +653,32 @@ static void klist_children_put(struct klist_node *n)
  * NOTE: Use put_device() to give up your reference instead of freeing
  * @dev directly once you have called this function.
  */
+/* => 位于/sys/devices下的设备初始化 */
+/*
+JYW: 
+struct device platform_bus = {
+	.init_name	= "platform",
+};
+*/
 void device_initialize(struct device *dev)
 {
+    /* JYW: 设置kobj属于哪个kset，devices_kset 表示的目录为/sys/devices目录 */
 	dev->kobj.kset = devices_kset;
+    /* JYW: 初始化dev->kobj */
 	kobject_init(&dev->kobj, &device_ktype);
+    /* JYW: 初始化链表头 */ 
 	INIT_LIST_HEAD(&dev->dma_pools);
+    /* JYW: 初始化互斥体 */  
 	mutex_init(&dev->mutex);
+    /* JYW: ?? */
 	lockdep_set_novalidate_class(&dev->mutex);
+    /* JYW: 初始化自旋锁 */
 	spin_lock_init(&dev->devres_lock);
+    /* JYW: 初始化链表头 */
 	INIT_LIST_HEAD(&dev->devres_head);
+    /* JYW: 设置电源的状态 */
 	device_pm_init(dev);
+    /* JYW: 设置NUMA节点 如果使用NUMA，则设置NUMA节点 */
 	set_dev_node(dev, -1);
 }
 EXPORT_SYMBOL_GPL(device_initialize);
@@ -807,9 +826,11 @@ static int device_add_class_symlinks(struct device *dev)
 {
 	int error;
 
+    /* JYW: 必须有类才能创建 */
 	if (!dev->class)
 		return 0;
 
+    /* JYW: 创建软链接 */
 	error = sysfs_create_link(&dev->kobj,
 				  &dev->class->p->subsys.kobj,
 				  "subsystem");
@@ -926,12 +947,15 @@ static void device_remove_sys_dev_entry(struct device *dev)
 	}
 }
 
+/* JYW: 分配device_private结构并初始化 */
 int device_private_init(struct device *dev)
 {
+    /* JYW: 分配device_private结构 */
 	dev->p = kzalloc(sizeof(*dev->p), GFP_KERNEL);
 	if (!dev->p)
 		return -ENOMEM;
 	dev->p->device = dev;
+    /* JYW: 初始化内核链表 */
 	klist_init(&dev->p->klist_children, klist_children_get,
 		   klist_children_put);
 	INIT_LIST_HEAD(&dev->p->deferred_probe);
@@ -960,6 +984,13 @@ int device_private_init(struct device *dev)
  * if it returned an error! Always use put_device() to give up your
  * reference instead.
  */
+ /* JYW: device_register 的第二步，调用device_add；在/sys/devices/下添加 */
+/*
+JYW:
+struct device platform_bus = {
+	.init_name	= "platform",
+};
+*/
 int device_add(struct device *dev)
 {
 	struct device *parent = NULL;
@@ -967,10 +998,12 @@ int device_add(struct device *dev)
 	struct class_interface *class_intf;
 	int error = -EINVAL;
 
+	/* JYW: 增加引用计数 */
 	dev = get_device(dev);
 	if (!dev)
 		goto done;
 
+    /* JYW: 分配device_private结构并初始化 */
 	if (!dev->p) {
 		error = device_private_init(dev);
 		if (error)
@@ -982,6 +1015,8 @@ int device_add(struct device *dev)
 	 * some day, we need to initialize the name. We prevent reading back
 	 * the name, and force the use of dev_name()
 	 */
+    /* JYW: dev->kobject->name = dev->init_name */
+    /* JYW: 平台设备: platform */
 	if (dev->init_name) {
 		dev_set_name(dev, "%s", dev->init_name);
 		dev->init_name = NULL;
@@ -991,6 +1026,7 @@ int device_add(struct device *dev)
 	if (!dev_name(dev) && dev->bus && dev->bus->dev_name)
 		dev_set_name(dev, "%s%u", dev->bus->dev_name, dev->id);
 
+    /* JYW: 检查dev->kobject->name */ 
 	if (!dev_name(dev)) {
 		error = -EINVAL;
 		goto name_error;
@@ -998,7 +1034,9 @@ int device_add(struct device *dev)
 
 	pr_debug("device: '%s': %s\n", dev_name(dev), __func__);
 
+    /* JYW: 增加父设备引用计数 */
 	parent = get_device(dev->parent);
+    /* JYW: 设置dev->kobject->parent */ 
 	kobj = get_device_parent(dev, parent);
 	if (kobj)
 		dev->kobj.parent = kobj;
@@ -1009,6 +1047,9 @@ int device_add(struct device *dev)
 
 	/* first, register with generic layer. */
 	/* we require the name to be set before, and pass NULL */
+    /* JYW: 执行完以后，将在/sys/devices/下建立目录XXX，目录名XXX为dev->kobj->name */
+    /* 		平台设备: /sys/devices/platform */
+    /* 		Fixed MDIO bus: /sys/devices/platform/Fixed MDIO bus.0 */
 	error = kobject_add(&dev->kobj, dev->kobj.parent, NULL);
 	if (error)
 		goto Error;
@@ -1017,6 +1058,9 @@ int device_add(struct device *dev)
 	if (platform_notify)
 		platform_notify(dev);
 
+    /* JYW: 在XXX下建立文件uevent
+     * 	平台总线: /sys/devices/platform/uevnet
+	 */
 	error = device_create_file(dev, &dev_attr_uevent);
 	if (error)
 		goto attrError;
@@ -1024,15 +1068,20 @@ int device_add(struct device *dev)
 	error = device_add_class_symlinks(dev);
 	if (error)
 		goto SymlinkError;
+     /* JYW: 添加类设备属型文件和属性组 */
 	error = device_add_attrs(dev);
 	if (error)
 		goto AttrsError;
+    /* JYW: 添加3个symlink */
+    /* JYW: 由于dev.bus 为&platform_bus_type 因此将建立三个symlink */
 	error = bus_add_device(dev);
 	if (error)
 		goto BusError;
+     /* JYW: 创建power子目录，并在其下添加电源管理的属性组文件 */
 	error = dpm_sysfs_add(dev);
 	if (error)
 		goto DPMError;
+     /* JYW: 将该device添加到电源管理链表中 */
 	device_pm_add(dev);
 
 	if (MAJOR(dev->devt)) {
@@ -1054,15 +1103,20 @@ int device_add(struct device *dev)
 		blocking_notifier_call_chain(&dev->bus->p->bus_notifier,
 					     BUS_NOTIFY_ADD_DEVICE, dev);
 
+    /* JYW: 通知用户层 */
 	kobject_uevent(&dev->kobj, KOBJ_ADD);
+    /* JYW: 将设备添加到总线的设备链表中，并尝试获取驱动 */
 	bus_probe_device(dev);
 	if (parent)
+        /* JYW: 有父设备，则将该设备添加到父设备的儿子链表中 */
 		klist_add_tail(&dev->p->knode_parent,
 			       &parent->p->klist_children);
 
+    /* JYW: 该设备属于某个设备类 */
 	if (dev->class) {
 		mutex_lock(&dev->class->p->mutex);
 		/* tie the class to the device */
+        /* JYW: 将device添加到class的类设备链表中 */
 		klist_add_tail(&dev->knode_class,
 			       &dev->class->p->klist_devices);
 
@@ -1122,6 +1176,13 @@ EXPORT_SYMBOL_GPL(device_add);
  * if it returned an error! Always use put_device() to give up the
  * reference initialized in this function instead.
  */
+ /* JYW: 调用完成可以在/sys/devices下面见到，任何加到这个总线的设备接着 */
+/*
+JYW:
+struct device platform_bus = {
+	.init_name	= "platform",
+};
+*/
 int device_register(struct device *dev)
 {
 	device_initialize(dev);
@@ -1137,6 +1198,7 @@ EXPORT_SYMBOL_GPL(device_register);
  * we do take care to provide for the case that we get a NULL
  * pointer passed in.
  */
+/* JYW: 增加引用计数 */
 struct device *get_device(struct device *dev)
 {
 	return dev ? kobj_to_dev(kobject_get(&dev->kobj)) : NULL;
@@ -1363,18 +1425,23 @@ struct device *device_find_child(struct device *parent, void *data,
 	return child;
 }
 EXPORT_SYMBOL_GPL(device_find_child);
-
+/* JYW: 设备初始化 */
 int __init devices_init(void)
 {
+    /* JYW: 生成/sys/devices目录 */
 	devices_kset = kset_create_and_add("devices", &device_uevent_ops, NULL);
 	if (!devices_kset)
 		return -ENOMEM;
+    /* JYW: 生成/sys/dev目录 */
 	dev_kobj = kobject_create_and_add("dev", NULL);
 	if (!dev_kobj)
 		goto dev_kobj_err;
+    
+    /* JYW: 在/sys/dev目录下生成block目录 */
 	sysfs_dev_block_kobj = kobject_create_and_add("block", dev_kobj);
 	if (!sysfs_dev_block_kobj)
 		goto block_kobj_err;
+    /* JYW: 在/sys/dev目录下生成char目录 */
 	sysfs_dev_char_kobj = kobject_create_and_add("char", dev_kobj);
 	if (!sysfs_dev_char_kobj)
 		goto char_kobj_err;
@@ -1672,6 +1739,7 @@ EXPORT_SYMBOL_GPL(device_create_vargs);
  * Note: the struct class passed to this function must have previously
  * been created with a call to class_create().
  */
+/* JYW: 创建一个设备并注册进sysfs中，在/dev/下生成一个设备节点，并在/sys/devices下面生成相应的节点 */
 struct device *device_create(struct class *class, struct device *parent,
 			     dev_t devt, void *drvdata, const char *fmt, ...)
 {
@@ -1996,6 +2064,7 @@ void device_shutdown(void)
  */
 
 #ifdef CONFIG_PRINTK
+/* JYW: 创建syslog头 */
 static int
 create_syslog_header(const struct device *dev, char *hdr, size_t hdrlen)
 {
@@ -2053,18 +2122,21 @@ overflow:
 	return 0;
 }
 
+/* JYW: 基于设备层的printk打印 */
 int dev_vprintk_emit(int level, const struct device *dev,
 		     const char *fmt, va_list args)
 {
 	char hdr[128];
 	size_t hdrlen;
 
+    /* JYW: 创建一个syslog的头 */
 	hdrlen = create_syslog_header(dev, hdr, sizeof(hdr));
 
 	return vprintk_emit(0, level, hdrlen ? hdr : NULL, hdrlen, fmt, args);
 }
 EXPORT_SYMBOL(dev_vprintk_emit);
 
+/* JYW: 基于设备层的，printk打印 */
 int dev_printk_emit(int level, const struct device *dev, const char *fmt, ...)
 {
 	va_list args;
@@ -2072,6 +2144,7 @@ int dev_printk_emit(int level, const struct device *dev, const char *fmt, ...)
 
 	va_start(args, fmt);
 
+    /* JYW: 基于设备层的printk打印 */
 	r = dev_vprintk_emit(level, dev, fmt, args);
 
 	va_end(args);
@@ -2080,6 +2153,7 @@ int dev_printk_emit(int level, const struct device *dev, const char *fmt, ...)
 }
 EXPORT_SYMBOL(dev_printk_emit);
 
+/* JYW: 基于设备的printk打印 */
 static void __dev_printk(const char *level, const struct device *dev,
 			struct va_format *vaf)
 {
@@ -2090,6 +2164,7 @@ static void __dev_printk(const char *level, const struct device *dev,
 		printk("%s(NULL device *): %pV", level, vaf);
 }
 
+/* JYW: 基于dev的printk打印 */
 void dev_printk(const char *level, const struct device *dev,
 		const char *fmt, ...)
 {
@@ -2107,6 +2182,7 @@ void dev_printk(const char *level, const struct device *dev,
 }
 EXPORT_SYMBOL(dev_printk);
 
+/* JYW: 宏定义，定义不同打印等级的dev_printk函数 */
 #define define_dev_printk_level(func, kern_level)		\
 void func(const struct device *dev, const char *fmt, ...)	\
 {								\

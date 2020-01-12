@@ -313,7 +313,9 @@ struct request_queue {
 	/*
 	 * Together with queue_head for cacheline sharing
 	 */
+	/* JYW: 待处理请求的链表 */
 	struct list_head	queue_head;
+    /* JYW: 指向首先可能被合并的请求 */
 	struct request		*last_merge;
 	struct elevator_queue	*elevator;
 	int			nr_rqs[2];	/* # allocated [a]sync rqs */
@@ -327,7 +329,16 @@ struct request_queue {
 	 */
 	struct request_list	root_rl;
 
+    /* JYW: 实现驱动程序处理请求的接口 */
+	/*
+	 * JYW: mtd_blktrans_request
+	 *      scsi_request_fn
+	 */
 	request_fn_proc		*request_fn;
+    /* JYW: 将一个新请求插入到请求队列时调用的方法 */
+    /* JYW: md_make_request
+     *      blk_queue_bio
+     */
 	make_request_fn		*make_request_fn;
 	prep_rq_fn		*prep_rq_fn;
 	unprep_rq_fn		*unprep_rq_fn;
@@ -366,6 +377,7 @@ struct request_queue {
 	 * The queue owner gets to use this for whatever they like.
 	 * ll_rw_blk doesn't touch it.
 	 */
+	/* JYW: mtdblock. mtd_blktrans_dev */
 	void			*queuedata;
 
 	/*
@@ -1374,6 +1386,7 @@ static inline int blk_rq_aligned(struct request_queue *q, unsigned long addr,
 }
 
 /* assumes size > 256 */
+/* JYW: 获取blksize的位数 */
 static inline unsigned int blksize_bits(unsigned int size)
 {
 	unsigned int bits = 8;

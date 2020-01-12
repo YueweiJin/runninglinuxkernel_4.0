@@ -6,7 +6,9 @@
 #include <net/ip_fib.h>
 
 struct fib_alias {
+	/* JYW: 被链接到 */
 	struct list_head	fa_list;
+	/* JYW: 指向fib_info结构体,由fib_info可找到fib_nh结构体 */
 	struct fib_info		*fa_info;
 	u8			fa_tos;
 	u8			fa_type;

@@ -40,6 +40,14 @@
  * course): it moves the ident pattern and the version byte into the data area
  * and the OOB area will remain untouched.
  *
+ JYW:
+ bbt是在内存中分配的一块内存（nand_scan_bbt中分配的，后面会说到），这块内存会存放BBT。
+
+ 如果定义了NAND_BBT_USE_FLASH（这个可以在编写nand控制器驱动时选择），会先在nand中查找BBT是否存在，如果存在，然后读出放在bbt中.
+ 如果不存在（全新flash会有这种情况），则在bbt中建立BBT，然后写入nand中。
+
+ 如果没有定义NAND_BBT_USE_FLASH，那么会直接在bbt指向的内存中建立BBT。
+ 
  * The table uses 2 bits per block
  * 11b:		block is good
  * 00b:		block is factory marked bad
@@ -454,6 +462,7 @@ static int scan_block_fast(struct mtd_info *mtd, struct nand_bbt_descr *bd,
  * Create a bad block table by scanning the device for the given good/bad block
  * identify pattern.
  */
+/* JYW: 就是扫描NAND芯片所有的block，读取每个block中第一个page的oob内容，然后根据oob中的坏块信息建立起bbt，这坏块信息就是根据badblock_pattern来确定的 */
 static int create_bbt(struct mtd_info *mtd, uint8_t *buf,
 	struct nand_bbt_descr *bd, int chip)
 {
@@ -820,10 +829,12 @@ static int write_bbt(struct mtd_info *mtd, uint8_t *buf,
  * The function creates a memory based bbt by scanning the device for
  * manufacturer / software marked good / bad blocks.
  */
+/* JYW: 在内存中建立bbt */
 static inline int nand_memory_bbt(struct mtd_info *mtd, struct nand_bbt_descr *bd)
 {
 	struct nand_chip *this = mtd->priv;
 
+    /* JYW: 就是扫描NAND芯片所有的block，读取每个block中第一个page的oob内容，然后根据oob中的坏块信息建立起bbt，这坏块信息就是根据badblock_pattern来确定的 */
 	return create_bbt(mtd, this->buffers->databuf, bd, -1);
 }
 
@@ -1075,6 +1086,7 @@ static void verify_bbt_descr(struct mtd_info *mtd, struct nand_bbt_descr *bd)
  * The bad block table memory is allocated here. It must be freed by calling
  * the nand_free_bbt function.
  */
+/* JYW: 扫描并创建坏块表 */
 int nand_scan_bbt(struct mtd_info *mtd, struct nand_bbt_descr *bd)
 {
 	struct nand_chip *this = mtd->priv;
@@ -1096,14 +1108,20 @@ int nand_scan_bbt(struct mtd_info *mtd, struct nand_bbt_descr *bd)
 	 * If no primary table decriptor is given, scan the device to build a
 	 * memory based bad block table.
 	 */
+	/* JYW: 如果bbt_td为空，则在内存中建立bbt */
 	if (!td) {
+        /* JYW: 在内存中建立bbt */
 		if ((res = nand_memory_bbt(mtd, bd))) {
 			pr_err("nand_bbt: can't scan flash and build the RAM-based BBT\n");
 			kfree(this->bbt);
 			this->bbt = NULL;
 		}
+        /* JYW: 建立完成后返回 */
 		return res;
 	}
+
+    /* JYW: 下面是bbt放在NAND中的情况，比较复杂，暂时没有用到，暂不分析 */
+    
 	verify_bbt_descr(mtd, td);
 	verify_bbt_descr(mtd, md);
 
@@ -1143,6 +1161,7 @@ int nand_scan_bbt(struct mtd_info *mtd, struct nand_bbt_descr *bd)
  *
  * The function updates the bad block table(s).
  */
+/* JYW: 更新坏块表 */
 static int nand_update_bbt(struct mtd_info *mtd, loff_t offs)
 {
 	struct nand_chip *this = mtd->priv;
@@ -1251,6 +1270,7 @@ static struct nand_bbt_descr bbt_mirror_no_oob_descr = {
  * this->badblock_pattern. Thus, this->badblock_pattern should be NULL when
  * passed to this function.
  */
+/* JYW: 创建一个bbt描述符 */
 static int nand_create_badblock_pattern(struct nand_chip *this)
 {
 	struct nand_bbt_descr *bd;
@@ -1277,6 +1297,7 @@ static int nand_create_badblock_pattern(struct nand_chip *this)
  * This function selects the default bad block table support for the device and
  * calls the nand_scan_bbt function.
  */
+/* JYW: 选择默认的坏块表 */
 int nand_default_bbt(struct mtd_info *mtd)
 {
 	struct nand_chip *this = mtd->priv;
@@ -1294,17 +1315,19 @@ int nand_default_bbt(struct mtd_info *mtd)
 				this->bbt_md = &bbt_mirror_descr;
 			}
 		}
+    /* JYW: bbt放在内存中 */
 	} else {
 		this->bbt_td = NULL;
 		this->bbt_md = NULL;
 	}
 
+    /* JYW: 如果没有定义，则创建默认的模式 */
 	if (!this->badblock_pattern) {
 		ret = nand_create_badblock_pattern(this);
 		if (ret)
 			return ret;
 	}
-
+    /* JYW: 扫描并创建坏块表 */
 	return nand_scan_bbt(mtd, this->badblock_pattern);
 }
 
@@ -1328,6 +1351,7 @@ int nand_isreserved_bbt(struct mtd_info *mtd, loff_t offs)
  * @offs: offset in the device
  * @allowbbt: allow access to bad block table region
  */
+/* JYW: 从bbt中查找给定的block是否是坏块 */
 int nand_isbad_bbt(struct mtd_info *mtd, loff_t offs, int allowbbt)
 {
 	struct nand_chip *this = mtd->priv;

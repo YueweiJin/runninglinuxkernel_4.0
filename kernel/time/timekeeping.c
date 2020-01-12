@@ -1706,6 +1706,7 @@ void getboottime64(struct timespec64 *ts)
 }
 EXPORT_SYMBOL_GPL(getboottime64);
 
+/* JYW: 获取内核时间 */
 unsigned long get_seconds(void)
 {
 	struct timekeeper *tk = &tk_core.timekeeper;

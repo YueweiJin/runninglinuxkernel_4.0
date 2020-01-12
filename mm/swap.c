@@ -40,6 +40,7 @@
 /* How many pages do we try to swap or page in/out together? */
 int page_cluster;
 
+/* JYW: 定义全局数据，每个CPU上有一个page向量 */
 static DEFINE_PER_CPU(struct pagevec, lru_add_pvec);
 static DEFINE_PER_CPU(struct pagevec, lru_rotate_pvecs);
 static DEFINE_PER_CPU(struct pagevec, lru_deactivate_pvecs);
@@ -618,13 +619,19 @@ void mark_page_accessed(struct page *page)
 }
 EXPORT_SYMBOL(mark_page_accessed);
 
+/* JYW: 将页面添加到lru链表 */
 static void __lru_cache_add(struct page *page)
 {
+	/* JYW: 获取当前CPU上的page向量 */
 	struct pagevec *pvec = &get_cpu_var(lru_add_pvec);
 
 	page_cache_get(page);
+	/* JYW:
+	 * 判断page向量是否有空间，若没有空间，则将向量中的所有页面添加到lru链表中 */
 	if (!pagevec_space(pvec))
+		/* JYW: 将页面向量中的所有页面添加到lru链表中 */
 		__pagevec_lru_add(pvec);
+	/* JYW: 将页面放入当前CPU的page向量中 */
 	pagevec_add(pvec, page);
 	put_cpu_var(lru_add_pvec);
 }
@@ -657,10 +664,12 @@ EXPORT_SYMBOL(lru_cache_add_file);
  * pagevec is drained. This gives a chance for the caller of lru_cache_add()
  * have the page added to the active list using mark_page_accessed().
  */
+/* JYW: 将页面添加到lru链表 */
 void lru_cache_add(struct page *page)
 {
 	VM_BUG_ON_PAGE(PageActive(page) && PageUnevictable(page), page);
 	VM_BUG_ON_PAGE(PageLRU(page), page);
+	/* JYW: 将页面添加到lru链表 */
 	__lru_cache_add(page);
 }
 
@@ -1020,11 +1029,13 @@ void lru_add_page_tail(struct page *page, struct page *page_tail,
 }
 #endif /* CONFIG_TRANSPARENT_HUGEPAGE */
 
+/* JYW: 将一个页面添加到lru链表 */
 static void __pagevec_lru_add_fn(struct page *page, struct lruvec *lruvec,
 				 void *arg)
 {
 	int file = page_is_file_cache(page);
 	int active = PageActive(page);
+	/* JYW: 判断page属于哪个链表 */
 	enum lru_list lru = page_lru(page);
 
 	VM_BUG_ON_PAGE(PageLRU(page), page);
@@ -1039,8 +1050,10 @@ static void __pagevec_lru_add_fn(struct page *page, struct lruvec *lruvec,
  * Add the passed pages to the LRU, then drop the caller's refcount
  * on them.  Reinitialises the caller's pagevec.
  */
+/* JYW: 将页面向量中的所有页面添加到lru链表中 */
 void __pagevec_lru_add(struct pagevec *pvec)
 {
+	/* JYW: 将所有的页面添加到lru链表 */
 	pagevec_lru_move_fn(pvec, __pagevec_lru_add_fn, NULL);
 }
 EXPORT_SYMBOL(__pagevec_lru_add);

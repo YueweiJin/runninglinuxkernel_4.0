@@ -751,6 +751,7 @@ EXPORT_SYMBOL_GPL(ata_scsi_ioctl);
  *	RETURNS:
  *	Command allocated, or %NULL if none available.
  */
+/* JYW: 申请一个ata_queued_cmd */
 static struct ata_queued_cmd *ata_scsi_qc_new(struct ata_device *dev,
 					      struct scsi_cmnd *cmd)
 {
@@ -1737,6 +1738,7 @@ nothing_to_do:
 	return 1;
 }
 
+/* JYW: scsi_done */
 static void ata_scsi_qc_complete(struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
@@ -1772,7 +1774,7 @@ static void ata_scsi_qc_complete(struct ata_queued_cmd *qc)
 
 	if (need_sense && !ap->ops->error_handler)
 		ata_dump_status(ap->print_id, &qc->result_tf);
-
+    /* JYW: scsi_done->blk_complete_request */
 	qc->scsidone(cmd);
 
 	ata_qc_free(qc);
@@ -1804,6 +1806,7 @@ static void ata_scsi_qc_complete(struct ata_queued_cmd *qc)
  *	0 on success, SCSI_ML_QUEUE_DEVICE_BUSY if the command
  *	needs to be deferred.
  */
+/* JYW: 将scsi命令转成ata命令 */
 static int ata_scsi_translate(struct ata_device *dev, struct scsi_cmnd *cmd,
 			      ata_xlat_func_t xlat_func)
 {
@@ -1813,6 +1816,7 @@ static int ata_scsi_translate(struct ata_device *dev, struct scsi_cmnd *cmd,
 
 	VPRINTK("ENTER\n");
 
+    /* JYW: 申请一个ata_queued_cmd */
 	qc = ata_scsi_qc_new(dev, cmd);
 	if (!qc)
 		goto err_mem;
@@ -3423,6 +3427,7 @@ static inline void ata_scsi_dump_cdb(struct ata_port *ap,
 #endif
 }
 
+/* JYW: 下发SCSI命令至ATA设备 */
 static inline int __ata_scsi_queuecmd(struct scsi_cmnd *scmd,
 				      struct ata_device *dev)
 {
@@ -3457,6 +3462,7 @@ static inline int __ata_scsi_queuecmd(struct scsi_cmnd *scmd,
 	}
 
 	if (xlat_func)
+        /* JYW: 将scsi命令转成ata命令 */
 		rc = ata_scsi_translate(dev, scmd, xlat_func);
 	else
 		ata_scsi_simulate(dev, scmd);
@@ -3490,6 +3496,7 @@ static inline int __ata_scsi_queuecmd(struct scsi_cmnd *scmd,
  *	Return value from __ata_scsi_queuecmd() if @cmd can be queued,
  *	0 otherwise.
  */
+/* JYW: 下发SCSI命令至ATA设备 */
 int ata_scsi_queuecmd(struct Scsi_Host *shost, struct scsi_cmnd *cmd)
 {
 	struct ata_port *ap;
@@ -3636,6 +3643,7 @@ void ata_scsi_simulate(struct ata_device *dev, struct scsi_cmnd *cmd)
 	}
 }
 
+/* JYW: 为每个ata_port分配一个scsi host */
 int ata_scsi_add_hosts(struct ata_host *host, struct scsi_host_template *sht)
 {
 	int i, rc;
@@ -3691,6 +3699,7 @@ int ata_scsi_add_hosts(struct ata_host *host, struct scsi_host_template *sht)
 	return rc;
 }
 
+/* JYW: 发起ata scsi host扫描 */
 void ata_scsi_scan_host(struct ata_port *ap, int sync)
 {
 	int tries = 5;
@@ -3898,6 +3907,7 @@ void ata_scsi_media_change_notify(struct ata_device *dev)
  *	LOCKING:
  *	Kernel thread context (may sleep).
  */
+/* JYW: ata scsi热插拔处理 */
 void ata_scsi_hotplug(struct work_struct *work)
 {
 	struct ata_port *ap =

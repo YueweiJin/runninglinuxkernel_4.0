@@ -708,6 +708,9 @@ static int vfat_d_anon_disconn(struct dentry *dentry)
 	return IS_ROOT(dentry) && (dentry->d_flags & DCACHE_DISCONNECTED);
 }
 
+/* JYW: dir: 父目录对象的inode对象 
+ *	dentry: 待查找的dentry对象，其name字段已在分配dentry结构时初始化完成
+ */
 static struct dentry *vfat_lookup(struct inode *dir, struct dentry *dentry,
 				  unsigned int flags)
 {
@@ -1069,10 +1072,12 @@ static struct file_system_type vfat_fs_type = {
 	.name		= "vfat",
 	.mount		= vfat_mount,
 	.kill_sb	= kill_block_super,
+	/* JYW: 这种类型的文件系统必须位于物理磁盘设备上 */
 	.fs_flags	= FS_REQUIRES_DEV,
 };
 MODULE_ALIAS_FS("vfat");
 
+/* JYW: fatfs初始化入口 */
 static int __init init_vfat_fs(void)
 {
 	return register_filesystem(&vfat_fs_type);

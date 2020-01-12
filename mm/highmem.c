@@ -214,6 +214,7 @@ void kmap_flush_unused(void)
 	unlock_kmap();
 }
 
+/* JYW: 映射一个新的虚拟地址 */
 static inline unsigned long map_new_virtual(struct page *page)
 {
 	unsigned long vaddr;
@@ -227,6 +228,7 @@ start:
 	for (;;) {
 		last_pkmap_nr = get_next_pkmap_nr(color);
 		if (no_more_pkmaps(last_pkmap_nr, color)) {
+            /* JYW: 把计数器重置为0 */
 			flush_all_zero_pkmaps();
 			count = get_pkmap_entries_count(color);
 		}
@@ -263,6 +265,7 @@ start:
 		   &(pkmap_page_table[last_pkmap_nr]), mk_pte(page, kmap_prot));
 
 	pkmap_count[last_pkmap_nr] = 1;
+    /* JYW: 插入或删除一个新的元素到哈希表中 */
 	set_page_address(page, (void *)vaddr);
 
 	return vaddr;
@@ -276,6 +279,7 @@ start:
  *
  * We cannot call this from interrupts, as it may block.
  */
+/* JYW: 映射一个高端内存页框，返回对应的虚拟地址 */
 void *kmap_high(struct page *page)
 {
 	unsigned long vaddr;
@@ -287,6 +291,7 @@ void *kmap_high(struct page *page)
 	lock_kmap();
 	vaddr = (unsigned long)page_address(page);
 	if (!vaddr)
+        /* JYW: 映射一个新的虚拟地址 */
 		vaddr = map_new_virtual(page);
 	pkmap_count[PKMAP_NR(vaddr)]++;
 	BUG_ON(pkmap_count[PKMAP_NR(vaddr)] < 2);
@@ -382,9 +387,10 @@ EXPORT_SYMBOL(kunmap_high);
 /*
  * Describes one page->virtual association
  */
+/* JYW：为高端内存中的每一个页框进行当前映射 */
 struct page_address_map {
-	struct page *page;
-	void *virtual;
+	struct page *page;          /* JYW: 指向页描述符的指针 */
+	void *virtual;              /* JYW: 分配给该页框的线性地址 */
 	struct list_head list;
 };
 
@@ -409,6 +415,7 @@ static struct page_address_slot *page_slot(const struct page *page)
  *
  * Returns the page's virtual address.
  */
+/* JYW: 返回页框对应的虚拟地址 */
 void *page_address(const struct page *page)
 {
 	unsigned long flags;
@@ -417,7 +424,7 @@ void *page_address(const struct page *page)
 
 	if (!PageHighMem(page))
 		return lowmem_page_address(page);
-
+    /* JYW: 如果页框在高端内存，则在散列表中查找 */
 	pas = page_slot(page);
 	ret = NULL;
 	spin_lock_irqsave(&pas->lock, flags);
@@ -425,6 +432,7 @@ void *page_address(const struct page *page)
 		struct page_address_map *pam;
 
 		list_for_each_entry(pam, &pas->lh, list) {
+		    /* JYW: 若找到，则返回对应的虚拟地址 */
 			if (pam->page == page) {
 				ret = pam->virtual;
 				goto done;
@@ -433,6 +441,7 @@ void *page_address(const struct page *page)
 	}
 done:
 	spin_unlock_irqrestore(&pas->lock, flags);
+    /* JYW: 找不到，则返回NULL */
 	return ret;
 }
 
@@ -443,6 +452,7 @@ EXPORT_SYMBOL(page_address);
  * @page: &struct page to set
  * @virtual: virtual address to use
  */
+/* JYW: 插入或删除一个新的元素到哈希表中 */
 void set_page_address(struct page *page, void *virtual)
 {
 	unsigned long flags;

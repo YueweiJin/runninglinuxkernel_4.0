@@ -5,6 +5,8 @@
 # (c) 2008-2010 Andy Whitcroft <apw@canonical.com>
 # Licensed under the terms of the GNU GPL License version 2
 
+# JYW: 提供了检查代码风格的脚本 
+
 use strict;
 use POSIX;
 use File::Basename;

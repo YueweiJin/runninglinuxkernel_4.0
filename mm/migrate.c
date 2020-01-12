@@ -1082,6 +1082,7 @@ out:
  *
  * Returns the number of pages that were not migrated, or an error code.
  */
+/* JYW: 完成页面的迁移 */
 int migrate_pages(struct list_head *from, new_page_t get_new_page,
 		free_page_t put_new_page, unsigned long private,
 		enum migrate_mode mode, int reason)

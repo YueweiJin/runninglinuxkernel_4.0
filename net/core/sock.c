@@ -2014,6 +2014,7 @@ EXPORT_SYMBOL(sk_wait_data);
  *	rmem allocation. This function assumes that protocols which have
  *	memory_pressure use sk_wmem_queued as write buffer accounting.
  */
+/* JYW: 返回1: 允许分配，返回0: 不允许分配 */
 int __sk_mem_schedule(struct sock *sk, int size, int kind)
 {
 	struct proto *prot = sk->sk_prot;
@@ -2026,6 +2027,7 @@ int __sk_mem_schedule(struct sock *sk, int size, int kind)
 	allocated = sk_memory_allocated_add(sk, amt, &parent_status);
 
 	/* Under limit. */
+    /* JYW: 小于sysctl_mem[0]离开内存压力区 */
 	if (parent_status == UNDER_LIMIT &&
 			allocated <= sk_prot_mem_limits(sk, 0)) {
 		sk_leave_memory_pressure(sk);
@@ -2033,6 +2035,7 @@ int __sk_mem_schedule(struct sock *sk, int size, int kind)
 	}
 
 	/* Under pressure. (we or our parents) */
+    /* JYW: 超过sysctl_mem[1]进入内存压力区 */
 	if ((parent_status > SOFT_LIMIT) ||
 			allocated > sk_prot_mem_limits(sk, 1))
 		sk_enter_memory_pressure(sk);

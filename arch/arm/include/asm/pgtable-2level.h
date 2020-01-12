@@ -83,6 +83,8 @@
  * PGDIR_SHIFT determines what a third-level page table entry can map
  */
 #define PMD_SHIFT		21
+/* JYW:
+ * ARM32架构中一级页表PGD的偏移应该是从20开始，这里从21开始，代码取巧了：相当于映射了512个PTE，前256个PTE是给OS用的，后512个PTE是给ARM硬件MMU使用的 */
 #define PGDIR_SHIFT		21
 
 #define PMD_SIZE		(1UL << PMD_SHIFT)
@@ -93,6 +95,7 @@
 /*
  * section address mask and size definitions.
  */
+/* JYW: 段映射，每个表项可以映射1MB空间大小，总计有4096个表项 */
 #define SECTION_SHIFT		20
 #define SECTION_SIZE		(1UL << SECTION_SHIFT)
 #define SECTION_MASK		(~(SECTION_SIZE-1))
@@ -157,6 +160,7 @@
 #define pud_clear(pudp)		do { } while (0)
 #define set_pud(pud,pudp)	do { } while (0)
 
+/* JYW: 返回进程页表对应的pmd目录项，这里由于是2级页表，等于pud */
 static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
 {
 	return (pmd_t *)pud;
@@ -172,6 +176,7 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
 		flush_pmd_entry(pmdpd);	\
 	} while (0)
 
+/* JYW: 清除pmd目录项 */
 #define pmd_clear(pmdp)			\
 	do {				\
 		pmdp[0] = __pmd(0);	\
@@ -182,6 +187,7 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
 /* we don't need complex calculations here as the pmd is folded into the pgd */
 #define pmd_addr_end(addr,end) (end)
 
+/* JYW: 设置页表项内容到硬件 */
 #define set_pte_ext(ptep,pte,ext) cpu_set_pte_ext(ptep,pte,ext)
 #define pte_special(pte)	(0)
 static inline pte_t pte_mkspecial(pte_t pte) { return pte; }

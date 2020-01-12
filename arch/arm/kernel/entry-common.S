@@ -66,8 +66,18 @@ work_pending:
 ENTRY(ret_to_user)
 ret_slow_syscall:
 	disable_irq				@ disable interrupts
+/* JYW: 准备从中断返回到用户空间 */
 ENTRY(ret_to_user_from_irq)
+    /* JYW: 获得flags标志 offsetof(struct thread_info, flags) */
 	ldr	r1, [tsk, #TI_FLAGS]
+ 	/* JYW: 检查 #define _TIF_WORK_MASK (_TIF_NEED_RESCHED | _TIF_SIGPENDING | _TIF_NOTIFY_RESUME) */
+    /* JYW: 设置需要重新调度标志TIF_NEED_RESCHED */
+    /*
+     * 1、当前进程通过系统调用自愿让出CPU(主动sleep，通过系统调用nanosleep)
+     * 2、在系统调用中因为某种原因受阻(若在内核态下因为IO阻塞)
+     * 3、因为某种原因唤醒一个进程(无论是在内核态还是在用户态)
+     * 4、在中断服务程序发现当前进程已经连续运行太久(时间片到了)
+     */
 	tst	r1, #_TIF_WORK_MASK
 	bne	work_pending
 no_work_pending:

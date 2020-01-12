@@ -7,6 +7,7 @@
 
 #include <linux/slab.h>
 
+/* JYW: 默认为100ms */
 int sched_rr_timeslice = RR_TIMESLICE;
 
 static int do_sched_rt_period_timer(struct rt_bandwidth *rt_b, int overrun);
@@ -2109,6 +2110,7 @@ static void set_curr_task_rt(struct rq *rq)
 	dequeue_pushable_task(rq, p);
 }
 
+/* JYW: 获取实时进程的时间片 */
 static unsigned int get_rr_interval_rt(struct rq *rq, struct task_struct *task)
 {
 	/*

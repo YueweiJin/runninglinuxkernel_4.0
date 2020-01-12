@@ -86,6 +86,7 @@ static inline int radix_tree_is_indirect_ptr(void *ptr)
 
 struct radix_tree_node {
 	unsigned int	path;	/* Offset in parent & height from the bottom */
+	/* JYW: 记录节点中非空指针数量 */
 	unsigned int	count;
 	union {
 		struct {
@@ -100,11 +101,18 @@ struct radix_tree_node {
 	/* For tree user */
 	struct list_head private_list;
 	void __rcu	*slots[RADIX_TREE_MAP_SIZE];
+	/* JYW: 二维的标记数组, 用于快速遍历脏节点等
+	 * #define PAGECACHE_TAG_DIRTY	0
+	 * #define PAGECACHE_TAG_WRITEBACK	1
+	 * #define PAGECACHE_TAG_TOWRITE	2
+	 * 通过radix_tree_tag_set()
+	 */
 	unsigned long	tags[RADIX_TREE_MAX_TAGS][RADIX_TREE_TAG_LONGS];
 };
 
 /* root tags are stored in gfp_mask, shifted by __GFP_BITS_SHIFT */
 struct radix_tree_root {
+	/* JYW: 当前树的高度，不包括叶子节点的层数 */
 	unsigned int		height;
 	gfp_t			gfp_mask;
 	struct radix_tree_node	__rcu *rnode;

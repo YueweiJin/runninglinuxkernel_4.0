@@ -200,6 +200,7 @@ static int ip_local_deliver_finish(struct sk_buff *skb)
 		int raw;
 
 	resubmit:
+        /* JYW: 原始套接字的接收处理 */
 		raw = raw_local_deliver(skb, protocol);
 
 		ipprot = rcu_dereference(inet_protos[protocol]);
@@ -373,6 +374,7 @@ drop:
 /*
  * 	Main IP Receive routine.
  */
+/* JYW: 接收处理ip数据报文 */
 int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, struct net_device *orig_dev)
 {
 	const struct iphdr *iph;
@@ -395,6 +397,7 @@ int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, 
 	if (!pskb_may_pull(skb, sizeof(struct iphdr)))
 		goto inhdr_error;
 
+	/* JYW: 获取ip头 */
 	iph = ip_hdr(skb);
 
 	/*
@@ -450,6 +453,8 @@ int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, 
 	/* Must drop socket now because of tproxy. */
 	skb_orphan(skb);
 
+	/* JYW: 若注册了netfilter的pre
+	 * routing钩子，则执行钩子，否则执行ip_rcv_finish */
 	return NF_HOOK(NFPROTO_IPV4, NF_INET_PRE_ROUTING, skb, dev, NULL,
 		       ip_rcv_finish);
 

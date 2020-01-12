@@ -72,21 +72,29 @@ fail:
 }
 #else
 
+/* JYW: 创建一张新的路由表，若已存在则直接从哈希数组链表中取 */
 struct fib_table *fib_new_table(struct net *net, u32 id)
 {
 	struct fib_table *tb;
 	unsigned int h;
 
+	/* JYW: 若id没有指定，则操作的是MAIN路由表 */
 	if (id == 0)
 		id = RT_TABLE_MAIN;
+
+	/* JYW:
+ 	 * 根据id号，在全局路由表的hash链表数组中查找是否存在id对应的struct_fib_table 
+	 */
 	tb = fib_get_table(net, id);
 	if (tb)
 		return tb;
 
+	/* JYW: 如果不存在，则创建一个路由表 */
 	tb = fib_trie_table(id);
 	if (!tb)
 		return NULL;
 
+	/* JYW: 关联路由表 */
 	switch (id) {
 	case RT_TABLE_LOCAL:
 		net->ipv4.fib_local = tb;
@@ -104,6 +112,7 @@ struct fib_table *fib_new_table(struct net *net, u32 id)
 		break;
 	}
 
+	/* JYW: 添加到hash链表中 */
 	h = id & (FIB_TABLE_HASHSZ - 1);
 	hlist_add_head_rcu(&tb->tb_hlist, &net->ipv4.fib_table_hash[h]);
 	return tb;

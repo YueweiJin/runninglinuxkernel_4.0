@@ -170,7 +170,7 @@ MODULE_DESCRIPTION("Library module for ATA devices");
 MODULE_LICENSE("GPL");
 MODULE_VERSION(DRV_VERSION);
 
-
+/* JYW: 检测设备在位，且PHY通信已建立 */
 static bool ata_sstatus_online(u32 sstatus)
 {
 	return (sstatus & 0xf) == 0x3;
@@ -545,6 +545,7 @@ int atapi_cmd_type(u8 opcode)
  *	LOCKING:
  *	Inherited from caller.
  */
+/* JYW: 将ata_taskfile转换位一个FIS结构 */
 void ata_tf_to_fis(const struct ata_taskfile *tf, u8 pmp, int is_cmd, u8 *fis)
 {
 	fis[0] = 0x27;			/* Register - Host to Device FIS */
@@ -586,7 +587,7 @@ void ata_tf_to_fis(const struct ata_taskfile *tf, u8 pmp, int is_cmd, u8 *fis)
  *	LOCKING:
  *	Inherited from caller.
  */
-
+/* JYW: 将FIS帧转换位ATA taskfile */
 void ata_tf_from_fis(const u8 *fis, struct ata_taskfile *tf)
 {
 	tf->command	= fis[2];	/* status */
@@ -1018,6 +1019,7 @@ const char *ata_mode_string(unsigned long xfer_mask)
 	return "<n/a>";
 }
 
+/* JYW: 根据SCR0:SStatus寄存器获取速度 */
 const char *sata_spd_string(unsigned int spd)
 {
 	static const char * const spd_str[] = {
@@ -2157,6 +2159,7 @@ static int ata_dev_config_ncq(struct ata_device *dev,
  *	RETURNS:
  *	0 on success, -errno otherwise
  */
+/* JYW: ? */
 int ata_dev_configure(struct ata_device *dev)
 {
 	struct ata_port *ap = dev->link->ap;
@@ -2699,6 +2702,7 @@ int ata_bus_probe(struct ata_port *ap)
  *	LOCKING:
  *	None.
  */
+/* JYW: 打印link状态 */
 static void sata_print_link_status(struct ata_link *link)
 {
 	u32 sstatus, scontrol, tmp;
@@ -2707,8 +2711,10 @@ static void sata_print_link_status(struct ata_link *link)
 		return;
 	sata_scr_read(link, SCR_CONTROL, &scontrol);
 
+    /* JYW: 检测设备在位，且PHY通信已建立 */
 	if (ata_phys_link_online(link)) {
 		tmp = (sstatus >> 4) & 0xf;
+        /* JYW: 根据SCR0:SStatus寄存器获取速度 */
 		ata_link_info(link, "SATA link up %s (SStatus %X SControl %X)\n",
 			      sata_spd_string(tmp), sstatus, scontrol);
 	} else {
@@ -2808,6 +2814,7 @@ int sata_down_spd_limit(struct ata_link *link, u32 spd_limit)
 	return 0;
 }
 
+/* JYW: 判断是否需要配置速率，返回1表示需要 */
 static int __sata_set_spd_needed(struct ata_link *link, u32 *scontrol)
 {
 	struct ata_link *host_link = &link->ap->link;
@@ -2826,7 +2833,7 @@ static int __sata_set_spd_needed(struct ata_link *link, u32 *scontrol)
 		target = 0;
 	else
 		target = fls(limit);
-
+    /* JYW: 获取接口允许的最高速率 */
 	spd = (*scontrol >> 4) & 0xf;
 	*scontrol = (*scontrol & ~0xf0) | ((target & 0xf) << 4);
 
@@ -2848,13 +2855,16 @@ static int __sata_set_spd_needed(struct ata_link *link, u32 *scontrol)
  *	RETURNS:
  *	1 if SATA spd configuration is needed, 0 otherwise.
  */
+/* JYW: 判断是否需要配置速率，返回1表示需要 */
 static int sata_set_spd_needed(struct ata_link *link)
 {
 	u32 scontrol;
 
+    /* JYW: 读取scr寄存器 */
 	if (sata_scr_read(link, SCR_CONTROL, &scontrol))
 		return 1;
 
+    /* JYW: 判断是否需要配置速率，返回1表示需要 */
 	return __sata_set_spd_needed(link, &scontrol);
 }
 
@@ -2871,6 +2881,7 @@ static int sata_set_spd_needed(struct ata_link *link)
  *	0 if spd doesn't need to be changed, 1 if spd has been
  *	changed.  Negative errno if SCR registers are inaccessible.
  */
+/* JYW: 根据sata_spd_limit字段，设置sata速率 */
 int sata_set_spd(struct ata_link *link)
 {
 	u32 scontrol;
@@ -3193,6 +3204,7 @@ int ata_down_xfermask_limit(struct ata_device *dev, unsigned int sel)
 	return 0;
 }
 
+/* JYW: ? */
 static int ata_dev_set_mode(struct ata_device *dev)
 {
 	struct ata_port *ap = dev->link->ap;
@@ -3222,6 +3234,7 @@ static int ata_dev_set_mode(struct ata_device *dev)
 
 	/* revalidate */
 	ehc->i.flags |= ATA_EHI_POST_SETMODE;
+    /* JYW: ? */
 	rc = ata_dev_revalidate(dev, ATA_DEV_UNKNOWN, 0);
 	ehc->i.flags &= ~ATA_EHI_POST_SETMODE;
 	if (rc)
@@ -3290,7 +3303,7 @@ static int ata_dev_set_mode(struct ata_device *dev)
  *	RETURNS:
  *	0 on success, negative errno otherwise
  */
-
+/* JYW: ? */
 int ata_do_set_mode(struct ata_link *link, struct ata_device **r_failed_dev)
 {
 	struct ata_port *ap = link->ap;
@@ -3356,6 +3369,7 @@ int ata_do_set_mode(struct ata_link *link, struct ata_device **r_failed_dev)
 
 	/* step 4: update devices' xfer mode */
 	ata_for_each_dev(dev, link, ENABLED) {
+	    /* JYW: ? */
 		rc = ata_dev_set_mode(dev);
 		if (rc)
 			goto out;
@@ -3393,6 +3407,7 @@ int ata_do_set_mode(struct ata_link *link, struct ata_device **r_failed_dev)
  *	RETURNS:
  *	0 if @linke is ready before @deadline; otherwise, -errno.
  */
+/* JYW: 检查设备是否就绪，0表示就绪 */
 int ata_wait_ready(struct ata_link *link, unsigned long deadline,
 		   int (*check_ready)(struct ata_link *link))
 {
@@ -3419,6 +3434,7 @@ int ata_wait_ready(struct ata_link *link, unsigned long deadline,
 		unsigned long now = jiffies;
 		int ready, tmp;
 
+        /* JYW: ahci_check_ready, 检查设备是否就绪，1表示就绪 */
 		ready = tmp = check_ready(link);
 		if (ready > 0)
 			return 0;
@@ -3474,11 +3490,13 @@ int ata_wait_ready(struct ata_link *link, unsigned long deadline,
  *	RETURNS:
  *	0 if @linke is ready before @deadline; otherwise, -errno.
  */
+/* JYW: 检查设备是否就绪，0表示就绪 */
 int ata_wait_after_reset(struct ata_link *link, unsigned long deadline,
 				int (*check_ready)(struct ata_link *link))
 {
 	ata_msleep(link->ap, ATA_WAIT_AFTER_RESET);
 
+    /* JYW: 检查设备是否就绪，0表示就绪 */
 	return ata_wait_ready(link, deadline, check_ready);
 }
 
@@ -3566,6 +3584,7 @@ int sata_link_debounce(struct ata_link *link, const unsigned long *params,
  *	RETURNS:
  *	0 on success, -errno on failure.
  */
+/* JYW: ？ */
 int sata_link_resume(struct ata_link *link, const unsigned long *params,
 		     unsigned long deadline)
 {
@@ -3706,6 +3725,7 @@ int sata_link_scr_lpm(struct ata_link *link, enum ata_lpm_policy policy,
  *	RETURNS:
  *	0 on success, -errno otherwise.
  */
+/* JYW: reset前调用的接口 */
 int ata_std_prereset(struct ata_link *link, unsigned long deadline)
 {
 	struct ata_port *ap = link->ap;
@@ -3728,6 +3748,7 @@ int ata_std_prereset(struct ata_link *link, unsigned long deadline)
 	}
 
 	/* no point in trying softreset on offline link */
+    /* JYW: 掉线的设备不需要软复位 */
 	if (ata_phys_link_offline(link))
 		ehc->i.action &= ~ATA_EH_SOFTRESET;
 
@@ -3758,6 +3779,7 @@ int ata_std_prereset(struct ata_link *link, unsigned long deadline)
  *	RETURNS:
  *	0 on success, -errno otherwise.
  */
+/* JYW: sata链路硬复位，通过复位PHY来复位链路 */
 int sata_link_hardreset(struct ata_link *link, const unsigned long *timing,
 			unsigned long deadline,
 			bool *online, int (*check_ready)(struct ata_link *))
@@ -3770,6 +3792,7 @@ int sata_link_hardreset(struct ata_link *link, const unsigned long *timing,
 	if (online)
 		*online = false;
 
+    /* JYW: 判断是否需要配置速率，返回1表示需要 */
 	if (sata_set_spd_needed(link)) {
 		/* SATA spec says nothing about how to reconfigure
 		 * spd.  To be on the safe side, turn off phy during
@@ -3784,6 +3807,7 @@ int sata_link_hardreset(struct ata_link *link, const unsigned long *timing,
 		if ((rc = sata_scr_write(link, SCR_CONTROL, scontrol)))
 			goto out;
 
+        /* JYW: 根据sata_spd_limit字段，设置sata速率 */
 		sata_set_spd(link);
 	}
 
@@ -3793,15 +3817,18 @@ int sata_link_hardreset(struct ata_link *link, const unsigned long *timing,
 
 	scontrol = (scontrol & 0x0f0) | 0x301;
 
+    /* JYW: 写scr寄存器 */
 	if ((rc = sata_scr_write_flush(link, SCR_CONTROL, scontrol)))
 		goto out;
 
 	/* Couldn't find anything in SATA I/II specs, but AHCI-1.1
 	 * 10.4.2 says at least 1 ms.
 	 */
+	/* JYW: 至少等待1ms，确保发送到接口上 */
 	ata_msleep(link->ap, 1);
 
 	/* bring link back */
+    /* JYW: ？ */
 	rc = sata_link_resume(link, timing, deadline);
 	if (rc)
 		goto out;
@@ -3860,6 +3887,7 @@ int sata_link_hardreset(struct ata_link *link, const unsigned long *timing,
  *	RETURNS:
  *	0 if link offline, -EAGAIN if link online, -errno on errors.
  */
+/* JYW: sata链路硬复位，通过复位PHY来复位链路 */
 int sata_std_hardreset(struct ata_link *link, unsigned int *class,
 		       unsigned long deadline)
 {
@@ -3884,6 +3912,7 @@ int sata_std_hardreset(struct ata_link *link, unsigned int *class,
  *	LOCKING:
  *	Kernel thread context (may sleep)
  */
+/* JYW: 复位后的接口调用，主要打印link状态 */
 void ata_std_postreset(struct ata_link *link, unsigned int *classes)
 {
 	u32 serror;
@@ -3895,6 +3924,7 @@ void ata_std_postreset(struct ata_link *link, unsigned int *classes)
 		sata_scr_write(link, SCR_ERROR, serror);
 
 	/* print link status */
+    /* JYW: 打印link状态 */
 	sata_print_link_status(link);
 
 	DPRINTK("EXIT\n");
@@ -3997,6 +4027,7 @@ int ata_dev_reread_id(struct ata_device *dev, unsigned int readid_flags)
  *	RETURNS:
  *	0 on success, negative errno otherwise
  */
+/* JYW: ? */
 int ata_dev_revalidate(struct ata_device *dev, unsigned int new_class,
 		       unsigned int readid_flags)
 {
@@ -4792,6 +4823,7 @@ void ata_qc_free(struct ata_queued_cmd *qc)
 	}
 }
 
+/* JYW: ata_scsi_qc_complete */
 void __ata_qc_complete(struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap;
@@ -4828,6 +4860,7 @@ void __ata_qc_complete(struct ata_queued_cmd *qc)
 	ap->qc_active &= ~(1 << qc->tag);
 
 	/* call completion callback */
+    /* JYW: ata_scsi_qc_complete */
 	qc->complete_fn(qc);
 }
 
@@ -4867,6 +4900,7 @@ static void ata_verify_xfer(struct ata_queued_cmd *qc)
  *	LOCKING:
  *	spin_lock_irqsave(host lock)
  */
+/* JYW: 清除qc相关标志位，并调用 ata_scsi_qc_complete */
 void ata_qc_complete(struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
@@ -4941,6 +4975,7 @@ void ata_qc_complete(struct ata_queued_cmd *qc)
 		if (unlikely(dev->flags & ATA_DFLAG_DUBIOUS_XFER))
 			ata_verify_xfer(qc);
 
+        /* JYW: ata_scsi_qc_complete */
 		__ata_qc_complete(qc);
 	} else {
 		if (qc->flags & ATA_QCFLAG_EH_SCHEDULED)
@@ -5014,6 +5049,7 @@ int ata_qc_complete_multiple(struct ata_port *ap, u32 qc_active)
  *	LOCKING:
  *	spin_lock_irqsave(host lock)
  */
+/* JYW: 准备一个ATA命令提交至设备 */
 void ata_qc_issue(struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
@@ -5062,7 +5098,7 @@ void ata_qc_issue(struct ata_queued_cmd *qc)
 		ata_link_abort(link);
 		return;
 	}
-
+    /* JYW: ahci_qc_prep */
 	ap->ops->qc_prep(qc);
 
 	qc->err_mask |= ap->ops->qc_issue(qc);
@@ -5111,6 +5147,7 @@ int sata_scr_valid(struct ata_link *link)
  *	RETURNS:
  *	0 on success, negative errno on failure.
  */
+/* JYW: 读取scr寄存器 */
 int sata_scr_read(struct ata_link *link, int reg, u32 *val)
 {
 	if (ata_is_host_link(link)) {
@@ -5164,6 +5201,7 @@ int sata_scr_write(struct ata_link *link, int reg, u32 val)
  *	RETURNS:
  *	0 on success, negative errno on failure.
  */
+/* JYW: 写scr寄存器 */
 int sata_scr_write_flush(struct ata_link *link, int reg, u32 val)
 {
 	if (ata_is_host_link(link)) {
@@ -5195,11 +5233,13 @@ int sata_scr_write_flush(struct ata_link *link, int reg, u32 val)
  *	RETURNS:
  *	True if the port online status is available and online.
  */
+/* JYW: 检测设备在位，且PHY通信已建立 */
 bool ata_phys_link_online(struct ata_link *link)
 {
 	u32 sstatus;
 
 	if (sata_scr_read(link, SCR_STATUS, &sstatus) == 0 &&
+        /* JYW: 检测设备在位，且PHY通信已建立 */
 	    ata_sstatus_online(sstatus))
 		return true;
 	return false;
@@ -5219,6 +5259,7 @@ bool ata_phys_link_online(struct ata_link *link)
  *	RETURNS:
  *	True if the port offline status is available and offline.
  */
+/* JYW: 检测设备不在位 */
 bool ata_phys_link_offline(struct ata_link *link)
 {
 	u32 sstatus;
@@ -5495,6 +5536,7 @@ struct device_type ata_port_type = {
  *	LOCKING:
  *	Inherited from caller.
  */
+/* JYW: 初始化ata_device */
 void ata_dev_init(struct ata_device *dev)
 {
 	struct ata_link *link = ata_dev_phys_link(dev);
@@ -5532,6 +5574,7 @@ void ata_dev_init(struct ata_device *dev)
  *	LOCKING:
  *	Kernel thread context (may sleep)
  */
+/* JYW: 初始化一个ata_link */
 void ata_link_init(struct ata_port *ap, struct ata_link *link, int pmp)
 {
 	int i;
@@ -5541,6 +5584,7 @@ void ata_link_init(struct ata_port *ap, struct ata_link *link, int pmp)
 	       ATA_LINK_CLEAR_END - ATA_LINK_CLEAR_BEGIN);
 
 	link->ap = ap;
+    /* JYW: PMP端口号 */
 	link->pmp = pmp;
 	link->active_tag = ATA_TAG_POISON;
 	link->hw_sata_spd_limit = UINT_MAX;
@@ -5554,6 +5598,7 @@ void ata_link_init(struct ata_port *ap, struct ata_link *link, int pmp)
 #ifdef CONFIG_ATA_ACPI
 		dev->gtf_filter = ata_acpi_gtf_filter;
 #endif
+        /* JYW: 初始化ata_device */
 		ata_dev_init(dev);
 	}
 }
@@ -5603,6 +5648,7 @@ int sata_link_init_spd(struct ata_link *link)
  *	LOCKING:
  *	Inherited from calling layer (may sleep).
  */
+/* JYW: 分配ata_port结构并初始化 */
 struct ata_port *ata_port_alloc(struct ata_host *host)
 {
 	struct ata_port *ap;
@@ -5630,7 +5676,9 @@ struct ata_port *ata_port_alloc(struct ata_host *host)
 #endif
 
 	mutex_init(&ap->scsi_scan_mutex);
+    /* JYW: 初始化工作队列ata_scsi_hotplug */
 	INIT_DELAYED_WORK(&ap->hotplug_task, ata_scsi_hotplug);
+    /* JYW: 初始化工作队列ata_scsi_dev_rescan */
 	INIT_WORK(&ap->scsi_rescan_task, ata_scsi_dev_rescan);
 	INIT_LIST_HEAD(&ap->eh_done_q);
 	init_waitqueue_head(&ap->eh_wait_q);
@@ -5695,6 +5743,7 @@ static void ata_host_release(struct device *gendev, void *res)
  *	LOCKING:
  *	Inherited from calling layer (may sleep).
  */
+/* JYW: 分配并初始化ata host及对应的ata_port结构体分配和初始化 */
 struct ata_host *ata_host_alloc(struct device *dev, int max_ports)
 {
 	struct ata_host *host;
@@ -5725,6 +5774,7 @@ struct ata_host *ata_host_alloc(struct device *dev, int max_ports)
 	for (i = 0; i < max_ports; i++) {
 		struct ata_port *ap;
 
+        /* JYW: 分配ata_port结构并初始化 */
 		ap = ata_port_alloc(host);
 		if (!ap)
 			goto err_out;
@@ -5757,6 +5807,7 @@ struct ata_host *ata_host_alloc(struct device *dev, int max_ports)
  *	LOCKING:
  *	Inherited from calling layer (may sleep).
  */
+/* JYW: 分配ata_host并初始化ata_port_info，传入host对应的端口个数 */
 struct ata_host *ata_host_alloc_pinfo(struct device *dev,
 				      const struct ata_port_info * const * ppi,
 				      int n_ports)
@@ -5765,6 +5816,7 @@ struct ata_host *ata_host_alloc_pinfo(struct device *dev,
 	struct ata_host *host;
 	int i, j;
 
+    /* JYW: 分配并初始化ata host及对应的ata_port结构体分配和初始化 */
 	host = ata_host_alloc(dev, n_ports);
 	if (!host)
 		return NULL;
@@ -6050,7 +6102,7 @@ int ata_port_probe(struct ata_port *ap)
 	return rc;
 }
 
-
+/* JWY: ata端口异步扫描 */
 static void async_port_probe(void *data, async_cookie_t cookie)
 {
 	struct ata_port *ap = data;
@@ -6068,8 +6120,10 @@ static void async_port_probe(void *data, async_cookie_t cookie)
 	(void)ata_port_probe(ap);
 
 	/* in order to keep device order, we need to synchronize at this point */
+    /* JYW: 确保不重复扫描？ */
 	async_synchronize_cookie(cookie);
 
+    /* JYW: 发起ata scsi host扫描 */
 	ata_scsi_scan_host(ap, 1);
 }
 
@@ -6089,6 +6143,7 @@ static void async_port_probe(void *data, async_cookie_t cookie)
  *	RETURNS:
  *	0 on success, -errno otherwise.
  */
+/* JYW: 向系统注册已经初始化完成后的host */
 int ata_host_register(struct ata_host *host, struct scsi_host_template *sht)
 {
 	int i, rc;
@@ -6117,12 +6172,14 @@ int ata_host_register(struct ata_host *host, struct scsi_host_template *sht)
 
 	/* Create associated sysfs transport objects  */
 	for (i = 0; i < host->n_ports; i++) {
+        /* JYW:  向系统添加ATA port */
 		rc = ata_tport_add(host->dev,host->ports[i]);
 		if (rc) {
 			goto err_tadd;
 		}
 	}
 
+    /* JYW: 为每个ata_port分配一个scsi host */
 	rc = ata_scsi_add_hosts(host, sht);
 	if (rc)
 		goto err_tadd;
@@ -6158,6 +6215,7 @@ int ata_host_register(struct ata_host *host, struct scsi_host_template *sht)
 	/* perform each probe asynchronously */
 	for (i = 0; i < host->n_ports; i++) {
 		struct ata_port *ap = host->ports[i];
+        /* JWY: ata端口异步扫描 */
 		async_schedule(async_port_probe, ap);
 	}
 
@@ -6194,6 +6252,7 @@ int ata_host_register(struct ata_host *host, struct scsi_host_template *sht)
  *	RETURNS:
  *	0 on success, -errno otherwise.
  */
+/* JWY: 启动host，请求中断并向系统注册host */
 int ata_host_activate(struct ata_host *host, int irq,
 		      irq_handler_t irq_handler, unsigned long irq_flags,
 		      struct scsi_host_template *sht)
@@ -6217,7 +6276,7 @@ int ata_host_activate(struct ata_host *host, int irq,
 
 	for (i = 0; i < host->n_ports; i++)
 		ata_port_desc(host->ports[i], "irq %d", irq);
-
+    /* JYW: 向系统注册已经初始化完成后的host */
 	rc = ata_host_register(host, sht);
 	/* if failed, just free the IRQ and leave ports alone */
 	if (rc)
@@ -6610,6 +6669,7 @@ static void __init ata_parse_force_param(void)
 	ata_force_tbl_size = idx;
 }
 
+/* JYW: ata核心层初始化 */
 static int __init ata_init(void)
 {
 	int rc;
@@ -6623,6 +6683,7 @@ static int __init ata_init(void)
 	}
 
 	libata_transport_init();
+    /* JYW: 将ata绑定到scsi */
 	ata_scsi_transport_template = ata_attach_transport();
 	if (!ata_scsi_transport_template) {
 		ata_sff_exit();
@@ -6706,6 +6767,7 @@ void ata_msleep(struct ata_port *ap, unsigned int msecs)
  *	RETURNS:
  *	The final register value.
  */
+/* JYW: 等待寄存器值满足条件 或 超时 */
 u32 ata_wait_register(struct ata_port *ap, void __iomem *reg, u32 mask, u32 val,
 		      unsigned long interval, unsigned long timeout)
 {

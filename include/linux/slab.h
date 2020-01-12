@@ -422,11 +422,12 @@ static __always_inline void *kmalloc(size_t size, gfp_t flags)
 			return kmalloc_large(size, flags);
 #ifndef CONFIG_SLOB
 		if (!(flags & GFP_DMA)) {
+            /* JYW: 根据大小，找到一个合适长度的slab描述符 */
 			int index = kmalloc_index(size);
 
 			if (!index)
 				return ZERO_SIZE_PTR;
-
+            /* JYW: 最主要调用 kmem_cache_alloc */
 			return kmem_cache_alloc_trace(kmalloc_caches[index],
 					flags, size);
 		}

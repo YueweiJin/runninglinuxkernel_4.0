@@ -63,8 +63,10 @@ static int __init parse_tag_core(const struct tag *tag)
 
 __tagtable(ATAG_CORE, parse_tag_core);
 
+/* JYW: 登记内存tag中的内存信息 */
 static int __init parse_tag_mem32(const struct tag *tag)
 {
+    /* JYW: 添加内存信息 */
 	return arm_add_memory(tag->u.mem.start, tag->u.mem.size);
 }
 
@@ -178,6 +180,7 @@ static void __init squash_mem_tags(struct tag *tag)
 			tag->hdr.tag = ATAG_NONE;
 }
 
+/* JYW: 解析TAGS */
 const struct machine_desc * __init
 setup_machine_tags(phys_addr_t __atags_pointer, unsigned int machine_nr)
 {
@@ -192,6 +195,7 @@ setup_machine_tags(phys_addr_t __atags_pointer, unsigned int machine_nr)
 	 */
 	for_each_machine_desc(p)
 		if (machine_nr == p->nr) {
+            /* => Machine: hi3536 */
 			pr_info("Machine: %s\n", p->name);
 			mdesc = p;
 			break;

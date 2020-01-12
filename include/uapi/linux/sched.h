@@ -23,7 +23,11 @@
 #define CLONE_CHILD_SETTID	0x01000000	/* set the TID in the child */
 /* 0x02000000 was previously the unused CLONE_STOPPED (Start in stopped state)
    and is now available for re-use. */
+/* JYW: 用来隔离系统的hostname以及NIS domain name */
 #define CLONE_NEWUTS		0x04000000	/* New utsname namespace */
+/* JYW: 隔离System V IPC objects和POSIX message queues。其中System V IPC 
+ *  objects包含Message queues、Semaphore sets和Shared memory segments.
+ */
 #define CLONE_NEWIPC		0x08000000	/* New ipc namespace */
 #define CLONE_NEWUSER		0x10000000	/* New user namespace */
 #define CLONE_NEWPID		0x20000000	/* New pid namespace */
@@ -33,12 +37,17 @@
 /*
  * Scheduling policies
  */
+/* JYW: 使用CFS调度器 */
 #define SCHED_NORMAL		0
+/* JYW: 使用realtime调度器 */
 #define SCHED_FIFO		1
 #define SCHED_RR		2
+/* JYW: 使用CFS调度器 */
 #define SCHED_BATCH		3
 /* SCHED_ISO: reserved but not implemented yet */
+/* JYW: IDLE调度 */
 #define SCHED_IDLE		5
+/* JYW: 使用deadline调度器 */
 #define SCHED_DEADLINE		6
 
 /* Can be ORed in to make sure the process is reverted back to SCHED_NORMAL on fork */

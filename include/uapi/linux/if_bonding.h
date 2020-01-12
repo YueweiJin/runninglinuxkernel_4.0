@@ -63,12 +63,21 @@
 
 #define BOND_CHECK_MII_STATUS	(SIOCGMIIPHY)
 
+/* JYW: 可通过/proc/net/bonding/bondx查看当前模式 */
+
+/* ！JYW: 负载均衡，交换机需配置聚合口，流量均分，MAC地址相同 */
 #define BOND_MODE_ROUNDROBIN	0
+/* ！JYW: 主备模式，不需要交换机支持，流量在主上，MAC地址不同，主备型 */
 #define BOND_MODE_ACTIVEBACKUP	1
+/* JYW: 基于bond0，交换机需配置聚合口，缺省的策略是：(源MAC地址 XOR 目标MAC地址) % slave数量 */
 #define BOND_MODE_XOR		2
+/* JYW: 复制广播 */
 #define BOND_MODE_BROADCAST	3
+/* ！JYW: 交换机需要支持IEEE 802.3ad，交换机自动会分配每个端口的出口流量 */
 #define BOND_MODE_8023AD        4
+/* JYW: 多个MAC地址，不需要交换机支持，在每个slave上根据当前的负载（根据速度计算）分配外出流量。 */
 #define BOND_MODE_TLB           5
+/* ！JYW: 多个MAC地址，不需要交换机支持，基于TLB，加上RLB，不需要交换机支持 */
 #define BOND_MODE_ALB		6 /* TLB + RLB (receive load balancing) */
 
 /* each slave's link has 4 states */

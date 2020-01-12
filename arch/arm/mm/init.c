@@ -135,6 +135,7 @@ void show_mem(unsigned int filter)
 	printk("%d pages swap cached\n", cached);
 }
 
+/* JYW: 进行normal区域划分 */
 static void __init find_limits(unsigned long *min, unsigned long *max_low,
 			       unsigned long *max_high)
 {
@@ -182,6 +183,7 @@ void __init setup_dma_zone(const struct machine_desc *mdesc)
 #endif
 }
 
+/* JYW: 内存zone的初始化 */
 static void __init zone_sizes_init(unsigned long min, unsigned long max_low,
 	unsigned long max_high)
 {
@@ -234,6 +236,7 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max_low,
 			arm_dma_zone_size >> PAGE_SHIFT);
 #endif
 
+	/* JYW: 初始化内存节点 */
 	free_area_init_node(0, zone_size, min, zhole_size);
 }
 
@@ -326,6 +329,7 @@ void __init arm_memblock_init(const struct machine_desc *mdesc)
 	memblock_dump_all();
 }
 
+/* JYW: 主要完成zone的初始化 */
 void __init bootmem_init(void)
 {
 	unsigned long min, max_low, max_high;
@@ -333,6 +337,7 @@ void __init bootmem_init(void)
 	memblock_allow_resize();
 	max_low = max_high = 0;
 
+	/* JYW: 进行normal区域划分 */
 	find_limits(&min, &max_low, &max_high);
 
 	/*
@@ -515,6 +520,7 @@ static void __init free_highpages(void)
  * memory is free.  This is done after various parts of the system have
  * claimed their memory after the kernel image.
  */
+/* JYW: 内存初始化 */
 void __init mem_init(void)
 {
 #ifdef CONFIG_HAVE_TCM
@@ -527,6 +533,7 @@ void __init mem_init(void)
 
 	/* this will put all unused low memory onto the freelists */
 	free_unused_memmap();
+	/* JYW: 释放bootmem */
 	free_all_bootmem();
 
 #ifdef CONFIG_SA1111
@@ -569,7 +576,9 @@ void __init mem_init(void)
 			MLK(ITCM_OFFSET, (unsigned long) itcm_end),
 #endif
 			MLK(FIXADDR_START, FIXADDR_END),
+			/* JYW: 打印vmalloc区域 */
 			MLM(VMALLOC_START, VMALLOC_END),
+            /* JYW: 打印低端内存区域（虚拟地址区域） */
 			MLM(PAGE_OFFSET, (unsigned long)high_memory),
 #ifdef CONFIG_HIGHMEM
 			MLM(PKMAP_BASE, (PKMAP_BASE) + (LAST_PKMAP) *
@@ -601,6 +610,17 @@ void __init mem_init(void)
 	BUILD_BUG_ON(PKMAP_BASE + LAST_PKMAP * PAGE_SIZE > PAGE_OFFSET);
 	BUG_ON(PKMAP_BASE + LAST_PKMAP * PAGE_SIZE	> PAGE_OFFSET);
 #endif
+
+	/*
+	 * JYW:
+	 *      Linux ARM的内存布局图可参考documentation/arm/memory.txt
+	 *
+	 *	内核image本身占据的内存空间从_text段到_end段(由arch/arm/kernel/vmlinux.ld.S控制)：
+	 *	代码段：_text------------------------------ _etext
+	 *	init段：__init_begin-----------------------__init_end
+	 *	数据段：_sdata-----------------------------_edata
+	 *	BSS段：__bss_start-------------------------__bss_stop 
+	 */
 
 	if (PAGE_SIZE >= 16384 && get_num_physpages() <= 128) {
 		extern int sysctl_overcommit_memory;

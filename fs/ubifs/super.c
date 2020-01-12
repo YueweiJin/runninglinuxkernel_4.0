@@ -98,6 +98,7 @@ static int validate_inode(struct ubifs_info *c, const struct inode *inode)
 	return err;
 }
 
+/* JYW: 获取UBIFS的inode结构，若没有则申请赋值 */
 struct inode *ubifs_iget(struct super_block *sb, unsigned long inum)
 {
 	int err;
@@ -122,8 +123,10 @@ struct inode *ubifs_iget(struct super_block *sb, unsigned long inum)
 		goto out;
 	}
 
+	/* JYW: 计算inode的key */
 	ino_key_init(c, &key, inode->i_ino);
 
+	/* JYW: 根据key，读取节点 */
 	err = ubifs_tnc_lookup(c, &key, ino);
 	if (err)
 		goto out_ino;
@@ -2245,6 +2248,7 @@ static int __init ubifs_init(void)
 	if (!ubifs_inode_slab)
 		return -ENOMEM;
 
+	/* JYW: 向PFRA注册一个shrinker函数 */
 	register_shrinker(&ubifs_shrinker_info);
 
 	err = ubifs_compressors_init();

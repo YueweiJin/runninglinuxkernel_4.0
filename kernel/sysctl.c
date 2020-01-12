@@ -416,6 +416,7 @@ static struct ctl_table kern_table[] = {
 		.proc_handler	= sched_rt_handler,
 	},
 	{
+        /* JYW: /proc/sys/kernel/sched_rr_timeslice_ms */
 		.procname	= "sched_rr_timeslice_ms",
 		.data		= &sched_rr_timeslice,
 		.maxlen		= sizeof(int),
@@ -1214,6 +1215,7 @@ static struct ctl_table vm_table[] = {
 	},
 	{
 		.procname	= "dirty_writeback_centisecs",
+        /* JYW: 回写线程的循环周期，当然，循环的前提是块设备存在脏数据 */
 		.data		= &dirty_writeback_interval,
 		.maxlen		= sizeof(dirty_writeback_interval),
 		.mode		= 0644,
@@ -1221,6 +1223,7 @@ static struct ctl_table vm_table[] = {
 	},
 	{
 		.procname	= "dirty_expire_centisecs",
+        /* JYW: 脏数据的超时时间，超过这个时间的脏数据将会马上放入回写队列 */
 		.data		= &dirty_expire_interval,
 		.maxlen		= sizeof(dirty_expire_interval),
 		.mode		= 0644,
@@ -1325,6 +1328,8 @@ static struct ctl_table vm_table[] = {
 #endif /* CONFIG_COMPACTION */
 	{
 		.procname	= "min_free_kbytes",
+		/* JYW:
+		 * 让每个zone保留一个预留的内存，作为min水位，代表系统所保留空闲内存的最低限 */
 		.data		= &min_free_kbytes,
 		.maxlen		= sizeof(min_free_kbytes),
 		.mode		= 0644,

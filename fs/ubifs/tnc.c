@@ -310,6 +310,7 @@ static struct ubifs_znode *dirty_cow_znode(struct ubifs_info *c,
  * used with @c->tnc_mutex unlock upon return from the TNC subsystem. But LNC
  * may be changed at any time, e.g. freed by the shrinker.
  */
+/* JYW: 将目录项节点或扩展属性项节点添加到TNC的叶子上，即LNC */
 static int lnc_add(struct ubifs_info *c, struct ubifs_zbranch *zbr,
 		   const void *node)
 {
@@ -321,6 +322,7 @@ static int lnc_add(struct ubifs_info *c, struct ubifs_zbranch *zbr,
 	ubifs_assert(zbr->len != 0);
 	ubifs_assert(is_hash_key(c, &zbr->key));
 
+	/* JYW: 判断读取的目录项或扩展属性项节点是否有效 */
 	err = ubifs_validate_entry(c, dent);
 	if (err) {
 		dump_stack();
@@ -389,6 +391,7 @@ static void lnc_free(struct ubifs_zbranch *zbr)
  * added to LNC. Returns zero in case of success or a negative negative error
  * code in case of failure.
  */
+/* JYW: 读取目录项节点,优先从cache上查找，不命中则从FLASH中读取后再添加到LNC */
 static int tnc_read_node_nm(struct ubifs_info *c, struct ubifs_zbranch *zbr,
 			    void *node)
 {
@@ -396,6 +399,7 @@ static int tnc_read_node_nm(struct ubifs_info *c, struct ubifs_zbranch *zbr,
 
 	ubifs_assert(is_hash_key(c, &zbr->key));
 
+	/* JYW: 如果LNC上有，则直接从LNC上获取 */
 	if (zbr->leaf) {
 		/* Read from the leaf node cache */
 		ubifs_assert(zbr->len != 0);
@@ -403,11 +407,13 @@ static int tnc_read_node_nm(struct ubifs_info *c, struct ubifs_zbranch *zbr,
 		return 0;
 	}
 
+	/* JYW: 否则从FLASH上读取 */
 	err = ubifs_tnc_read_node(c, zbr, node);
 	if (err)
 		return err;
 
 	/* Add the node to the leaf node cache */
+	/* JYW: 将目录项节点或扩展属性项节点添加到TNC的叶子上，即LNC */
 	err = lnc_add(c, zbr, node);
 	return err;
 }
@@ -484,6 +490,7 @@ static int try_read_node(const struct ubifs_info *c, void *buf, int type,
  * This function tries to read a node and returns %1 if the node is read, %0
  * if the node is not present, and a negative error code in the case of error.
  */
+/* JYW: 读取存放在FLASH上的叶子节点 */
 static int fallible_read_node(struct ubifs_info *c, const union ubifs_key *key,
 			      struct ubifs_zbranch *zbr, void *node)
 {
@@ -499,6 +506,7 @@ static int fallible_read_node(struct ubifs_info *c, const union ubifs_key *key,
 
 		/* All nodes have key in the same place */
 		key_read(c, &dent->key, &node_key);
+		/* JYW: 若物理上的key和想要的key不匹配，则返回0，表示节点不存在 */
 		if (keys_cmp(c, key, &node_key) != 0)
 			ret = 0;
 	}
@@ -1156,6 +1164,7 @@ static struct ubifs_znode *dirty_cow_bottom_up(struct ubifs_info *c,
  * function reads corresponding indexing nodes and inserts them to TNC. In
  * case of failure, a negative error code is returned.
  */
+/* JYW: 根据key搜索level=0的节点,输出@zn,及对应的分支号 */
 int ubifs_lookup_level0(struct ubifs_info *c, const union ubifs_key *key,
 			struct ubifs_znode **zn, int *n)
 {
@@ -1166,8 +1175,10 @@ int ubifs_lookup_level0(struct ubifs_info *c, const union ubifs_key *key,
 	dbg_tnck(key, "search key ");
 	ubifs_assert(key_type(c, key) < UBIFS_INVALID_KEY);
 
+	/* JYW: 表示root znode */
 	znode = c->zroot.znode;
 	if (unlikely(!znode)) {
+		/* JYW: 从FLASH上读取索引节点，并转换成内存表示的znode，被zbranch指向 */
 		znode = ubifs_load_znode(c, &c->zroot, NULL, 0);
 		if (IS_ERR(znode))
 			return PTR_ERR(znode);
@@ -1178,6 +1189,12 @@ int ubifs_lookup_level0(struct ubifs_info *c, const union ubifs_key *key,
 	while (1) {
 		struct ubifs_zbranch *zbr;
 
+		/* JYW: 根据key查找节点的分支
+ 		 *  return 1: 查找到分支   @n: 分支索引
+ 		 *  return 0:
+		 *            key很大  @n: zonde->child_cnt - 1;
+		 *            key很小  @n: -1
+		 */
 		exact = ubifs_search_zbranch(c, znode, key, n);
 
 		if (znode->level == 0)
@@ -1194,11 +1211,13 @@ int ubifs_lookup_level0(struct ubifs_info *c, const union ubifs_key *key,
 		}
 
 		/* znode is not in TNC cache, load it from the media */
+		/* JYW: 从FLASH上读取索引节点，并转换成内存表示的znode，被zbranch指向 */
 		znode = ubifs_load_znode(c, zbr, znode, *n);
 		if (IS_ERR(znode))
 			return PTR_ERR(znode);
 	}
 
+	/* JYW: 搜索到level为0的znode */
 	*zn = znode;
 	if (exact || !is_hash_key(c, key) || *n != -1) {
 		dbg_tnc("found %d, lvl %d, n %d", exact, znode->level, *n);
@@ -1427,6 +1446,7 @@ static int maybe_leb_gced(struct ubifs_info *c, int lnum, int gc_seq1)
  * of success, %-ENOENT if the node was not found, and a negative error code in
  * case of failure. The node location can be returned in @lnum and @offs.
  */
+/* JYW: 根据key，读取节点 */
 int ubifs_tnc_locate(struct ubifs_info *c, const union ubifs_key *key,
 		     void *node, int *lnum, int *offs)
 {
@@ -1436,6 +1456,7 @@ int ubifs_tnc_locate(struct ubifs_info *c, const union ubifs_key *key,
 
 again:
 	mutex_lock(&c->tnc_mutex);
+	/* JYW: 根据key搜索level=0的节点,输出@zn,及对应的分支号 */
 	found = ubifs_lookup_level0(c, key, &znode, &n);
 	if (!found) {
 		err = -ENOENT;
@@ -1444,20 +1465,25 @@ again:
 		err = found;
 		goto out;
 	}
+	/* JYW: 已找到level=0的zbranch */
 	zt = &znode->zbranch[n];
 	if (lnum) {
+		/* JYW: 告知在哪个逻辑擦除块上的具体位置 */
 		*lnum = zt->lnum;
 		*offs = zt->offs;
 	}
+	/* JYW: 若读取的是目录项 */
 	if (is_hash_key(c, key)) {
 		/*
 		 * In this case the leaf node cache gets used, so we pass the
 		 * address of the zbranch and keep the mutex locked
 		 */
+		/* JYW: 读取目录项节点,优先从cache上查找，不命中则从FLASH中读取后再添加到LNC */
 		err = tnc_read_node_nm(c, zt, node);
 		goto out;
 	}
 	if (safely) {
+		/* JYW: FLASH或者wbuf上读取叶子节点 */
 		err = ubifs_tnc_read_node(c, zt, node);
 		goto out;
 	}
@@ -1472,6 +1498,7 @@ again:
 		return err;
 	}
 
+	/* JYW: 读取存放在FLASH上的叶子节点 */
 	err = fallible_read_node(c, key, &zbr, node);
 	if (err <= 0 || maybe_leb_gced(c, zbr.lnum, gc_seq1)) {
 		/*
@@ -1837,6 +1864,7 @@ out_unlock:
  * found. This function returns zero in case of success, %-ENOENT if the node
  * was not found, and a negative error code in case of failure.
  */
+/* JYW: 根据key，读取目录项或扩展属性项节点 */
 int ubifs_tnc_lookup_nm(struct ubifs_info *c, const union ubifs_key *key,
 			void *node, const struct qstr *nm)
 {
@@ -1847,6 +1875,7 @@ int ubifs_tnc_lookup_nm(struct ubifs_info *c, const union ubifs_key *key,
 	 * We assume that in most of the cases there are no name collisions and
 	 * 'ubifs_tnc_lookup()' returns us the right direntry.
 	 */
+	/* JYW: 根据key，读取目录项或扩展属性项节点 */
 	err = ubifs_tnc_lookup(c, key, node);
 	if (err)
 		return err;

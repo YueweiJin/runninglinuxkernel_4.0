@@ -2861,6 +2861,10 @@ static int packet_create(struct net *net, struct socket *sock, int protocol,
 
 	if (proto) {
 		po->prot_hook.type = proto;
+        /*
+         * JYW: 注册当前packet_type到ptype_all链表中
+         *   这样接收的时候可以触发相应的接收函数
+         */
 		register_prot_hook(sk);
 	}
 
@@ -4141,6 +4145,10 @@ static void __exit packet_exit(void)
 	proto_unregister(&packet_proto);
 }
 
+/*
+ * JYW: AF_PACKET协议族初始化
+ *  使得SOCK_RAW可以从驱动层直接获取报文，用于网络包的分析
+ */
 static int __init packet_init(void)
 {
 	int rc = proto_register(&packet_proto, 0);

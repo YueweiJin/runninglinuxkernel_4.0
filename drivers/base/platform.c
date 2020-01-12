@@ -33,6 +33,7 @@
 /* For automatically allocated device IDs */
 static DEFINE_IDA(platform_devid_ida);
 
+/* JYW: /sys/devices/platform */
 struct device platform_bus = {
 	.init_name	= "platform",
 };
@@ -63,6 +64,7 @@ void __weak arch_setup_pdev_archdata(struct platform_device *pdev)
  * @type: resource type
  * @num: resource index
  */
+/* JYW: 获取平台设备的资源 */
 struct resource *platform_get_resource(struct platform_device *dev,
 				       unsigned int type, unsigned int num)
 {
@@ -83,6 +85,7 @@ EXPORT_SYMBOL_GPL(platform_get_resource);
  * @dev: platform device
  * @num: IRQ number index
  */
+/* => 从平台设备获得一个中断号 */
 int platform_get_irq(struct platform_device *dev, unsigned int num)
 {
 #ifdef CONFIG_SPARC
@@ -113,6 +116,7 @@ EXPORT_SYMBOL_GPL(platform_get_irq);
  * @type: resource type
  * @name: resource name
  */
+/* JYW: 根据资源名称获得资源 */
 struct resource *platform_get_resource_byname(struct platform_device *dev,
 					      unsigned int type,
 					      const char *name)
@@ -159,6 +163,7 @@ EXPORT_SYMBOL_GPL(platform_get_irq_byname);
  * @devs: array of platform devices to add
  * @num: number of platform devices in array
  */
+/* JYW: 同时注册多个平台设备 */
 int platform_add_devices(struct platform_device **devs, int num)
 {
 	int i, ret = 0;
@@ -296,6 +301,21 @@ EXPORT_SYMBOL_GPL(platform_device_add_data);
  * This is part 2 of platform_device_register(), though may be called
  * separately _iff_ pdev was allocated by platform_device_alloc().
  */
+ /* JYW: 向系统添加一个平台级别的设备 */
+/*
+JYW:
+static struct platform_device hinfc610_os_pltdev = {
+	.name           = "hinand",
+	.id             = -1,
+
+	.dev.platform_data     = NULL,
+	.dev.dma_mask          = &hinand_dmamask,
+	.dev.coherent_dma_mask = DMA_BIT_MASK(32),
+	.dev.release           = hinfc610_pltdev_release,
+	.num_resources  = ARRAY_SIZE(hinfc610_resources),
+	.resource       = hinfc610_resources,
+};
+*/
 int platform_device_add(struct platform_device *pdev)
 {
 	int i, ret;
@@ -303,18 +323,23 @@ int platform_device_add(struct platform_device *pdev)
 	if (!pdev)
 		return -EINVAL;
 
+    /* JYW: 若没有指定平台设备的父设备，则默认指向/sys/devices/platform */
 	if (!pdev->dev.parent)
 		pdev->dev.parent = &platform_bus;
 
+    /* JYW: 设备挂载到platform总线上 */
 	pdev->dev.bus = &platform_bus_type;
 
 	switch (pdev->id) {
+    /* JYW: 若指定了ID号，则加上ID后缀 */
 	default:
 		dev_set_name(&pdev->dev, "%s.%d", pdev->name,  pdev->id);
 		break;
+    /* JYW: 如果指定 -1 , 则名称不变 */
 	case PLATFORM_DEVID_NONE:
 		dev_set_name(&pdev->dev, "%s", pdev->name);
 		break;
+    /* JYW: 若为auto，则由内核维护一个ID号，命名时带.auto后缀 */
 	case PLATFORM_DEVID_AUTO:
 		/*
 		 * Automatically allocated device ID. We mark it as such so
@@ -330,9 +355,11 @@ int platform_device_add(struct platform_device *pdev)
 		break;
 	}
 
+    /* JYW: 遍历平台设备的资源，并将资源添加到资源树中 */
 	for (i = 0; i < pdev->num_resources; i++) {
 		struct resource *p, *r = &pdev->resource[i];
 
+        /* JYW: 若没有定义资源的名称，则默认为设备名称 */
 		if (r->name == NULL)
 			r->name = dev_name(&pdev->dev);
 
@@ -344,6 +371,7 @@ int platform_device_add(struct platform_device *pdev)
 				p = &ioport_resource;
 		}
 
+        /* JYW: 将资源添加到资源树中，其中p为父资源 */
 		if (p && insert_resource(p, r)) {
 			dev_err(&pdev->dev, "failed to claim resource %d\n", i);
 			ret = -EBUSY;
@@ -354,11 +382,13 @@ int platform_device_add(struct platform_device *pdev)
 	pr_debug("Registering platform device '%s'. Parent at %s\n",
 		 dev_name(&pdev->dev), dev_name(pdev->dev.parent));
 
+    /* JYW: 将平台级的设备添加到/sys/devices/platform */
 	ret = device_add(&pdev->dev);
 	if (ret == 0)
 		return ret;
 
  failed:
+    /* JYW: 若该ID是自动分配的，则退出时释放资源 */
 	if (pdev->id_auto) {
 		ida_simple_remove(&platform_devid_ida, pdev->id);
 		pdev->id = PLATFORM_DEVID_AUTO;
@@ -497,6 +527,7 @@ err_alloc:
 }
 EXPORT_SYMBOL_GPL(platform_device_register_full);
 
+/* JYW: 平台驱动注册 */
 static int platform_drv_probe(struct device *_dev)
 {
 	struct platform_driver *drv = to_platform_driver(_dev->driver);
@@ -509,6 +540,7 @@ static int platform_drv_probe(struct device *_dev)
 
 	ret = dev_pm_domain_attach(_dev, true);
 	if (ret != -EPROBE_DEFER) {
+    	/* JYW: 调用具体驱动注册函数 */
 		ret = drv->probe(dev);
 		if (ret)
 			dev_pm_domain_detach(_dev, true);
@@ -553,10 +585,12 @@ static void platform_drv_shutdown(struct device *_dev)
  * @drv: platform driver structure
  * @owner: owning module/driver
  */
+/* JYW: 注册一个平台总线 */
 int __platform_driver_register(struct platform_driver *drv,
 				struct module *owner)
 {
 	drv->driver.owner = owner;
+	/* JYW: 将驱动的总线设置为平台总线 */
 	drv->driver.bus = &platform_bus_type;
 	if (drv->probe)
 		drv->driver.probe = platform_drv_probe;
@@ -565,6 +599,7 @@ int __platform_driver_register(struct platform_driver *drv,
 	if (drv->shutdown)
 		drv->driver.shutdown = platform_drv_shutdown;
 
+    /* JYW: 注册驱动 */
 	return driver_register(&drv->driver);
 }
 EXPORT_SYMBOL_GPL(__platform_driver_register);
@@ -812,6 +847,7 @@ static const struct platform_device_id *platform_match_id(
  * and compare it against the name of the driver. Return whether they match
  * or not.
  */
+ /* JYW: 使用stcmp进行字符匹配，判断pdev->name和drv->name是否相等 */
 static int platform_match(struct device *dev, struct device_driver *drv)
 {
 	struct platform_device *pdev = to_platform_device(dev);
@@ -987,6 +1023,7 @@ static const struct dev_pm_ops platform_dev_pm_ops = {
 	USE_PLATFORM_PM_SLEEP_OPS
 };
 
+/* JYW: 平台总线类型 */
 struct bus_type platform_bus_type = {
 	.name		= "platform",
 	.dev_groups	= platform_dev_groups,
@@ -996,15 +1033,18 @@ struct bus_type platform_bus_type = {
 };
 EXPORT_SYMBOL_GPL(platform_bus_type);
 
+/* JYW: 平台总线初始化 */
 int __init platform_bus_init(void)
 {
 	int error;
 
 	early_platform_cleanup();
 
+    /* JYW: 注册总线设备 */
 	error = device_register(&platform_bus);
 	if (error)
 		return error;
+    /* JYW: 总线注册函数，把总线对象注册到内核 */
 	error =  bus_register(&platform_bus_type);
 	if (error)
 		device_unregister(&platform_bus);

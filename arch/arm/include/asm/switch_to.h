@@ -20,6 +20,10 @@
  */
 extern struct task_struct *__switch_to(struct task_struct *, struct thread_info *, struct thread_info *);
 
+/* JYW:
+ * 负责从上一个进程的处理器状态切换到新进程的处理器状态
+ *  包括保存、恢复栈信息和寄存器信息
+ */
 #define switch_to(prev,next,last)					\
 do {									\
 	last = __switch_to(prev,task_thread_info(prev), task_thread_info(next));	\

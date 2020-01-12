@@ -13,7 +13,15 @@
  */
 	.align	5
 ENTRY(v7_early_abort)
+	/* JYW: 获取Data Fault Status Register,
+	 * 反映存储访问所属域和存储访问类型等
+	 * 通过协处理寄存器c5读取
+	 */
 	mrc	p15, 0, r1, c5, c0, 0		@ get FSR
+	/* JYW: 获取Data Fault Address Register 
+	 * 记录访问失效的虚拟地址
+	 * 通过协处理寄存器c6读取
+	 */
 	mrc	p15, 0, r0, c6, c0, 0		@ get FAR
 
 	/*
@@ -28,6 +36,7 @@ ENTRY(v7_early_abort)
 	ldr	r3, =0x40d			@ On permission fault
 	and	r3, r1, r3
 	cmp	r3, #0x0d
+	/* JYW: 调用此接口 */
 	bne	do_DataAbort
 
 	mcr	p15, 0, r0, c7, c8, 0   	@ Retranslate FAR

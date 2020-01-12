@@ -592,6 +592,7 @@ void ubi_free_internal_volumes(struct ubi_device *ubi)
 	}
 }
 
+/* JYW: 获取ubi设备最大的坏块限制 */
 static int get_bad_peb_limit(const struct ubi_device *ubi, int max_beb_per1024)
 {
 	int limit, device_pebs;
@@ -636,6 +637,7 @@ static int get_bad_peb_limit(const struct ubi_device *ubi, int max_beb_per1024)
  * This function returns zero in case of success and a negative error code in
  * case of failure.
  */
+/* JYW: 初始化io子系统 */
 static int io_init(struct ubi_device *ubi, int max_beb_per1024)
 {
 	dbg_gen("sizeof(struct ubi_ainf_peb) %zu", sizeof(struct ubi_ainf_peb));
@@ -669,6 +671,7 @@ static int io_init(struct ubi_device *ubi, int max_beb_per1024)
 
 	if (mtd_can_have_bb(ubi->mtd)) {
 		ubi->bad_allowed = 1;
+		/* JYW: 获取ubi设备最大的坏块限制 */
 		ubi->bad_peb_limit = get_bad_peb_limit(ubi, max_beb_per1024);
 	}
 
@@ -709,7 +712,9 @@ static int io_init(struct ubi_device *ubi, int max_beb_per1024)
 	}
 
 	/* Calculate default aligned sizes of EC and VID headers */
+	/* JYW: EC头通常占用第一个page */
 	ubi->ec_hdr_alsize = ALIGN(UBI_EC_HDR_SIZE, ubi->hdrs_min_io_size);
+	/* JYW: VID头通常占用第二个page */
 	ubi->vid_hdr_alsize = ALIGN(UBI_VID_HDR_SIZE, ubi->hdrs_min_io_size);
 
 	dbg_gen("min_io_size      %d", ubi->min_io_size);
@@ -720,6 +725,7 @@ static int io_init(struct ubi_device *ubi, int max_beb_per1024)
 
 	if (ubi->vid_hdr_offset == 0)
 		/* Default offset */
+		/* JYW: VID头通常占用第二个page */
 		ubi->vid_hdr_offset = ubi->vid_hdr_aloffset =
 				      ubi->ec_hdr_alsize;
 	else {
@@ -731,6 +737,7 @@ static int io_init(struct ubi_device *ubi, int max_beb_per1024)
 
 	/* Similar for the data offset */
 	ubi->leb_start = ubi->vid_hdr_offset + UBI_VID_HDR_SIZE;
+	/* JYW: 通常从第三个page开始放数据 */
 	ubi->leb_start = ALIGN(ubi->leb_start, ubi->min_io_size);
 
 	dbg_gen("vid_hdr_offset   %d", ubi->vid_hdr_offset);
@@ -866,6 +873,7 @@ static int autoresize(struct ubi_device *ubi, int vol_id)
  * Note, the invocations of this function has to be serialized by the
  * @ubi_devices_mutex.
  */
+/* JYW: 绑定一个mtd设备 */
 int ubi_attach_mtd_dev(struct mtd_info *mtd, int ubi_num,
 		       int vid_hdr_offset, int max_beb_per1024)
 {
@@ -928,6 +936,7 @@ int ubi_attach_mtd_dev(struct mtd_info *mtd, int ubi_num,
 		}
 	}
 
+	/* JYW: 分配一个UBI设备 */
 	ubi = kzalloc(sizeof(struct ubi_device), GFP_KERNEL);
 	if (!ubi)
 		return -ENOMEM;
@@ -975,6 +984,7 @@ int ubi_attach_mtd_dev(struct mtd_info *mtd, int ubi_num,
 
 	ubi_msg(ubi, "attaching mtd%d", mtd->index);
 
+	/* JYW: 初始化io子系统 */
 	err = io_init(ubi, max_beb_per1024);
 	if (err)
 		goto out_free;
@@ -1213,6 +1223,7 @@ static struct mtd_info * __init open_mtd_device(const char *mtd_dev)
 	return mtd;
 }
 
+/* JYW: ubi初始化入口 */
 static int __init ubi_init(void)
 {
 	int err, i, k;
@@ -1241,6 +1252,7 @@ static int __init ubi_init(void)
 		goto out_class;
 	}
 
+	/* JYW: 注册UBI控制设备 */
 	err = misc_register(&ubi_ctrl_cdev);
 	if (err) {
 		pr_err("UBI error: cannot register device");
@@ -1403,6 +1415,8 @@ static int __init bytes_str_to_int(const char *str)
  * This function returns zero in case of success and a negative error code in
  * case of error.
  */
+/* JYW: 解析‘mtd=’ UBI参数 */
+/* modprobe ubi mtd=/dev/mtd5 block=/dev/ubi0_0 */
 static int __init ubi_mtd_param_parse(const char *val, struct kernel_param *kp)
 {
 	int i, len;
@@ -1484,6 +1498,7 @@ static int __init ubi_mtd_param_parse(const char *val, struct kernel_param *kp)
 	return 0;
 }
 
+/* JYW: 加载模块时指定参数 */
 module_param_call(mtd, ubi_mtd_param_parse, NULL, NULL, 000);
 MODULE_PARM_DESC(mtd, "MTD devices to attach. Parameter format: mtd=<name|num|path>[,<vid_hdr_offs>[,max_beb_per1024[,ubi_num]]].\n"
 		      "Multiple \"mtd\" parameters may be specified.\n"

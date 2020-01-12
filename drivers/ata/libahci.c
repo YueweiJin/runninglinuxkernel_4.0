@@ -142,6 +142,7 @@ struct device_attribute *ahci_sdev_attrs[] = {
 };
 EXPORT_SYMBOL_GPL(ahci_sdev_attrs);
 
+/* JYW: 端口操作结构体 */
 struct ata_port_operations ahci_ops = {
 	.inherits		= &sata_pmp_port_ops,
 
@@ -152,10 +153,14 @@ struct ata_port_operations ahci_ops = {
 
 	.freeze			= ahci_freeze,
 	.thaw			= ahci_thaw,
+	/* JYW: 软复位 */
 	.softreset		= ahci_softreset,
+    /* JYW: 硬复位 */
 	.hardreset		= ahci_hardreset,
+    /* JYW: ?复位 */
 	.postreset		= ahci_postreset,
 	.pmp_softreset		= ahci_softreset,
+	/* JYW: ahci错误处理 */
 	.error_handler		= ahci_error_handler,
 	.post_internal_cmd	= ahci_post_internal_cmd,
 	.dev_config		= ahci_dev_config,
@@ -552,6 +557,7 @@ static unsigned ahci_scr_offset(struct ata_port *ap, unsigned int sc_reg)
 	return 0;
 }
 
+/* JYW: 读scr寄存器 */
 static int ahci_scr_read(struct ata_link *link, unsigned int sc_reg, u32 *val)
 {
 	void __iomem *port_mmio = ahci_port_base(link->ap);
@@ -564,6 +570,7 @@ static int ahci_scr_read(struct ata_link *link, unsigned int sc_reg, u32 *val)
 	return -EINVAL;
 }
 
+/* JYW: 写scr寄存器 */
 static int ahci_scr_write(struct ata_link *link, unsigned int sc_reg, u32 val)
 {
 	void __iomem *port_mmio = ahci_port_base(link->ap);
@@ -1193,6 +1200,7 @@ unsigned int ahci_dev_classify(struct ata_port *ap)
 }
 EXPORT_SYMBOL_GPL(ahci_dev_classify);
 
+/* JYW: 填充cmd槽 */
 void ahci_fill_cmd_slot(struct ahci_port_priv *pp, unsigned int tag,
 			u32 opts)
 {
@@ -1252,6 +1260,7 @@ int ahci_kick_engine(struct ata_port *ap)
 }
 EXPORT_SYMBOL_GPL(ahci_kick_engine);
 
+/* JYW: 执行一个命令，根据ata_taskfile和pmp封装 */
 static int ahci_exec_polled_cmd(struct ata_port *ap, int pmp,
 				struct ata_taskfile *tf, int is_cmd, u16 flags,
 				unsigned long timeout_msec)
@@ -1263,13 +1272,17 @@ static int ahci_exec_polled_cmd(struct ata_port *ap, int pmp,
 	u32 tmp;
 
 	/* prep the command */
+    /* JYW: 将ata_taskfile转换位一个FIS结构 */
 	ata_tf_to_fis(tf, pmp, is_cmd, fis);
+    /* JYW: 填充cmd槽 */
 	ahci_fill_cmd_slot(pp, 0, cmd_fis_len | flags | (pmp << 12));
 
 	/* issue & wait */
+    /* JYW: 下发命令 */
 	writel(1, port_mmio + PORT_CMD_ISSUE);
 
 	if (timeout_msec) {
+        /* JYW: 等待寄存器值满足条件 或 超时 */
 		tmp = ata_wait_register(ap, port_mmio + PORT_CMD_ISSUE,
 					0x1, 0x1, 1, timeout_msec);
 		if (tmp & 0x1) {
@@ -1282,6 +1295,7 @@ static int ahci_exec_polled_cmd(struct ata_port *ap, int pmp,
 	return 0;
 }
 
+/* JYW: 软复位 */
 int ahci_do_softreset(struct ata_link *link, unsigned int *class,
 		      int pmp, unsigned long deadline,
 		      int (*check_ready)(struct ata_link *link))
@@ -1321,9 +1335,11 @@ int ahci_do_softreset(struct ata_link *link, unsigned int *class,
 		msecs = jiffies_to_msecs(deadline - now);
 
 	tf.ctl |= ATA_SRST;
+    /* JYW: 执行一个命令，根据ata_taskfile和pmp封装 */
 	if (ahci_exec_polled_cmd(ap, pmp, &tf, 0,
 				 AHCI_CMD_RESET | AHCI_CMD_CLR_BUSY, msecs)) {
 		rc = -EIO;
+        /* JYW: 若没有响应，则报告发送第一个FIS失败 */
 		reason = "1st FIS failed";
 		goto fail;
 	}
@@ -1336,6 +1352,7 @@ int ahci_do_softreset(struct ata_link *link, unsigned int *class,
 	ahci_exec_polled_cmd(ap, pmp, &tf, 0, 0, 0);
 
 	/* wait for link to become ready */
+    /* JYW: 检查设备是否就绪，0表示就绪 */
 	rc = ata_wait_after_reset(link, deadline, check_ready);
 	if (rc == -EBUSY && hpriv->flags & AHCI_HFLAG_SRST_TOUT_IS_OFFLINE) {
 		/*
@@ -1364,15 +1381,18 @@ int ahci_do_softreset(struct ata_link *link, unsigned int *class,
 	return rc;
 }
 
+/* JYW: 检查设备是否就绪，1表示就绪 */
 int ahci_check_ready(struct ata_link *link)
 {
 	void __iomem *port_mmio = ahci_port_base(link->ap);
 	u8 status = readl(port_mmio + PORT_TFDATA) & 0xFF;
 
+    /* JYW: 检查设备是否就绪，1表示就绪 */
 	return ata_check_ready(status);
 }
 EXPORT_SYMBOL_GPL(ahci_check_ready);
 
+/* JYW: 软复位 */
 static int ahci_softreset(struct ata_link *link, unsigned int *class,
 			  unsigned long deadline)
 {
@@ -1380,6 +1400,7 @@ static int ahci_softreset(struct ata_link *link, unsigned int *class,
 
 	DPRINTK("ENTER\n");
 
+    /* JYW: 软复位 */
 	return ahci_do_softreset(link, class, pmp, deadline, ahci_check_ready);
 }
 EXPORT_SYMBOL_GPL(ahci_do_softreset);
@@ -1411,6 +1432,7 @@ static int ahci_pmp_retry_softreset(struct ata_link *link, unsigned int *class,
 
 	DPRINTK("ENTER\n");
 
+    /* JYW: 软复位 */
 	rc = ahci_do_softreset(link, class, pmp, deadline,
 			       ahci_bad_pmp_check_ready);
 
@@ -1425,6 +1447,7 @@ static int ahci_pmp_retry_softreset(struct ata_link *link, unsigned int *class,
 			ata_link_warn(link,
 					"applying PMP SRST workaround "
 					"and retrying\n");
+            /* JYW: 软复位 */
 			rc = ahci_do_softreset(link, class, 0, deadline,
 					       ahci_check_ready);
 		}
@@ -1433,6 +1456,7 @@ static int ahci_pmp_retry_softreset(struct ata_link *link, unsigned int *class,
 	return rc;
 }
 
+/* JYW: ahci硬复位 */
 static int ahci_hardreset(struct ata_link *link, unsigned int *class,
 			  unsigned long deadline)
 {
@@ -1454,6 +1478,7 @@ static int ahci_hardreset(struct ata_link *link, unsigned int *class,
 	tf.command = ATA_BUSY;
 	ata_tf_to_fis(&tf, 0, 0, d2h_fis);
 
+    /* JYW: ？ */
 	rc = sata_link_hardreset(link, timing, deadline, &online,
 				 ahci_check_ready);
 
@@ -1466,12 +1491,13 @@ static int ahci_hardreset(struct ata_link *link, unsigned int *class,
 	return rc;
 }
 
+/* JYW: 复位后调用的接口 */
 static void ahci_postreset(struct ata_link *link, unsigned int *class)
 {
 	struct ata_port *ap = link->ap;
 	void __iomem *port_mmio = ahci_port_base(ap);
 	u32 new_tmp, tmp;
-
+    /* JYW: 复位后的接口调用，主要打印link状态 */
 	ata_std_postreset(link, class);
 
 	/* Make sure port's ATAPI bit is set appropriately */
@@ -1520,6 +1546,7 @@ static int ahci_pmp_qc_defer(struct ata_queued_cmd *qc)
 		return sata_pmp_qc_defer_cmd_switch(qc);
 }
 
+/* JYW: 准备一个ATA命令提交至设备 */
 static void ahci_qc_prep(struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
@@ -1536,6 +1563,7 @@ static void ahci_qc_prep(struct ata_queued_cmd *qc)
 	 */
 	cmd_tbl = pp->cmd_tbl + qc->tag * AHCI_CMD_TBL_SZ;
 
+    /* JYW: 将ata_taskfile转换位一个FIS结构 */
 	ata_tf_to_fis(&qc->tf, qc->dev->link->pmp, 1, cmd_tbl);
 	if (is_atapi) {
 		memset(cmd_tbl + AHCI_CMD_TBL_CDB, 0, 32);
@@ -1555,6 +1583,7 @@ static void ahci_qc_prep(struct ata_queued_cmd *qc)
 	if (is_atapi)
 		opts |= AHCI_CMD_ATAPI | AHCI_CMD_PREFETCH;
 
+    /* JYW: 填充cmd槽 */
 	ahci_fill_cmd_slot(pp, qc->tag, opts);
 }
 
@@ -1582,6 +1611,7 @@ static void ahci_fbs_dec_intr(struct ata_port *ap)
 		dev_err(ap->host->dev, "failed to clear device error\n");
 }
 
+/* JYW: 处理错误中断，仅仅是置位标记位，具体到错误处理线程中处理 */
 static void ahci_error_intr(struct ata_port *ap, u32 irq_stat)
 {
 	struct ahci_host_priv *hpriv = ap->host->private_data;
@@ -1693,6 +1723,7 @@ static void ahci_error_intr(struct ata_port *ap, u32 irq_stat)
 		ata_port_abort(ap);
 }
 
+/* JYW: 处理每个端口的中断 */
 static void ahci_handle_port_interrupt(struct ata_port *ap,
 				       void __iomem *port_mmio, u32 status)
 {
@@ -1713,7 +1744,9 @@ static void ahci_handle_port_interrupt(struct ata_port *ap,
 		ahci_scr_write(&ap->link, SCR_ERROR, SERR_PHYRDY_CHG);
 	}
 
+    /* JYW: 处理错误中断 */
 	if (unlikely(status & PORT_IRQ_ERROR)) {
+        /* JYW: 处理错误中断，仅仅是置位标记位，具体到错误处理线程中处理 */
 		ahci_error_intr(ap, status);
 		return;
 	}
@@ -1778,6 +1811,7 @@ static void ahci_handle_port_interrupt(struct ata_port *ap,
 	}
 }
 
+/* JYW: 处理每个端口的中断 */
 static void ahci_port_intr(struct ata_port *ap)
 {
 	void __iomem *port_mmio = ahci_port_base(ap);
@@ -1786,6 +1820,7 @@ static void ahci_port_intr(struct ata_port *ap)
 	status = readl(port_mmio + PORT_IRQ_STAT);
 	writel(status, port_mmio + PORT_IRQ_STAT);
 
+    /* JYW: 处理每个端口的中断 */
 	ahci_handle_port_interrupt(ap, port_mmio, status);
 }
 
@@ -1826,6 +1861,7 @@ static irqreturn_t ahci_multi_irqs_intr(int irq, void *dev_instance)
 	return IRQ_WAKE_THREAD;
 }
 
+/* JYW: 中断处理流程 */
 static irqreturn_t ahci_single_irq_intr(int irq, void *dev_instance)
 {
 	struct ata_host *host = dev_instance;
@@ -1840,6 +1876,7 @@ static irqreturn_t ahci_single_irq_intr(int irq, void *dev_instance)
 	mmio = hpriv->mmio;
 
 	/* sigh.  0xffffffff is a valid return from h/w */
+    /* JYW: 获取中断状态，表示了哪个端口触发了中断 */
 	irq_stat = readl(mmio + HOST_IRQ_STAT);
 	if (!irq_stat)
 		return IRQ_NONE;
@@ -1853,7 +1890,7 @@ static irqreturn_t ahci_single_irq_intr(int irq, void *dev_instance)
 
 		if (!(irq_masked & (1 << i)))
 			continue;
-
+        /* JYW: 处理每个端口的中断 */
 		ap = host->ports[i];
 		if (ap) {
 			ahci_port_intr(ap);
@@ -1877,6 +1914,7 @@ static irqreturn_t ahci_single_irq_intr(int irq, void *dev_instance)
 	 * Also, use the unmasked value to clear interrupt as spurious
 	 * pending event on a dummy port might cause screaming IRQ.
 	 */
+	/* JYW: 清除中断 */
 	writel(irq_stat, mmio + HOST_IRQ_STAT);
 
 	spin_unlock(&host->lock);
@@ -1886,6 +1924,8 @@ static irqreturn_t ahci_single_irq_intr(int irq, void *dev_instance)
 	return IRQ_RETVAL(handled);
 }
 
+/* JYW: 对端口寄存器的Portx Command Issue进行置位，设备开始执行ATAPI命令 */
+/* JYW: qc命令执行后，硬中断回调 ata_qc_complete() */
 unsigned int ahci_qc_issue(struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
@@ -1966,6 +2006,7 @@ static void ahci_thaw(struct ata_port *ap)
 	writel(pp->intr_mask, port_mmio + PORT_IRQ_MASK);
 }
 
+/* JYW: ahci错误处理 */
 void ahci_error_handler(struct ata_port *ap)
 {
 	struct ahci_host_priv *hpriv = ap->host->private_data;
@@ -1976,6 +2017,7 @@ void ahci_error_handler(struct ata_port *ap)
 		hpriv->start_engine(ap);
 	}
 
+    /* JYW: 标准错误处理流程 */
 	sata_pmp_error_handler(ap);
 
 	if (!ata_dev_enabled(ap->link.device))
@@ -2478,6 +2520,7 @@ out_free_irqs:
  *	RETURNS:
  *	0 on success, -errno otherwise.
  */
+/* JYW: 激活AHCI控制器 */
 int ahci_host_activate(struct ata_host *host, int irq,
 		       struct scsi_host_template *sht)
 {
@@ -2487,6 +2530,7 @@ int ahci_host_activate(struct ata_host *host, int irq,
 	if (hpriv->flags & AHCI_HFLAG_MULTI_MSI)
 		rc = ahci_host_activate_multi_irqs(host, irq, sht);
 	else
+        /* JYW: 走这里 */
 		rc = ata_host_activate(host, irq, ahci_single_irq_intr,
 				       IRQF_SHARED, sht);
 	return rc;

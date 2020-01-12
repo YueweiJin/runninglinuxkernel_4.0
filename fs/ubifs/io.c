@@ -95,7 +95,7 @@ void ubifs_ro_mode(struct ubifs_info *c, int err)
  * additional checks and UBIFS debugging stuff. See corresponding UBI function
  * for more information.
  */
-
+/* JYW: 从逻辑擦除块中读取数据 */
 int ubifs_leb_read(const struct ubifs_info *c, int lnum, void *buf, int offs,
 		   int len, int even_ebadmsg)
 {
@@ -971,6 +971,7 @@ out:
  * stores in @buf. Returns zero in case of success, %-EUCLEAN if CRC mismatched
  * and a negative error code in case of failure.
  */
+/* JYW: 从逻辑擦除块中读取节点，并对节点头进行检查，判断是否合法 */
 int ubifs_read_node(const struct ubifs_info *c, void *buf, int type, int len,
 		    int lnum, int offs)
 {
@@ -983,6 +984,7 @@ int ubifs_read_node(const struct ubifs_info *c, void *buf, int type, int len,
 	ubifs_assert(!(offs & 7) && offs < c->leb_size);
 	ubifs_assert(type >= 0 && type < UBIFS_NODE_TYPES_CNT);
 
+	/* JYW: 从逻辑擦除块中读取数据 */
 	err = ubifs_leb_read(c, lnum, buf, offs, len, 0);
 	if (err && err != -EBADMSG)
 		return err;

@@ -509,6 +509,7 @@ struct ubi_device {
 	int avail_pebs;
 	int beb_rsvd_pebs;
 	int beb_rsvd_level;
+	/* JYW: ubi设备最大的坏块限制 */
 	int bad_peb_limit;
 
 	int autoresize_vol_id;
@@ -561,8 +562,11 @@ struct ubi_device {
 	char bgt_name[sizeof(UBI_BGT_NAME_PATTERN)+2];
 
 	/* I/O sub-system's stuff */
+	/* JYW: mtd分区的大小 */
 	long long flash_size;
+	/* JYW: 分区的擦除块个数 */
 	int peb_count;
+	/* JYW: 擦除块大小 */
 	int peb_size;
 	int bad_peb_count;
 	int good_peb_count;
@@ -572,11 +576,17 @@ struct ubi_device {
 	int min_io_size;
 	int hdrs_min_io_size;
 	int ro_mode;
+	/* JYW: 通常是擦除块-2×page（EC,VID）*/
 	int leb_size;
+	/* JYW: 通常是擦除块的第二个page开始 */
 	int leb_start;
+	/* JYW: 通常是一个page */
 	int ec_hdr_alsize;
+	/* JYW: 通常是一个page */
 	int vid_hdr_alsize;
+	/* JYW: 通常是一个page */
 	int vid_hdr_offset;
+	/* JYW: 通常是一个page */
 	int vid_hdr_aloffset;
 	int vid_hdr_shift;
 	unsigned int bad_allowed:1;
@@ -584,6 +594,7 @@ struct ubi_device {
 	int max_write_size;
 	struct mtd_info *mtd;
 
+	/* JYW: 物理擦除块的大小 */
 	void *peb_buf;
 	struct mutex buf_mutex;
 	struct mutex ckvol_mutex;

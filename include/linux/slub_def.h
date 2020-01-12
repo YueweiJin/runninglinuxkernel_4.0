@@ -37,10 +37,15 @@ enum stat_item {
 	CPU_PARTIAL_DRAIN,	/* Drain cpu partial to node partial */
 	NR_SLUB_STAT_ITEMS };
 
+/* JYW: 本地内存缓存池的描述, 每个CPU一个 */
 struct kmem_cache_cpu {
+    /* JYW: 指向下一个可用的object */
 	void **freelist;	/* Pointer to next available object */
+    /* JYW: 用于同步作用 */
 	unsigned long tid;	/* Globally unique transaction id */
+    /* JYW: slub内存的page指针 */
 	struct page *page;	/* The slab from which we are allocating */
+    /* JYW: 本地slab partial链表。主要是一些部分使用object的slab。 */
 	struct page *partial;	/* Partially allocated frozen slabs */
 #ifdef CONFIG_SLUB_STATS
 	unsigned stat[NR_SLUB_STAT_ITEMS];
@@ -59,27 +64,48 @@ struct kmem_cache_order_objects {
 /*
  * Slab cache management.
  */
+/* JYW: 表示一个slab描述符 */
 struct kmem_cache {
-	struct kmem_cache_cpu __percpu *cpu_slab;
+    /* JYW: 本地内存缓存池，当分配内存的时候优先从本地cpu分配内存以保证cache的命中率 */
+    struct kmem_cache_cpu __percpu *cpu_slab;
 	/* Used for retriving partial slabs etc */
+    /* JYW: object分配掩码 */
 	unsigned long flags;
+    /*
+     * JYW: 限制struct kmem_cache_node中的partial链表slab的数量
+     *      如果大于这个mini_partial的值，那么多余的slab就会被释放
+     */
 	unsigned long min_partial;
+    /* JYW: object_size对齐后的size大小 */
 	int size;		/* The size of an object including meta data */
-	int object_size;	/* The size of an object without meta data */
+    /* JYW: 实际的object size，就是创建kmem_cache时候传递进来的参数 */
+    int object_size;	/* The size of an object without meta data */
+    /* JYW: 存储下个object地址数据相对于这个object首地址的偏移 */
 	int offset;		/* Free pointer offset. */
+    /*
+     * JYW: per cpu partial中所有slab的free object的数量的最大值
+     *  超过这个值就会将所有的slab转移到kmem_cache_node的partial链表
+     */
 	int cpu_partial;	/* Number of per cpu partial objects to keep around */
+    /* JYW: 低16位代表一个slab中所有object的数量（oo &((1 << 16) - 1)），高16位代表一个slab管理的page数量（(2^(oo  16)) pages） */
 	struct kmem_cache_order_objects oo;
 
 	/* Allocation and freeing of slabs */
 	struct kmem_cache_order_objects max;
+    /* JYW: 当按照oo大小分配内存的时候出现内存不足就会考虑min大小方式分配。min只需要可以容纳一个object即可 */
 	struct kmem_cache_order_objects min;
+    /* JYW: 从伙伴系统分配内存掩码 */
 	gfp_t allocflags;	/* gfp flags to use on each alloc */
 	int refcount;		/* Refcount for slab cache destroy */
 	void (*ctor)(void *);
+    /* JYW: object_size按照word对齐之后的大小 */
 	int inuse;		/* Offset to metadata */
+    /* JYW: 字节对齐大小 */
 	int align;		/* Alignment */
 	int reserved;		/* Reserved bytes at the end of slabs */
+    /* JYW: sysfs文件系统显示使用 */
 	const char *name;	/* Name (only for display!) */
+    /* JYW: 系统有一个slab_caches链表，所有的slab都会挂入此链表 */
 	struct list_head list;	/* List of slab caches */
 #ifdef CONFIG_SYSFS
 	struct kobject kobj;	/* For sysfs */
@@ -98,6 +124,7 @@ struct kmem_cache {
 	 */
 	int remote_node_defrag_ratio;
 #endif
+    /* JYW: slab节点。在NUMA系统中，每个node都有一个struct kmem_cache_node数据结构 */
 	struct kmem_cache_node *node[MAX_NUMNODES];
 };
 

@@ -16,10 +16,13 @@
 /* this must be > 0. */
 #define FAT_MAX_CACHE	8
 
+/* JYW: fat entry缓存，作用为根据文件中的簇号找到磁盘中的簇号 */
 struct fat_cache {
 	struct list_head cache_list;
 	int nr_contig;	/* number of contiguous clusters */
+	/* JYW: 文件簇号 */
 	int fcluster;	/* cluster number in the file. */
+	/* JYW: 磁盘簇号 */
 	int dcluster;	/* cluster number on disk. */
 };
 
@@ -37,6 +40,7 @@ static inline int fat_max_cache(struct inode *inode)
 
 static struct kmem_cache *fat_cache_cachep;
 
+/* JYW: 初始化fat cache 链表头 */
 static void init_once(void *foo)
 {
 	struct fat_cache *cache = (struct fat_cache *)foo;
@@ -44,6 +48,7 @@ static void init_once(void *foo)
 	INIT_LIST_HEAD(&cache->cache_list);
 }
 
+/* JYW: 初始化缓存池 */
 int __init fat_cache_init(void)
 {
 	fat_cache_cachep = kmem_cache_create("fat_cache",
@@ -55,22 +60,26 @@ int __init fat_cache_init(void)
 	return 0;
 }
 
+/* JYW: 销毁缓存池 */
 void fat_cache_destroy(void)
 {
 	kmem_cache_destroy(fat_cache_cachep);
 }
 
+/* JYW: 分配一个fat cahce */
 static inline struct fat_cache *fat_cache_alloc(struct inode *inode)
 {
 	return kmem_cache_alloc(fat_cache_cachep, GFP_NOFS);
 }
 
+/* JYW: 释放一个fat cache */
 static inline void fat_cache_free(struct fat_cache *cache)
 {
 	BUG_ON(!list_empty(&cache->cache_list));
 	kmem_cache_free(fat_cache_cachep, cache);
 }
 
+/* JYW: 移动fat cache到lru链表 */
 static inline void fat_cache_update_lru(struct inode *inode,
 					struct fat_cache *cache)
 {
@@ -223,6 +232,7 @@ static inline void cache_init(struct fat_cache_id *cid, int fclus, int dclus)
 	cid->nr_contig = 0;
 }
 
+/* JYW: 根据簇值得到簇在文件中的簇号以及在硬盘中的簇号 */
 int fat_get_cluster(struct inode *inode, int cluster, int *fclus, int *dclus)
 {
 	struct super_block *sb = inode->i_sb;
@@ -247,6 +257,7 @@ int fat_get_cluster(struct inode *inode, int cluster, int *fclus, int *dclus)
 	}
 
 	fatent_init(&fatent);
+	/* JYW: 遍历每个簇entry */
 	while (*fclus < cluster) {
 		/* prevent the infinite loop of cluster chain */
 		if (*fclus > limit) {
@@ -258,9 +269,11 @@ int fat_get_cluster(struct inode *inode, int cluster, int *fclus, int *dclus)
 			goto out;
 		}
 
+		/* JYW: 根据entry值，读取并返回下一个簇号 */
 		nr = fat_ent_read(inode, &fatent, *dclus);
 		if (nr < 0)
 			goto out;
+		/* JYW: 非结束符，则当前的簇链是无效的 */
 		else if (nr == FAT_ENT_FREE) {
 			fat_fs_error_ratelimit(sb,
 				       "%s: invalid cluster chain (i_pos %lld)",
@@ -268,11 +281,14 @@ int fat_get_cluster(struct inode *inode, int cluster, int *fclus, int *dclus)
 				       MSDOS_I(inode)->i_pos);
 			nr = -EIO;
 			goto out;
+		/* JYW: 结束符 */
 		} else if (nr == FAT_ENT_EOF) {
 			fat_cache_add(inode, &cid);
 			goto out;
 		}
+		/* JYW: 增加文件的簇号 */
 		(*fclus)++;
+		/* JYW: 文件在磁盘中的簇号 */
 		*dclus = nr;
 		if (!cache_contiguous(&cid, *dclus))
 			cache_init(&cid, *fclus, *dclus);
@@ -292,6 +308,7 @@ static int fat_bmap_cluster(struct inode *inode, int cluster)
 	if (MSDOS_I(inode)->i_start == 0)
 		return 0;
 
+	/* JYW: 根据簇值得到簇在文件中的簇号以及在硬盘中的簇号 */
 	ret = fat_get_cluster(inode, cluster, &fclus, &dclus);
 	if (ret < 0)
 		return ret;
@@ -344,6 +361,7 @@ int fat_bmap(struct inode *inode, sector_t sector, sector_t *phys,
 	if (cluster < 0)
 		return cluster;
 	else if (cluster) {
+		/* JYW: 根据簇号计算所在的物理位置 */
 		*phys = fat_clus_to_blknr(sbi, cluster) + offset;
 		*mapped_blocks = sbi->sec_per_clus - offset;
 		if (*mapped_blocks > last_block - sector)

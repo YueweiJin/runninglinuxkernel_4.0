@@ -125,6 +125,7 @@ static const struct sysfs_ops bus_sysfs_ops = {
 	.store	= bus_attr_store,
 };
 
+/* JYW: 任何属于一个总线的属性应当明确使用它来创建 */
 int bus_create_file(struct bus_type *bus, struct bus_attribute *attr)
 {
 	int error;
@@ -137,6 +138,7 @@ int bus_create_file(struct bus_type *bus, struct bus_attribute *attr)
 }
 EXPORT_SYMBOL_GPL(bus_create_file);
 
+/* JYW: 去除总线属性 */
 void bus_remove_file(struct bus_type *bus, struct bus_attribute *attr)
 {
 	if (bus_get(bus)) {
@@ -297,6 +299,7 @@ static struct device *next_device(struct klist_iter *i)
  * to retain this data, it should do so, and increment the reference
  * count in the supplied callback.
  */
+ /* JYW: 迭代了总线上的每个设备，将相关的device结构传递给fn，同时传递data值 */
 int bus_for_each_dev(struct bus_type *bus, struct device *start,
 		     void *data, int (*fn)(struct device *, void *))
 {
@@ -307,9 +310,12 @@ int bus_for_each_dev(struct bus_type *bus, struct device *start,
 	if (!bus || !bus->p)
 		return -EINVAL;
 
+    /* JYW: 初始化一个klist，从设备start开始，目的是在双向链表中定位一个成员 */
 	klist_iter_init_node(&bus->p->klist_devices, &i,
 			     (start ? &start->p->knode_bus : NULL));
+    /* JYW: 遍历总线上已经挂载的设备 */
 	while ((dev = next_device(&i)) && !error)
+        /* JYW: 调用__driver_attach函数 */
 		error = fn(dev, data);
 	klist_iter_exit(&i);
 	return error;
@@ -331,6 +337,7 @@ EXPORT_SYMBOL_GPL(bus_for_each_dev);
  * if it does.  If the callback returns non-zero, this function will
  * return to the caller and not iterate over any more devices.
  */
+/* JYW: 通过设备名找到总线上的设备 */
 struct device *bus_find_device(struct bus_type *bus,
 			       struct device *start, void *data,
 			       int (*match)(struct device *dev, void *data))
@@ -351,6 +358,7 @@ struct device *bus_find_device(struct bus_type *bus,
 }
 EXPORT_SYMBOL_GPL(bus_find_device);
 
+/* JYW: 匹配名字 */
 static int match_name(struct device *dev, void *data)
 {
 	const char *name = data;
@@ -368,6 +376,7 @@ static int match_name(struct device *dev, void *data)
  * searching by a name automatically, no need to write another strcmp matching
  * function.
  */
+/* JYW: 通过设备名找到总线上的设备 */
 struct device *bus_find_device_by_name(struct bus_type *bus,
 				       struct device *start, const char *name)
 {
@@ -447,6 +456,13 @@ static struct device_driver *next_driver(struct klist_iter *i)
  * in the callback. It must also be sure to increment the refcount
  * so it doesn't disappear before returning to the caller.
  */
+ /* JYW: 
+  * 该函数列举总线上的每一个驱动，也就是/sys/bus/XXX/drivers/下的目录,
+    传递关联的设备驱动结构给fn，
+  * 连同作为data来传递的值。如果start是NULL，列举从总线的第一个
+  * 驱动开始；否则列举从start之后的第一个驱动开始。
+  * 如果fn返回一个非零值，列举停止并且那个值从bus_for_each_drv返回。
+  */
 int bus_for_each_drv(struct bus_type *bus, struct device_driver *start,
 		     void *data, int (*fn)(struct device_driver *, void *))
 {
@@ -516,10 +532,15 @@ int bus_add_device(struct device *dev)
 		error = device_add_groups(dev, bus->dev_groups);
 		if (error)
 			goto out_groups;
+		/* JYW: hinand -> ../../../devices/platform/hinand */
 		error = sysfs_create_link(&bus->p->devices_kset->kobj,
 						&dev->kobj, dev_name(dev));
 		if (error)
 			goto out_id;
+        /*
+		 * JYW: 建立链接subsystem
+         * 		subsystem -> ../../../bus/platform
+		 */
 		error = sysfs_create_link(&dev->kobj,
 				&dev->bus->p->subsys.kobj, "subsystem");
 		if (error)
@@ -663,40 +684,51 @@ static DRIVER_ATTR_WO(uevent);
  * bus_add_driver - Add a driver to the bus.
  * @drv: driver.
  */
+/* JYW: 为总线添加一个驱动 */
 int bus_add_driver(struct device_driver *drv)
 {
 	struct bus_type *bus;
 	struct driver_private *priv;
 	int error = 0;
 
+    /* JYW: 增加引用计数获取bus_type */ 
 	bus = bus_get(drv->bus);
 	if (!bus)
 		return -EINVAL;
 
 	pr_debug("bus: '%s': add driver %s\n", bus->name, drv->name);
 
+    /* JYW: 分配driver_private结构体 */
 	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
 	if (!priv) {
 		error = -ENOMEM;
 		goto out_put_bus;
 	}
+    /* JYW: 初始化内核链表 */
 	klist_init(&priv->klist_devices, NULL, NULL);
+    /* JYW: 相互保存 */
 	priv->driver = drv;
 	drv->p = priv;
+    /* JYW: 设置该kobj属于哪个kset */ 
 	priv->kobj.kset = bus->p->drivers_kset;
+    /* JYW: 执行完以后，会在bus/总线名/drivers/下建立名为drv->name的目录 */
 	error = kobject_init_and_add(&priv->kobj, &driver_ktype, NULL,
 				     "%s", drv->name);
 	if (error)
 		goto out_unregister;
 
+    /* JYW: 将驱动加入总线的驱动列表 */
 	klist_add_tail(&priv->knode_bus, &bus->p->klist_drivers);
 	if (drv->bus->p->drivers_autoprobe) {
+        /* JYW: 尝试绑定驱动和设备 */
 		error = driver_attach(drv);
 		if (error)
 			goto out_unregister;
 	}
+    /* JYW: 创建驱动的属性模块 */
 	module_add_driver(drv->owner, drv);
 
+    /* JYW: 创建属性，在bus/总线名/drivers/驱动名/下建立文件uevent*/
 	error = driver_create_file(drv, &driver_attr_uevent);
 	if (error) {
 		printk(KERN_ERR "%s: uevent attr (%s) failed\n",
@@ -710,6 +742,7 @@ int bus_add_driver(struct device_driver *drv)
 	}
 
 	if (!drv->suppress_bind_attrs) {
+        /* JYW: 创建属性，在bus/总线名/drivers/驱动名/下建立文件bind和unbind */ 
 		error = add_bind_files(drv);
 		if (error) {
 			/* Ditto */
@@ -860,6 +893,7 @@ static ssize_t bus_uevent_store(struct bus_type *bus,
 		kobject_uevent(&bus->p->subsys.kobj, action);
 	return count;
 }
+/* JYW: 总线属性 */
 static BUS_ATTR(uevent, S_IWUSR, NULL, bus_uevent_store);
 
 /**
@@ -870,12 +904,27 @@ static BUS_ATTR(uevent, S_IWUSR, NULL, bus_uevent_store);
  * infrastructure, then register the children subsystems it has:
  * the devices and drivers that belong to the subsystem.
  */
+ /* 
+  * JYW: 将总线注册到系统，如果成功，新总线子系统已被添加到系统;
+  * 	在sysfs中/sys/bus下面可以见到，并且可能启动添加设备;
+  */
+/*
+JYW: 平台总线:
+struct bus_type platform_bus_type = {
+	.name		= "platform",
+	.dev_attrs	= platform_dev_attrs,
+	.match		= platform_match,
+	.uevent		= platform_uevent,
+	.pm		= &platform_dev_pm_ops,
+};
+*/
 int bus_register(struct bus_type *bus)
 {
 	int retval;
 	struct subsys_private *priv;
 	struct lock_class_key *key = &bus->lock_key;
 
+    /* JYW: 首先分配一个subsys_private对象 */
 	priv = kzalloc(sizeof(struct subsys_private), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
@@ -885,22 +934,32 @@ int bus_register(struct bus_type *bus)
 
 	BLOCKING_INIT_NOTIFIER_HEAD(&priv->bus_notifier);
 
+    /* JYW: 为bus所在的内核对象分配名称，该名称将显示在sysfs文件系统中
+     * 		平台总线: platform
+	 */
 	retval = kobject_set_name(&priv->subsys.kobj, "%s", bus->name);
 	if (retval)
 		goto out;
 
+    /* JYW: 当前注册的bus对象所属的上层kset对象 */
 	priv->subsys.kobj.kset = bus_kset;
+    /* JYW: 当前注册的bus属性类型bus_type */
 	priv->subsys.kobj.ktype = &bus_ktype;
 	priv->drivers_autoprobe = 1;
 
+    /* JYW: 在/sys/bus目录下为当前注册的bus生成一个新的目录
+     * => 平台总线: /sys/bus/platform
+	 */
 	retval = kset_register(&priv->subsys);
 	if (retval)
 		goto out;
 
+    /* JYW: 生成bus的属性文件，名字为uevent */
 	retval = bus_create_file(bus, &bus_attr_uevent);
 	if (retval)
 		goto bus_uevent_fail;
 
+    /* JYW: 为当前bus产生容纳设备的kset容器 */
 	priv->devices_kset = kset_create_and_add("devices", NULL,
 						 &priv->subsys.kobj);
 	if (!priv->devices_kset) {
@@ -908,6 +967,7 @@ int bus_register(struct bus_type *bus)
 		goto bus_devices_fail;
 	}
 
+    /* JYW: 为当前bus产生容纳驱动的kset容器 */
 	priv->drivers_kset = kset_create_and_add("drivers", NULL,
 						 &priv->subsys.kobj);
 	if (!priv->drivers_kset) {
@@ -917,9 +977,14 @@ int bus_register(struct bus_type *bus)
 
 	INIT_LIST_HEAD(&priv->interfaces);
 	__mutex_init(&priv->mutex, "subsys mutex", key);
+    /* JYW: 初始化bus上的设备与驱动的链表 */
 	klist_init(&priv->klist_devices, klist_devices_get, klist_devices_put);
 	klist_init(&priv->klist_drivers, NULL, NULL);
 
+    /* JYW: 为当前bus增加probe相关的属性文件drivers_autoprobe和drivers_probe
+     * 		平台总线: /sys/bus/platform/drivers_autoprobe
+     *		平台总线: /sys/bus/platform/drivers_probe
+	 */
 	retval = add_probe_files(bus);
 	if (retval)
 		goto bus_probe_files_fail;
@@ -955,6 +1020,7 @@ EXPORT_SYMBOL_GPL(bus_register);
  * Unregister the child subsystems and the bus itself.
  * Finally, we call bus_put() to release the refcount
  */
+ /* JYW: 从系统移除一个总线 */
 void bus_unregister(struct bus_type *bus)
 {
 	pr_debug("bus: '%s': unregistering\n", bus->name);
@@ -1260,8 +1326,10 @@ int subsys_virtual_register(struct bus_type *subsys,
 }
 EXPORT_SYMBOL_GPL(subsys_virtual_register);
 
+/* JYW: 总线初始化 */
 int __init buses_init(void)
 {
+    /* JYW: 创建/sys/bus目录 */
 	bus_kset = kset_create_and_add("bus", &bus_uevent_ops, NULL);
 	if (!bus_kset)
 		return -ENOMEM;

@@ -105,6 +105,7 @@ static void merge_fdt_bootargs(void *fdt, const char *fdt_cmdline)
  *    = 1 -> bad ATAG (may retry with another possible ATAG pointer)
  *    < 0 -> error from libfdt
  */
+/* JYW: 将tag升级为FDT */
 int atags_to_fdt(void *atag_list, void *fdt, int total_space)
 {
 	struct tag *atag = atag_list;
@@ -114,15 +115,15 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
 	int memcount = 0;
 	int ret, memsize;
 
-	/* make sure we've got an aligned pointer */
+	/* JYW: 必须确保4字节对齐 */
 	if ((u32)atag_list & 0x3)
 		return 1;
 
-	/* if we get a DTB here we're done already */
+	/* JYW: 如果已经是FDT，则不用再继续了 */
 	if (*(u32 *)atag_list == fdt32_to_cpu(FDT_MAGIC))
 	       return 0;
 
-	/* validate the ATAG */
+	/* JYW: 检查tag的有效性 */
 	if (atag->hdr.tag != ATAG_CORE ||
 	    (atag->hdr.size != tag_size(tag_core) &&
 	     atag->hdr.size != 2))
@@ -133,7 +134,9 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
 	if (ret < 0)
 		return ret;
 
+    /* JYW: 遍历每一个tag */
 	for_each_tag(atag, atag_list) {
+	    /* JYW: 如果是ATAG_CMDLINE */
 		if (atag->hdr.tag == ATAG_CMDLINE) {
 			/* Append the ATAGS command line to the device tree
 			 * command line.
@@ -147,6 +150,7 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
 			else
 				setprop_string(fdt, "/chosen", "bootargs",
 					       atag->u.cmdline.cmdline);
+        /* JYW: 如果是ATAG_MEM */
 		} else if (atag->hdr.tag == ATAG_MEM) {
 			if (memcount >= sizeof(mem_reg_property)/4)
 				continue;
@@ -170,7 +174,7 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
 				mem_reg_property[memcount++] =
 					cpu_to_fdt32(atag->u.mem.size);
 			}
-
+        /* JYW: 如果是ATAG_INITRD2 */
 		} else if (atag->hdr.tag == ATAG_INITRD2) {
 			uint32_t initrd_start, initrd_size;
 			initrd_start = atag->u.initrd.start;

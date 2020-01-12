@@ -269,6 +269,7 @@ EXPORT_SYMBOL(blk_sync_queue);
  *    stopped. Must be called with the queue lock held and interrupts
  *    disabled. See also @blk_run_queue.
  */
+/* JYW: scsi_request_fn */
 inline void __blk_run_queue_uncond(struct request_queue *q)
 {
 	if (unlikely(blk_queue_dead(q)))
@@ -282,6 +283,7 @@ inline void __blk_run_queue_uncond(struct request_queue *q)
 	 * can wait until all these request_fn calls have finished.
 	 */
 	q->request_fn_active++;
+    /* JYW: scsi_request_fn */
 	q->request_fn(q);
 	q->request_fn_active--;
 }
@@ -294,6 +296,7 @@ inline void __blk_run_queue_uncond(struct request_queue *q)
  *    See @blk_run_queue. This variant must be called with the queue lock
  *    held and interrupts disabled.
  */
+/* JYW: scsi_request_fn */
 void __blk_run_queue(struct request_queue *q)
 {
 	if (unlikely(blk_queue_stopped(q)))
@@ -1191,6 +1194,7 @@ static struct request *blk_old_get_request(struct request_queue *q, int rw,
 	return rq;
 }
 
+/* JYW: 申请一个request描述符 */
 struct request *blk_get_request(struct request_queue *q, int rw, gfp_t gfp_mask)
 {
 	if (q->mq_ops)
@@ -1666,6 +1670,7 @@ get_rq:
 	} else {
 		spin_lock_irq(q->queue_lock);
 		add_acct_request(q, req, where);
+        /* JYW: scsi_request_fn */
 		__blk_run_queue(q);
 out_unlock:
 		spin_unlock_irq(q->queue_lock);
@@ -2237,6 +2242,7 @@ void blk_account_io_start(struct request *rq, bool new_io)
  * Context:
  *     queue_lock must be held.
  */
+/* JYW: 根据算法获取一个请求 */
 struct request *blk_peek_request(struct request_queue *q)
 {
 	struct request *rq;
@@ -2392,6 +2398,7 @@ EXPORT_SYMBOL(blk_start_request);
  * Context:
  *     queue_lock must be held.
  */
+/* JYW: 从请求队列中获取一个请求 */
 struct request *blk_fetch_request(struct request_queue *q)
 {
 	struct request *rq;

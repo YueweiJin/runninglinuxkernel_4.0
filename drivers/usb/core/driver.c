@@ -756,6 +756,9 @@ EXPORT_SYMBOL_GPL(usb_match_one_id);
  * without vendor and product IDs; or specify a protocol without
  * its associated class and subclass.
  */
+ /* 判断设备(接口)的基本信息(idVendor、idProduct等)
+  * 是否和驱动(如USB Storage)的id_table一致，如果匹配直接返回
+  */
 const struct usb_device_id *usb_match_id(struct usb_interface *interface,
 					 const struct usb_device_id *id)
 {
@@ -938,13 +941,16 @@ int usb_register_driver(struct usb_driver *new_driver, struct module *owner,
 	new_driver->drvwrap.for_devices = 0;
 	new_driver->drvwrap.driver.name = new_driver->name;
 	new_driver->drvwrap.driver.bus = &usb_bus_type;
+    /* 该函数是在probe时调用的 */
 	new_driver->drvwrap.driver.probe = usb_probe_interface;
+    /* 该函数是在remove时调用的 */
 	new_driver->drvwrap.driver.remove = usb_unbind_interface;
 	new_driver->drvwrap.driver.owner = owner;
 	new_driver->drvwrap.driver.mod_name = mod_name;
 	spin_lock_init(&new_driver->dynids.lock);
 	INIT_LIST_HEAD(&new_driver->dynids.list);
 
+    /* 向总线注册USB驱动，本质就是把驱动链入到bus->drivers中去 */
 	retval = driver_register(&new_driver->drvwrap.driver);
 	if (retval)
 		goto out;

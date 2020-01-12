@@ -204,6 +204,7 @@ static async_cookie_t __async_schedule(async_func_t func, void *data, struct asy
  * Returns an async_cookie_t that may be used for checkpointing later.
  * Note: This function may be called from atomic or non-atomic contexts.
  */
+/* JYW: 每调用一次async_schedule，就把ptr放到async_pending链表，然后开启一个内核线程来完成工作，这样实现并行 */
 async_cookie_t async_schedule(async_func_t func, void *data)
 {
 	return __async_schedule(func, data, &async_dfl_domain);

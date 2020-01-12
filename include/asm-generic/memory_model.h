@@ -28,6 +28,7 @@
 #if defined(CONFIG_FLATMEM)
 
 #define __pfn_to_page(pfn)	(mem_map + ((pfn) - ARCH_PFN_OFFSET))
+/* JYW: 根据page找到对应的页帧号 */
 #define __page_to_pfn(page)	((unsigned long)((page) - mem_map) + \
 				 ARCH_PFN_OFFSET)
 #elif defined(CONFIG_DISCONTIGMEM)
@@ -48,7 +49,9 @@
 #elif defined(CONFIG_SPARSEMEM_VMEMMAP)
 
 /* memmap is virtually contiguous.  */
+/* JYW: 根据页帧找到page地址 */
 #define __pfn_to_page(pfn)	(vmemmap + (pfn))
+/* JYW: 根据page找到页帧号 */
 #define __page_to_pfn(page)	(unsigned long)((page) - vmemmap)
 
 #elif defined(CONFIG_SPARSEMEM)
@@ -69,7 +72,9 @@
 })
 #endif /* CONFIG_FLATMEM/DISCONTIGMEM/SPARSEMEM */
 
+/* JYW: 根据page找到对应的页帧号 */
 #define page_to_pfn __page_to_pfn
+/* JYW: 根据页帧找到对应的page */
 #define pfn_to_page __pfn_to_page
 
 #endif /* __ASSEMBLY__ */

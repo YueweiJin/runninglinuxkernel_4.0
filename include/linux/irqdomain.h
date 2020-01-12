@@ -60,10 +60,15 @@ struct irq_data;
  * whatever internal data structures management is required. It also needs
  * to setup the irq_desc when returning from map().
  */
+/* JYW: irq_domain操作方法 */
 struct irq_domain_ops {
 	int (*match)(struct irq_domain *d, struct device_node *node);
 	int (*map)(struct irq_domain *d, unsigned int virq, irq_hw_number_t hw);
 	void (*unmap)(struct irq_domain *d, unsigned int virq);
+	/* JYW:
+	 * 将指定的设备（node参数）上若干个（intsize参数）中断属性（intspec参数）翻译成HW
+	 * interrupt ID（out_hwirq参数）和trigger类型（out_type）
+	 */
 	int (*xlate)(struct irq_domain *d, struct device_node *node,
 		     const u32 *intspec, unsigned int intsize,
 		     unsigned long *out_hwirq, unsigned int *out_type);
@@ -108,13 +113,18 @@ struct irq_domain_chip_generic;
  * @linear_revmap: Linear table of hwirq->virq reverse mappings
  */
 struct irq_domain {
+	/* JYW: irq_domain_list, 可以获取整个系统中HW interrupt ID和IRQ
+	 * number的mapping DB
+	 */
 	struct list_head link;
 	const char *name;
+	/* JYW: 回调函数 */
 	const struct irq_domain_ops *ops;
 	void *host_data;
 	unsigned int flags;
 
 	/* Optional data */
+	/* JYW: 该interrupt domain对应的interrupt controller的device node */
 	struct device_node *of_node;
 	struct irq_domain_chip_generic *gc;
 #ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
@@ -122,10 +132,14 @@ struct irq_domain {
 #endif
 
 	/* reverse map data. The linear map gets appended to the irq_domain */
+	/* JYW: 该domain中最大的那个HW interrupt ID */
 	irq_hw_number_t hwirq_max;
 	unsigned int revmap_direct_max_irq;
+	/* JYW: 线性映射的size，for Radix Tree map和no map，该值等于0 */
 	unsigned int revmap_size;
+	/* JYW: Radix Tree map使用到的radix tree root node */
 	struct radix_tree_root revmap_tree;
+	/* JYW: 线性映射使用的lookup table */
 	unsigned int linear_revmap[];
 };
 
@@ -171,11 +185,13 @@ extern void irq_set_default_host(struct irq_domain *host);
  * @ops: map/unmap domain callbacks
  * @host_data: Controller private data pointer
  */
+/* JYW: 分配并注册一个线性映射的irq_domain */
 static inline struct irq_domain *irq_domain_add_linear(struct device_node *of_node,
 					 unsigned int size,
 					 const struct irq_domain_ops *ops,
 					 void *host_data)
 {
+	/* JYW: 分配一个新的irq_domain数据结构并进行初始化 */
 	return __irq_domain_add(of_node, size, size, 0, ops, host_data);
 }
 static inline struct irq_domain *irq_domain_add_nomap(struct device_node *of_node,

@@ -32,6 +32,7 @@ static struct page *no_page_table(struct vm_area_struct *vma,
 	return NULL;
 }
 
+/* JYW: 检查PTE页表 */
 static struct page *follow_page_pte(struct vm_area_struct *vma,
 		unsigned long address, pmd_t *pmd, unsigned int flags)
 {
@@ -41,11 +42,13 @@ static struct page *follow_page_pte(struct vm_area_struct *vma,
 	pte_t *ptep, pte;
 
 retry:
+	/* JYW: 检查pdm是否有效 */
 	if (unlikely(pmd_bad(*pmd)))
 		return no_page_table(vma, flags);
-
+    /* JYW: 获取PTE页表项 */
 	ptep = pte_offset_map_lock(mm, pmd, address, &ptl);
 	pte = *ptep;
+    /* JYW: 若页面不在内存中 */
 	if (!pte_present(pte)) {
 		swp_entry_t entry;
 		/*
@@ -55,12 +58,14 @@ retry:
 		 */
 		if (likely(!(flags & FOLL_MIGRATION)))
 			goto no_page;
+        /* JYW: PTE为空 */
 		if (pte_none(pte))
 			goto no_page;
 		entry = pte_to_swp_entry(pte);
 		if (!is_migration_entry(entry))
 			goto no_page;
 		pte_unmap_unlock(ptep, ptl);
+        /* JYW: 若是正在合并中的swap页面，则等待页面合并完成后再尝试 */
 		migration_entry_wait(mm, pmd, address);
 		goto retry;
 	}
@@ -70,7 +75,7 @@ retry:
 		pte_unmap_unlock(ptep, ptl);
 		return NULL;
 	}
-
+    /* JYW：根据PTE来返回normal mapping页面的struct page数据结构 */
 	page = vm_normal_page(vma, address, pte);
 	if (unlikely(!page)) {
 		if ((flags & FOLL_DUMP) ||
@@ -80,6 +85,7 @@ retry:
 	}
 
 	if (flags & FOLL_GET)
+        /* JYW: 增加page的引用计数 */
 		get_page_foll(page);
 	if (flags & FOLL_TOUCH) {
 		if ((flags & FOLL_WRITE) &&
@@ -90,6 +96,7 @@ retry:
 		 * is needed to avoid losing the dirty bit: it is easier to use
 		 * mark_page_accessed().
 		 */
+		/* JYW: 标记page可访问 */
 		mark_page_accessed(page);
 	}
 	if ((flags & FOLL_MLOCK) && (vma->vm_flags & VM_LOCKED)) {
@@ -140,6 +147,7 @@ no_page:
  * an error pointer if there is a mapping to something not represented
  * by a page descriptor (see also vm_normal_page()).
  */
+/* JYW: 查看VMA中的虚拟页面是否已经分配了物理内存  */
 struct page *follow_page_mask(struct vm_area_struct *vma,
 			      unsigned long address, unsigned int flags,
 			      unsigned int *page_mask)
@@ -159,10 +167,12 @@ struct page *follow_page_mask(struct vm_area_struct *vma,
 		return page;
 	}
 
+	/* JYW：返回进程页表对应的PGD目录项 */
 	pgd = pgd_offset(mm, address);
 	if (pgd_none(*pgd) || unlikely(pgd_bad(*pgd)))
 		return no_page_table(vma, flags);
 
+	/* JYW：返回进程页表对应的pud目录项; */
 	pud = pud_offset(pgd, address);
 	if (pud_none(*pud))
 		return no_page_table(vma, flags);
@@ -175,6 +185,7 @@ struct page *follow_page_mask(struct vm_area_struct *vma,
 	if (unlikely(pud_bad(*pud)))
 		return no_page_table(vma, flags);
 
+	/* JYW: 返回进程页表对应的pmd目录项 */
 	pmd = pmd_offset(pud, address);
 	if (pmd_none(*pmd))
 		return no_page_table(vma, flags);
@@ -206,6 +217,7 @@ struct page *follow_page_mask(struct vm_area_struct *vma,
 		} else
 			spin_unlock(ptl);
 	}
+    /* JYW: 最后检查PTE页表 */
 	return follow_page_pte(vma, address, pmd, flags);
 }
 
@@ -413,6 +425,7 @@ static int check_vma_flags(struct vm_area_struct *vma, unsigned long gup_flags)
  * instead of __get_user_pages. __get_user_pages should be used only if
  * you need some special @gup_flags.
  */
+/* JYW: 为进程地址空间分配物理内存并且建立映射关系 */
 long __get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 		unsigned long start, unsigned long nr_pages,
 		unsigned int gup_flags, struct page **pages,
@@ -471,9 +484,12 @@ retry:
 		if (unlikely(fatal_signal_pending(current)))
 			return i ? i : -ERESTARTSYS;
 		cond_resched();
+        /* JYW: 查看VMA中的虚拟页面是否已经分配了物理内存  */
 		page = follow_page_mask(vma, start, foll_flags, &page_mask);
+        /* JYW: 如果没有分配过 */
 		if (!page) {
 			int ret;
+            /* JYW: 人为的触发一个缺页中断 */
 			ret = faultin_page(tsk, vma, start, &foll_flags,
 					nonblocking);
 			switch (ret) {

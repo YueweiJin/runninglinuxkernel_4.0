@@ -36,6 +36,7 @@ const struct ata_port_operations sata_pmp_port_ops = {
  *	RETURNS:
  *	0 on success, AC_ERR_* mask on failure.
  */
+/* JYW: 读取pmp寄存器 */
 static unsigned int sata_pmp_read(struct ata_link *link, int reg, u32 *r_val)
 {
 	struct ata_port *ap = link->ap;
@@ -43,6 +44,7 @@ static unsigned int sata_pmp_read(struct ata_link *link, int reg, u32 *r_val)
 	struct ata_taskfile tf;
 	unsigned int err_mask;
 
+    /* JYW: 初始化一个ata_taskfile结构体 */
 	ata_tf_init(pmp_dev, &tf);
 	tf.command = ATA_CMD_PMP_READ;
 	tf.protocol = ATA_PROT_NODATA;
@@ -73,6 +75,7 @@ static unsigned int sata_pmp_read(struct ata_link *link, int reg, u32 *r_val)
  *	RETURNS:
  *	0 on success, AC_ERR_* mask on failure.
  */
+/* JYW: 写pmp寄存器 */
 static unsigned int sata_pmp_write(struct ata_link *link, int reg, u32 val)
 {
 	struct ata_port *ap = link->ap;
@@ -334,6 +337,7 @@ static int sata_pmp_configure(struct ata_device *dev, int print_info)
 	return rc;
 }
 
+/* JYW: 初始化ata端口下PMP的下行端口(link) */
 static int sata_pmp_init_links (struct ata_port *ap, int nr_ports)
 {
 	struct ata_link *pmp_link = ap->pmp_link;
@@ -476,6 +480,7 @@ static void sata_pmp_quirks(struct ata_port *ap)
  *	RETURNS:
  *	0 on success, -errno on failure.
  */
+/* JYW: 绑定一个PMP设备 */
 int sata_pmp_attach(struct ata_device *dev)
 {
 	struct ata_link *link = dev->link;
@@ -501,6 +506,7 @@ int sata_pmp_attach(struct ata_device *dev)
 	}
 
 	WARN_ON(link->pmp != 0);
+    /* JYW: 上行端口为15 */
 	link->pmp = SATA_PMP_CTRL_PORT;
 
 	/* read GSCR block */
@@ -513,6 +519,7 @@ int sata_pmp_attach(struct ata_device *dev)
 	if (rc)
 		goto fail;
 
+    /* JYW: 初始化ata端口下PMP的下行端口(link) */
 	rc = sata_pmp_init_links(ap, sata_pmp_gscr_ports(dev->gscr));
 	if (rc) {
 		ata_dev_info(dev, "failed to initialize PMP links\n");
@@ -913,6 +920,7 @@ static int sata_pmp_handle_link_fail(struct ata_link *link, int *link_tries)
  *	RETURNS:
  *	0 on success, -errno on failure.
  */
+/* JYW: 错误处理恢复 */
 static int sata_pmp_eh_recover(struct ata_port *ap)
 {
 	struct ata_port_operations *ops = ap->ops;
@@ -934,6 +942,7 @@ static int sata_pmp_eh_recover(struct ata_port *ap)
  retry:
 	/* PMP attached? */
 	if (!sata_pmp_attached(ap)) {
+        /* JYW: ata端口错误处理 */
 		rc = ata_eh_recover(ap, ops->prereset, ops->softreset,
 				    ops->hardreset, ops->postreset, NULL);
 		if (rc) {
@@ -1093,10 +1102,13 @@ static int sata_pmp_eh_recover(struct ata_port *ap)
  *	LOCKING:
  *	Kernel thread context (may sleep).
  */
+/* JYW: 标准错误处理流程 */
 void sata_pmp_error_handler(struct ata_port *ap)
 {
 	ata_eh_autopsy(ap);
+    /* JYW: 向用户态报告错误 */
 	ata_eh_report(ap);
+    /* JYW: 错误处理恢复 */
 	sata_pmp_eh_recover(ap);
 	ata_eh_finish(ap);
 }

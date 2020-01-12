@@ -1190,6 +1190,7 @@ int security_socket_connect(struct socket *sock, struct sockaddr *address, int a
 
 int security_socket_listen(struct socket *sock, int backlog)
 {
+    /* JYW: inet_listen */
 	return security_ops->socket_listen(sock, backlog);
 }
 

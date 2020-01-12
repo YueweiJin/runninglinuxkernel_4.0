@@ -442,7 +442,7 @@ static inline int acpi_i2c_install_space_handler(struct i2c_adapter *adapter)
 #endif /* CONFIG_ACPI_I2C_OPREGION */
 
 /* ------------------------------------------------------------------------- */
-
+/* JYW: 匹配板文件中的ID和i2c_driver所支持的ID表 */
 static const struct i2c_device_id *i2c_match_id(const struct i2c_device_id *id,
 						const struct i2c_client *client)
 {
@@ -454,6 +454,7 @@ static const struct i2c_device_id *i2c_match_id(const struct i2c_device_id *id,
 	return NULL;
 }
 
+/* JYW: 判断当前设备和设备驱动是否匹配 1: 匹配 0: 不匹配 */
 static int i2c_device_match(struct device *dev, struct device_driver *drv)
 {
 	struct i2c_client	*client = i2c_verify_client(dev);
@@ -766,6 +767,7 @@ EXPORT_SYMBOL(i2c_verify_client);
 
 /* This is a permissive address validity check, I2C address map constraints
  * are purposely not enforced, except for the general call address. */
+/* JYW: 检查地址有效性 */
 static int i2c_check_client_addr_validity(const struct i2c_client *client)
 {
 	if (client->flags & I2C_CLIENT_TEN) {
@@ -840,6 +842,7 @@ static int i2c_check_mux_children(struct device *dev, void *addrp)
 	return result;
 }
 
+/* JYW: 检查I2C设备地址是否已经存在 */
 static int i2c_check_addr_busy(struct i2c_adapter *adapter, int addr)
 {
 	struct i2c_adapter *parent = i2c_parent_is_i2c_adapter(adapter);
@@ -931,12 +934,14 @@ static void i2c_dev_set_name(struct i2c_adapter *adap,
  * This returns the new i2c client, which may be saved for later use with
  * i2c_unregister_device(); or NULL to indicate an error.
  */
+/* JYW: 根据适配器(I2C控制器)和板级信息注册一个逻辑上的I2C设备 */
 struct i2c_client *
 i2c_new_device(struct i2c_adapter *adap, struct i2c_board_info const *info)
 {
 	struct i2c_client	*client;
 	int			status;
 
+    /* JYW: 分配一个client */
 	client = kzalloc(sizeof *client, GFP_KERNEL);
 	if (!client)
 		return NULL;
@@ -952,6 +957,7 @@ i2c_new_device(struct i2c_adapter *adap, struct i2c_board_info const *info)
 	client->addr = info->addr;
 	client->irq = info->irq;
 
+    /* JYW: 赋值I2C从设备的名字 */
 	strlcpy(client->name, info->type, sizeof(client->name));
 
 	/* Check for address validity */
@@ -974,6 +980,7 @@ i2c_new_device(struct i2c_adapter *adap, struct i2c_board_info const *info)
 	ACPI_COMPANION_SET(&client->dev, info->acpi_node.companion);
 
 	i2c_dev_set_name(adap, client);
+	/* JYW: 注册一个I2C从设备 */
 	status = device_register(&client->dev);
 	if (status)
 		goto out_err;
@@ -998,6 +1005,7 @@ EXPORT_SYMBOL_GPL(i2c_new_device);
  * @client: value returned from i2c_new_device()
  * Context: can sleep
  */
+/* JYW: 注销一个I2C从设备 */
 void i2c_unregister_device(struct i2c_client *client)
 {
 	device_unregister(&client->dev);
@@ -1371,6 +1379,7 @@ static int __process_new_adapter(struct device_driver *d, void *data)
 	return i2c_do_add_adapter(to_i2c_driver(d), data);
 }
 
+/* JYW: 向系统注册一个适配器 */
 static int i2c_register_adapter(struct i2c_adapter *adap)
 {
 	int res = 0;
@@ -1480,6 +1489,7 @@ out_list:
  *
  * See i2c_add_numbered_adapter() for details.
  */
+/* JYW: 添加一个指定总线号的适配器 */
 static int __i2c_add_numbered_adapter(struct i2c_adapter *adap)
 {
 	int	id;
@@ -1491,6 +1501,7 @@ static int __i2c_add_numbered_adapter(struct i2c_adapter *adap)
 	if (id < 0)
 		return id == -ENOSPC ? -EBUSY : id;
 
+    /* JYW: 向系统注册一个适配器 */
 	return i2c_register_adapter(adap);
 }
 
@@ -1508,6 +1519,7 @@ static int __i2c_add_numbered_adapter(struct i2c_adapter *adap)
  * in adap->nr, and the specified adapter became available for clients.
  * Otherwise, a negative errno value is returned.
  */
+/* JYW: 添加一个I2C适配器 */
 int i2c_add_adapter(struct i2c_adapter *adapter)
 {
 	struct device *dev = &adapter->dev;
@@ -1529,7 +1541,7 @@ int i2c_add_adapter(struct i2c_adapter *adapter)
 		return id;
 
 	adapter->nr = id;
-
+    /* JYW: 向系统注册一个适配器 */
 	return i2c_register_adapter(adapter);
 }
 EXPORT_SYMBOL(i2c_add_adapter);
@@ -1557,6 +1569,7 @@ EXPORT_SYMBOL(i2c_add_adapter);
  * and the appropriate driver model device nodes are created.  Otherwise, a
  * negative errno value is returned.
  */
+/* JYW: 向系统添加一个I2C适配器 */
 int i2c_add_numbered_adapter(struct i2c_adapter *adap)
 {
 	if (adap->nr == -1) /* -1 means dynamically assign bus id */
@@ -1990,6 +2003,7 @@ EXPORT_SYMBOL(__i2c_transfer);
  * Note that there is no requirement that each message be sent to
  * the same slave address, although that is the most common model.
  */
+/* JYW: 执行一个I2C消息传输 */
 int i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 {
 	int ret;
@@ -2300,6 +2314,7 @@ i2c_new_probed_device(struct i2c_adapter *adap,
 }
 EXPORT_SYMBOL_GPL(i2c_new_probed_device);
 
+/* JYW: 根据总线号获得一个适配器 */
 struct i2c_adapter *i2c_get_adapter(int nr)
 {
 	struct i2c_adapter *adapter;
@@ -2314,6 +2329,7 @@ struct i2c_adapter *i2c_get_adapter(int nr)
 }
 EXPORT_SYMBOL(i2c_get_adapter);
 
+/* JYW: 释放适配器 */
 void i2c_put_adapter(struct i2c_adapter *adap)
 {
 	if (adap)

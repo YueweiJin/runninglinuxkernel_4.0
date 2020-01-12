@@ -56,6 +56,7 @@ struct files_struct {
 	int next_fd;
 	unsigned long close_on_exec_init[1];
 	unsigned long open_fds_init[1];
+	/* JYW: 这里的数组索引就是fd */
 	struct file __rcu * fd_array[NR_OPEN_DEFAULT];
 };
 

@@ -2883,6 +2883,7 @@ static int sd_format_disk_name(char *prefix, int index, char *buf, int buflen)
 /*
  * The asynchronous part of sd_probe
  */
+/* JYW */
 static void sd_probe_async(void *data, async_cookie_t cookie)
 {
 	struct scsi_disk *sdkp = data;
@@ -2956,6 +2957,7 @@ static void sd_probe_async(void *data, async_cookie_t cookie)
  *	Assume sd_probe is not re-entrant (for time being)
  *	Also think about sd_probe() and sd_remove() running coincidentally.
  **/
+/* JYW: */
 static int sd_probe(struct device *dev)
 {
 	struct scsi_device *sdp = to_scsi_device(dev);
@@ -3028,6 +3030,7 @@ static int sd_probe(struct device *dev)
 	dev_set_drvdata(dev, sdkp);
 
 	get_device(&sdkp->dev);	/* prevent release before async_schedule */
+    /* JYW */
 	async_schedule_domain(sd_probe_async, sdkp, &scsi_sd_probe_domain);
 
 	return 0;

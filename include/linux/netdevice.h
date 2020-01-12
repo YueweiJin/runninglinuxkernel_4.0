@@ -1555,7 +1555,9 @@ struct net_device {
 	const struct iw_handler_def *	wireless_handlers;
 	struct iw_public_data *	wireless_data;
 #endif
+    /* JYW: bond_netdev_ops */
 	const struct net_device_ops *netdev_ops;
+    /* JYW: bond_ethtool_ops */
 	const struct ethtool_ops *ethtool_ops;
 	const struct forwarding_accel_ops *fwd_ops;
 
@@ -1721,7 +1723,7 @@ struct net_device {
 	struct device	dev;
 	const struct attribute_group *sysfs_groups[4];
 	const struct attribute_group *sysfs_rx_queue_group;
-
+    /* JYW: bond_link_ops */
 	const struct rtnl_link_ops *rtnl_link_ops;
 
 	/* for setting kernel sock attribute on TCP connection setup */

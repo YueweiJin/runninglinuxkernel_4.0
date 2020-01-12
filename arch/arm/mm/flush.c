@@ -64,6 +64,7 @@ void flush_cache_mm(struct mm_struct *mm)
 	}
 }
 
+/* JYW: 刷cache */
 void flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned long end)
 {
 	if (cache_is_vivt()) {

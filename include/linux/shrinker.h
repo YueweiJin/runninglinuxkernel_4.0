@@ -47,8 +47,12 @@ struct shrink_control {
  * @flags determine the shrinker abilities, like numa awareness
  */
 struct shrinker {
+	/* JYW: 返回当前可回收的cache数量,
+	 * 若没有可回收的cache或无法计算得出则返回0
+	 */
 	unsigned long (*count_objects)(struct shrinker *,
 				       struct shrink_control *sc);
+	/* JYW: 尝试释放cache，返回释放的cache数量 */
 	unsigned long (*scan_objects)(struct shrinker *,
 				      struct shrink_control *sc);
 

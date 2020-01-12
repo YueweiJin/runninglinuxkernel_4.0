@@ -115,6 +115,7 @@
  * 			the fast path and disables lockless freelists.
  */
 
+/* JYW: 满足debug条件，可搜索 */
 static inline int kmem_cache_debug(struct kmem_cache *s)
 {
 #ifdef CONFIG_SLUB_DEBUG
@@ -225,6 +226,7 @@ static inline void stat(const struct kmem_cache *s, enum stat_item si)
  *******************************************************************/
 
 /* Verify that a pointer has an address that is valid within a slab page */
+/* JYW: 判断object指针是否有效 */
 static inline int check_valid_pointer(struct kmem_cache *s,
 				struct page *page, const void *object)
 {
@@ -242,6 +244,7 @@ static inline int check_valid_pointer(struct kmem_cache *s,
 	return 1;
 }
 
+/* JYW: 获取下一个对象的指针 */
 static inline void *get_freepointer(struct kmem_cache *s, void *object)
 {
 	return *(void **)(object + s->offset);
@@ -279,6 +282,7 @@ static inline void set_freepointer(struct kmem_cache *s, void *object, void *fp)
 			__p += (__s)->size, __idx++)
 
 /* Determine object index from a given position */
+/* JYW: 计算slab的索引 */
 static inline int slab_index(void *p, struct kmem_cache *s, void *addr)
 {
 	return (p - addr) / s->size;
@@ -459,12 +463,14 @@ static void get_map(struct kmem_cache *s, struct page *page, unsigned long *map)
 /*
  * Debug settings:
  */
+/* JYW: SLUB DEBUG 需要打开 */
 #ifdef CONFIG_SLUB_DEBUG_ON
 static int slub_debug = DEBUG_DEFAULT_FLAGS;
 #else
 static int slub_debug;
 #endif
 
+/* JYW: 调试具体的slab描述符名称 */
 static char *slub_debug_slabs;
 static int disable_higher_order_debug;
 
@@ -674,12 +680,12 @@ static void slab_err(struct kmem_cache *s, struct page *page,
 static void init_object(struct kmem_cache *s, void *object, u8 val)
 {
 	u8 *p = object;
-
+    /* JYW: 对obj部分填充0x6b，最后一个字节填充0x5a */
 	if (s->flags & __OBJECT_POISON) {
 		memset(p, POISON_FREE, s->object_size - 1);
 		p[s->object_size - 1] = POISON_END;
 	}
-
+    /* JYW: 对red zone填充 */
 	if (s->flags & SLAB_RED_ZONE)
 		memset(p + s->object_size, val, s->inuse - s->object_size);
 }
@@ -808,6 +814,7 @@ static int slab_pad_check(struct kmem_cache *s, struct page *page)
 	return 0;
 }
 
+/* JYW: 检测Red zone区域的数值是否被改变 */
 static int check_object(struct kmem_cache *s, struct page *page,
 					void *object, u8 val)
 {
@@ -891,6 +898,7 @@ static int check_slab(struct kmem_cache *s, struct page *page)
  * Determine if a certain object on a page is on the freelist. Must hold the
  * slab lock to guarantee that the chains are in a consistent state.
  */
+/* JYW: 检查是否已经在freelist上又被free了 */
 static int on_freelist(struct kmem_cache *s, struct page *page, void *search)
 {
 	int nr = 0;
@@ -961,6 +969,7 @@ static void trace(struct kmem_cache *s, struct page *page, void *object,
 /*
  * Tracking of fully allocated slabs for debugging purposes.
  */
+/* JYW：将full的slub对应的page挂到node的full链表上 */
 static void add_full(struct kmem_cache *s,
 	struct kmem_cache_node *n, struct page *page)
 {
@@ -971,6 +980,7 @@ static void add_full(struct kmem_cache *s,
 	list_add(&page->lru, &n->full);
 }
 
+/* JYW：从node的full链表上摘除 */
 static void remove_full(struct kmem_cache *s, struct kmem_cache_node *n, struct page *page)
 {
 	if (!(s->flags & SLAB_STORE_USER))
@@ -1039,6 +1049,7 @@ static noinline int alloc_debug_processing(struct kmem_cache *s,
 		goto bad;
 	}
 
+    /* JYW: 检测Red zone区域的数值是否被改变 */
 	if (!check_object(s, page, object, SLUB_RED_INACTIVE))
 		goto bad;
 
@@ -1046,6 +1057,7 @@ static noinline int alloc_debug_processing(struct kmem_cache *s,
 	if (s->flags & SLAB_STORE_USER)
 		set_track(s, object, TRACK_ALLOC, addr);
 	trace(s, page, object, 1);
+    /* JYW: 分配时对Red zone填充0xcc */
 	init_object(s, object, SLUB_RED_ACTIVE);
 	return 1;
 
@@ -1063,6 +1075,7 @@ bad:
 	return 0;
 }
 
+/* JYW: 释放检查流程 */
 static noinline struct kmem_cache_node *free_debug_processing(
 	struct kmem_cache *s, struct page *page, void *object,
 	unsigned long addr, unsigned long *flags)
@@ -1075,16 +1088,19 @@ static noinline struct kmem_cache_node *free_debug_processing(
 	if (!check_slab(s, page))
 		goto fail;
 
+    /* JYW: 判断object指针是否在有效范围内 */
 	if (!check_valid_pointer(s, page, object)) {
 		slab_err(s, page, "Invalid object pointer 0x%p", object);
 		goto fail;
 	}
 
+    /* JYW: 检查是否已经在freelist上又被free了 */
 	if (on_freelist(s, page, object)) {
 		object_err(s, page, object, "Object already free");
 		goto fail;
 	}
 
+    /* JYW: 检测redzone区域的数值是否被改变 */
 	if (!check_object(s, page, object, SLUB_RED_ACTIVE))
 		goto out;
 
@@ -1121,6 +1137,25 @@ fail:
 	return NULL;
 }
 
+/*
+ * JYW: SLUB debug选项解析
+slub_debug=<Debug-Options>       Enable options for all slabs
+slub_debug=<Debug-Options>,<slab name>
+                Enable options only for select slabs
+
+Possible debug options are
+    F       Sanity checks on (enables SLAB_DEBUG_FREE. Sorry
+            SLAB legacy issues)
+    Z       Red zoning
+    P       Poisoning (object and padding)
+    U       User tracking (free and alloc)
+    T       Trace (please only use on single slabs)
+    A       Toggle failslab filter mark for the cache
+    O       Switch debugging off for caches that would have
+            caused higher minimum slab orders
+    -       Switch all debugging off (useful if the kernel is
+            configured with CONFIG_SLUB_DEBUG_ON)
+ */
 static int __init setup_slub_debug(char *str)
 {
 	slub_debug = DEBUG_DEFAULT_FLAGS;
@@ -1184,6 +1219,7 @@ static int __init setup_slub_debug(char *str)
 
 check_slabs:
 	if (*str == ',')
+        /* JYW: 调试具体的slab描述符名称 */
 		slub_debug_slabs = str + 1;
 out:
 	return 1;
@@ -1191,6 +1227,7 @@ out:
 
 __setup("slub_debug", setup_slub_debug);
 
+/* JYW: 获取调试标记 */
 unsigned long kmem_cache_flags(unsigned long object_size,
 	unsigned long flags, const char *name,
 	void (*ctor)(void *))
@@ -1333,6 +1370,7 @@ static inline struct page *alloc_slab_page(struct kmem_cache *s,
 	return page;
 }
 
+/* JYW: 从伙伴系统申请一批页面 */
 static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
 {
 	struct page *page;
@@ -1387,6 +1425,7 @@ static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
 	if (!page)
 		return NULL;
 
+    /* JYW: 管理的objects的数量 */
 	page->objects = oo_objects(oo);
 	mod_zone_page_state(page_zone(page),
 		(s->flags & SLAB_RECLAIM_ACCOUNT) ?
@@ -1407,6 +1446,7 @@ static void setup_object(struct kmem_cache *s, struct page *page,
 	}
 }
 
+/* JYW: 从伙伴系统申请一批页面 */
 static struct page *new_slab(struct kmem_cache *s, gfp_t flags, int node)
 {
 	struct page *page;
@@ -1420,6 +1460,7 @@ static struct page *new_slab(struct kmem_cache *s, gfp_t flags, int node)
 		BUG();
 	}
 
+    /* JYW: 从伙伴系统申请一批页面 */
 	page = allocate_slab(s,
 		flags & (GFP_RECLAIM_MASK | GFP_CONSTRAINT_MASK), node);
 	if (!page)
@@ -1427,18 +1468,21 @@ static struct page *new_slab(struct kmem_cache *s, gfp_t flags, int node)
 
 	order = compound_order(page);
 	inc_slabs_node(s, page_to_nid(page), page->objects);
+    /* JYW: 关联kmem_cache对象 */
 	page->slab_cache = s;
 	__SetPageSlab(page);
 	if (page->pfmemalloc)
 		SetPageSlabPfmemalloc(page);
-
+    /* JYW: 返回对应的虚拟地址 */
 	start = page_address(page);
 
+    /* JYW: 分配后全部初始化为0x5a */
 	if (unlikely(s->flags & SLAB_POISON))
 		memset(start, POISON_INUSE, PAGE_SIZE << order);
 
 	kasan_poison_slab(page);
 
+    /* JYW: 遍历每个object */
 	for_each_object_idx(p, idx, s, start, page->objects) {
 		setup_object(s, page, p);
 		if (likely(idx < page->objects))
@@ -1481,6 +1525,7 @@ static void __free_slab(struct kmem_cache *s, struct page *page)
 	page_mapcount_reset(page);
 	if (current->reclaim_state)
 		current->reclaim_state->reclaimed_slab += pages;
+    /* JYW: 释放page */
 	__free_pages(page, order);
 	memcg_uncharge_slab(s, order);
 }
@@ -1532,16 +1577,20 @@ static void discard_slab(struct kmem_cache *s, struct page *page)
 /*
  * Management of partially allocated slabs.
  */
+/* JYW: 将page添加到node的partial链表上 */
 static inline void
 __add_partial(struct kmem_cache_node *n, struct page *page, int tail)
 {
+    /* JYW: 增加增加slab节点的个数 */
 	n->nr_partial++;
 	if (tail == DEACTIVATE_TO_TAIL)
+        /* JYW: 将page挂接到n->partial链表的尾部 */
 		list_add_tail(&page->lru, &n->partial);
 	else
 		list_add(&page->lru, &n->partial);
 }
 
+/* JYW: 将page添加到node的partial链表上 */
 static inline void add_partial(struct kmem_cache_node *n,
 				struct page *page, int tail)
 {
@@ -1936,6 +1985,7 @@ redo:
 		} else if (m == M_FULL) {
 
 			stat(s, DEACTIVATE_FULL);
+            /* JYW：将full的slub对应的page挂到node的full链表上 */
 			add_full(s, n, page);
 
 		}
@@ -2037,6 +2087,7 @@ static void unfreeze_partials(struct kmem_cache *s,
  */
 static void put_cpu_partial(struct kmem_cache *s, struct page *page, int drain)
 {
+/* JYW: 默认打开 */
 #ifdef CONFIG_SLUB_CPU_PARTIAL
 	struct page *oldpage;
 	int pages;
@@ -2218,12 +2269,13 @@ static inline void *new_slab_objects(struct kmem_cache *s, gfp_t flags,
 	void *freelist;
 	struct kmem_cache_cpu *c = *pc;
 	struct page *page;
-
+    /* JYW: 从kmem_cache_node的partial链表获取 */
 	freelist = get_partial(s, flags, node, c);
 
 	if (freelist)
 		return freelist;
 
+    /* JYW: 从伙伴系统分配 */
 	page = new_slab(s, flags, node);
 	if (page) {
 		c = raw_cpu_ptr(s->cpu_slab);
@@ -2304,6 +2356,7 @@ static inline void *get_freelist(struct kmem_cache *s, struct page *page)
  * we need to allocate a new slab. This is the slowest path since it involves
  * a call to the page allocator and the setup of a new slab.
  */
+/* JYW: 慢速分配对象 */
 static void *__slab_alloc(struct kmem_cache *s, gfp_t gfpflags, int node,
 			  unsigned long addr, struct kmem_cache_cpu *c)
 {
@@ -2357,7 +2410,7 @@ redo:
 	freelist = c->freelist;
 	if (freelist)
 		goto load_freelist;
-
+    /* JYW: 从freelist分配 */
 	freelist = get_freelist(s, page);
 
 	if (!freelist) {
@@ -2381,7 +2434,10 @@ load_freelist:
 	return freelist;
 
 new_slab:
-
+    /* 
+     * JYW: 随着正在使用的slab中obj的一个个分配出去，
+     *  最终会无obj可分配，此时per cpu partial链表中有可用slab用于分配，那么就会从percpu partial链表中取下一个slab用于分配obj
+     */
 	if (c->partial) {
 		page = c->page = c->partial;
 		c->partial = page->next;
@@ -2389,9 +2445,9 @@ new_slab:
 		c->freelist = NULL;
 		goto redo;
 	}
-
+    /* JYW: 从node或伙伴系统分配 */
 	freelist = new_slab_objects(s, gfpflags, node, &c);
-
+    /* JYW: 说明内存不足了 */
 	if (unlikely(!freelist)) {
 		slab_out_of_memory(s, gfpflags, node);
 		local_irq_restore(flags);
@@ -2424,6 +2480,7 @@ new_slab:
  *
  * Otherwise we can simply pick the next object from the lockless free list.
  */
+/* JYW: 从缓存池中申请内存 */
 static __always_inline void *slab_alloc_node(struct kmem_cache *s,
 		gfp_t gfpflags, int node, unsigned long addr)
 {
@@ -2468,10 +2525,12 @@ redo:
 	 * occurs on the right processor and that there was no operation on the
 	 * linked list in between.
 	 */
-
+    /* JYW: 找到下一个可用的object */
 	object = c->freelist;
 	page = c->page;
+    /* JYW: 如果freelist中没有可用对象 */
 	if (unlikely(!object || !node_match(page, node))) {
+        /* JYW: 慢速分配对象 */
 		object = __slab_alloc(s, gfpflags, node, addr, c);
 		stat(s, ALLOC_SLOWPATH);
 	} else {
@@ -2502,7 +2561,7 @@ redo:
 		prefetch_freepointer(s, next_object);
 		stat(s, ALLOC_FASTPATH);
 	}
-
+    /* JYW: 如果带__GFP_ZERO标记，则清零 */
 	if (unlikely(gfpflags & __GFP_ZERO) && object)
 		memset(object, 0, s->object_size);
 
@@ -2511,12 +2570,14 @@ redo:
 	return object;
 }
 
+/* JYW: 从缓存池中申请内存 */
 static __always_inline void *slab_alloc(struct kmem_cache *s,
 		gfp_t gfpflags, unsigned long addr)
 {
 	return slab_alloc_node(s, gfpflags, NUMA_NO_NODE, addr);
 }
 
+/* JYW: 从缓存池中申请内存 */
 void *kmem_cache_alloc(struct kmem_cache *s, gfp_t gfpflags)
 {
 	void *ret = slab_alloc(s, gfpflags, _RET_IP_);
@@ -2576,6 +2637,7 @@ EXPORT_SYMBOL(kmem_cache_alloc_node_trace);
  * lock and free the item. If there is no additional partial page
  * handling required then we can return immediately.
  */
+/* JYW: 释放非kmem_cache_cpu上当前正在使用的page中的某个object */
 static void __slab_free(struct kmem_cache *s, struct page *page,
 			void *x, unsigned long addr)
 {
@@ -2589,6 +2651,7 @@ static void __slab_free(struct kmem_cache *s, struct page *page,
 
 	stat(s, FREE_SLOWPATH);
 
+    /* JYW: 释放检查流程 */
 	if (kmem_cache_debug(s) &&
 		!(n = free_debug_processing(s, page, x, addr, &flags)))
 		return;
@@ -2681,6 +2744,7 @@ slab_empty:
 		stat(s, FREE_REMOVE_PARTIAL);
 	} else {
 		/* Slab must be on the full list */
+        /* JYW：从node的full链表上摘除 */
 		remove_full(s, n, page);
 	}
 
@@ -2700,6 +2764,7 @@ slab_empty:
  * If fastpath is not possible then fall back to __slab_free where we deal
  * with all sorts of special processing.
  */
+/* JYW: 释放一个object */
 static __always_inline void slab_free(struct kmem_cache *s,
 			struct page *page, void *x, unsigned long addr)
 {
@@ -2724,7 +2789,7 @@ redo:
 
 	/* Same with comment on barrier() in slab_alloc_node() */
 	barrier();
-
+    /* JYW: 释放kmem_cache_cpu上当前正在使用的page中的某个object */
 	if (likely(page == c->page)) {
 		set_freepointer(s, object, c->freelist);
 
@@ -2738,7 +2803,8 @@ redo:
 		}
 		stat(s, FREE_FASTPATH);
 	} else
-		__slab_free(s, page, x, addr);
+        /* JYW: 释放非kmem_cache_cpu上当前正在使用的page中的某个object */
+        __slab_free(s, page, x, addr);
 
 }
 
@@ -3008,6 +3074,7 @@ static void set_min_partial(struct kmem_cache *s, unsigned long min)
  * calculate_sizes() determines the order and the distribution of data within
  * a slab object.
  */
+/* JYW: 计算一个slab占用的页面数量以及objects的分布数量 */
 static int calculate_sizes(struct kmem_cache *s, int forced_order)
 {
 	unsigned long flags = s->flags;
@@ -3029,6 +3096,7 @@ static int calculate_sizes(struct kmem_cache *s, int forced_order)
 	 */
 	if ((flags & SLAB_POISON) && !(flags & SLAB_DESTROY_BY_RCU) &&
 			!s->ctor)
+        /* JYW: DEBUG_ON后，实际调试走这里 */
 		s->flags |= __OBJECT_POISON;
 	else
 		s->flags &= ~__OBJECT_POISON;
@@ -3039,6 +3107,7 @@ static int calculate_sizes(struct kmem_cache *s, int forced_order)
 	 * end of the object and the free pointer. If not then add an
 	 * additional word to have some bytes to store Redzone information.
 	 */
+    /* JYW: DEBUG_ON后，实际调试走这里 */
 	if ((flags & SLAB_RED_ZONE) && size == s->object_size)
 		size += sizeof(void *);
 #endif
@@ -3120,12 +3189,14 @@ static int calculate_sizes(struct kmem_cache *s, int forced_order)
 
 static int kmem_cache_open(struct kmem_cache *s, unsigned long flags)
 {
+    /* JYW: 获取调试标记 */
 	s->flags = kmem_cache_flags(s->size, flags, s->name, s->ctor);
 	s->reserved = 0;
 
 	if (need_reserve_slab_rcu && (s->flags & SLAB_DESTROY_BY_RCU))
 		s->reserved = sizeof(struct rcu_head);
 
+    /* JYW: 计算一个slab占用的页面数量以及objects的分布数量 */
 	if (!calculate_sizes(s, -1))
 		goto error;
 	if (disable_higher_order_debug) {
@@ -3410,6 +3481,7 @@ void kfree(const void *x)
 	if (unlikely(ZERO_OR_NULL_PTR(x)))
 		return;
 
+    /* JYW: 根据虚拟地址找到对应的复合页面的地址 */
 	page = virt_to_head_page(x);
 	if (unlikely(!PageSlab(page))) {
 		BUG_ON(!PageCompound(page));
@@ -3872,6 +3944,7 @@ static int count_total(struct page *page)
 #endif
 
 #ifdef CONFIG_SLUB_DEBUG
+/* JYW: 检测每座SLUB缓存池的有效性 */
 static int validate_slab(struct kmem_cache *s, struct page *page,
 						unsigned long *map)
 {
@@ -4386,24 +4459,28 @@ struct slab_attribute {
 	static struct slab_attribute _name##_attr =  \
 	__ATTR(_name, 0600, _name##_show, _name##_store)
 
+/* JYW: 显示object_size对齐后的大小 */
 static ssize_t slab_size_show(struct kmem_cache *s, char *buf)
 {
 	return sprintf(buf, "%d\n", s->size);
 }
 SLAB_ATTR_RO(slab_size);
 
+/* JYW: 字节对齐大小 */
 static ssize_t align_show(struct kmem_cache *s, char *buf)
 {
 	return sprintf(buf, "%d\n", s->align);
 }
 SLAB_ATTR_RO(align);
 
+/* JYW: 创建kmem_cache时候传递进来指定的object的大小 */
 static ssize_t object_size_show(struct kmem_cache *s, char *buf)
 {
 	return sprintf(buf, "%d\n", s->object_size);
 }
 SLAB_ATTR_RO(object_size);
 
+/* JYW: 每个slub可提供的object数量 */
 static ssize_t objs_per_slab_show(struct kmem_cache *s, char *buf)
 {
 	return sprintf(buf, "%d\n", oo_objects(s->oo));
@@ -4427,12 +4504,14 @@ static ssize_t order_store(struct kmem_cache *s,
 	return length;
 }
 
+/* JYW: 每个slub占用的页面阶数 */
 static ssize_t order_show(struct kmem_cache *s, char *buf)
 {
 	return sprintf(buf, "%d\n", oo_order(s->oo));
 }
 SLAB_ATTR(order);
 
+/* JYW: 限制struct kmem_cache_node中的partial链表slab的数量，如果大于这个mini_partial的值，那么多余的slub就会被释放 */
 static ssize_t min_partial_show(struct kmem_cache *s, char *buf)
 {
 	return sprintf(buf, "%lu\n", s->min_partial);
@@ -4453,6 +4532,10 @@ static ssize_t min_partial_store(struct kmem_cache *s, const char *buf,
 }
 SLAB_ATTR(min_partial);
 
+/*
+ * JYW: per cpu partial中所有slab的free object的数量的最大值
+ *  超过这个值就会将所有的slab转移到kmem_cache_node的partial链表
+ */
 static ssize_t cpu_partial_show(struct kmem_cache *s, char *buf)
 {
 	return sprintf(buf, "%u\n", s->cpu_partial);
@@ -4476,6 +4559,7 @@ static ssize_t cpu_partial_store(struct kmem_cache *s, const char *buf,
 }
 SLAB_ATTR(cpu_partial);
 
+/* JYW: 构造函数符号 */
 static ssize_t ctor_show(struct kmem_cache *s, char *buf)
 {
 	if (!s->ctor)
@@ -4490,30 +4574,35 @@ static ssize_t aliases_show(struct kmem_cache *s, char *buf)
 }
 SLAB_ATTR_RO(aliases);
 
+/* JYW: 统计每个节点上kmem_cache_node上的slub数量 */
 static ssize_t partial_show(struct kmem_cache *s, char *buf)
 {
 	return show_slab_objects(s, buf, SO_PARTIAL);
 }
 SLAB_ATTR_RO(partial);
 
+/* JYW: 统计所有本地CPU上的slab数量 */
 static ssize_t cpu_slabs_show(struct kmem_cache *s, char *buf)
 {
 	return show_slab_objects(s, buf, SO_CPU);
 }
 SLAB_ATTR_RO(cpu_slabs);
 
+/* JYW: 当前正在使用的object数量 */
 static ssize_t objects_show(struct kmem_cache *s, char *buf)
 {
 	return show_slab_objects(s, buf, SO_ALL|SO_OBJECTS);
 }
 SLAB_ATTR_RO(objects);
 
+/* JYW: 所有kmem_cache的node partial上正在使用的objects数量 */
 static ssize_t objects_partial_show(struct kmem_cache *s, char *buf)
 {
 	return show_slab_objects(s, buf, SO_PARTIAL|SO_OBJECTS);
 }
 SLAB_ATTR_RO(objects_partial);
 
+/* JYW: 显示每个kmem_cache_cpu上partial上的空闲objects个数 */
 static ssize_t slabs_cpu_partial_show(struct kmem_cache *s, char *buf)
 {
 	int objects = 0;
@@ -4560,6 +4649,7 @@ static ssize_t reclaim_account_store(struct kmem_cache *s,
 }
 SLAB_ATTR(reclaim_account);
 
+/* JYW: 是否是硬件cacheline对齐 */
 static ssize_t hwcache_align_show(struct kmem_cache *s, char *buf)
 {
 	return sprintf(buf, "%d\n", !!(s->flags & SLAB_HWCACHE_ALIGN));
@@ -4709,6 +4799,7 @@ static ssize_t validate_show(struct kmem_cache *s, char *buf)
 	return 0;
 }
 
+/* JYW: 主动触发检测当前SLUB缓存池 */
 static ssize_t validate_store(struct kmem_cache *s,
 			const char *buf, size_t length)
 {
@@ -4800,6 +4891,7 @@ static ssize_t remote_node_defrag_ratio_store(struct kmem_cache *s,
 SLAB_ATTR(remote_node_defrag_ratio);
 #endif
 
+/* JYW: SLUB DEBUG需要打开该选项 */
 #ifdef CONFIG_SLUB_STATS
 static int show_stat(struct kmem_cache *s, char *buf, enum stat_item si)
 {
@@ -4881,6 +4973,11 @@ STAT_ATTR(CPU_PARTIAL_NODE, cpu_partial_node);
 STAT_ATTR(CPU_PARTIAL_DRAIN, cpu_partial_drain);
 #endif
 
+/* JYW: /sys/kernel/slab/<slabname>/slab_size */
+/* JYW: /sys/kernel/slab/<slabname>/object_size */
+/* JYW: /sys/kernel/slab/<slabname>/objs_per_slab */
+/* JYW: /sys/kernel/slab/<slabname>/order */
+/* JYW：.... */
 static struct attribute *slab_attrs[] = {
 	&slab_size_attr.attr,
 	&object_size_attr.attr,
@@ -5157,6 +5254,7 @@ static char *create_unique_id(struct kmem_cache *s)
 	return name;
 }
 
+/* JYW: 添加节点信息 */
 static int sysfs_slab_add(struct kmem_cache *s)
 {
 	int err;
@@ -5273,6 +5371,7 @@ static int __init slab_sysfs_init(void)
 
 	mutex_lock(&slab_mutex);
 
+    /* JYW: 创建/sys/kernel/slab */
 	slab_kset = kset_create_and_add("slab", &slab_uevent_ops, kernel_kobj);
 	if (!slab_kset) {
 		mutex_unlock(&slab_mutex);
@@ -5282,7 +5381,9 @@ static int __init slab_sysfs_init(void)
 
 	slab_state = FULL;
 
+    /* JYW: 创建/sys/kernel/slab/<slabname> */
 	list_for_each_entry(s, &slab_caches, list) {
+        /* JYW: 添加节点信息 */
 		err = sysfs_slab_add(s);
 		if (err)
 			pr_err("SLUB: Unable to add boot slab %s to sysfs\n",
@@ -5312,6 +5413,7 @@ __initcall(slab_sysfs_init);
  * The /proc/slabinfo ABI
  */
 #ifdef CONFIG_SLABINFO
+/* JYW: 获取slab信息 */
 void get_slabinfo(struct kmem_cache *s, struct slabinfo *sinfo)
 {
 	unsigned long nr_slabs = 0;

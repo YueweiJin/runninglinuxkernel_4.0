@@ -170,8 +170,11 @@ int fat_file_fsync(struct file *filp, loff_t start, loff_t end, int datasync)
 
 const struct file_operations fat_file_operations = {
 	.llseek		= generic_file_llseek,
+	/* JYW: 通用读函数，通过read_iter实现 */
 	.read		= new_sync_read,
+	/* JYW: 通用写函数，通过write_iter实现 */
 	.write		= new_sync_write,
+	/* JYW: 最终调用aops->read_page,fat_aops */
 	.read_iter	= generic_file_read_iter,
 	.write_iter	= generic_file_write_iter,
 	.mmap		= generic_file_mmap,

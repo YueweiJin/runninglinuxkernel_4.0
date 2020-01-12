@@ -34,6 +34,7 @@ static inline pte_t get_fixmap_pte(unsigned long vaddr)
 	return *ptep;
 }
 
+/* JYW: 映射一个物理页框，返回虚拟地址 */
 void *kmap(struct page *page)
 {
 	might_sleep();
@@ -52,6 +53,7 @@ void kunmap(struct page *page)
 }
 EXPORT_SYMBOL(kunmap);
 
+/* JYW: 建立临时内核映射 */
 void *kmap_atomic(struct page *page)
 {
 	unsigned int idx;

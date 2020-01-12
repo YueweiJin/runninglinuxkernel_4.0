@@ -41,6 +41,7 @@
 #define NFC_IP_PROTO_UNKNOWN	0x2000
 
 /* IP Hooks */
+/* JYW: 工作在路由前 */
 /* After promisc drops, checksum checks. */
 #define NF_IP_PRE_ROUTING	0
 /* If the packet is destined for this box. */

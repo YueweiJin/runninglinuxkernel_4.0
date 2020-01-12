@@ -36,16 +36,16 @@ enum evdev_clock_type {
 };
 
 struct evdev {
-	int open;
-	struct input_handle handle;
-	wait_queue_head_t wait;
-	struct evdev_client __rcu *grab;
-	struct list_head client_list;
-	spinlock_t client_lock; /* protects client_list */
-	struct mutex mutex;
-	struct device dev;
-	struct cdev cdev;
-	bool exist;
+	int open;                           /* JYW: 打开计数，每打开一次，次数加1 */
+	struct input_handle handle;         /* JYW: 连接input_dev和handler的数据结构 */
+	wait_queue_head_t wait;             /* JYW: 阻塞时，将当前进程加入到该等待队列 */
+	struct evdev_client __rcu *grab;    /* JYW: 管理输入设备上报的数据 */
+	struct list_head client_list;       /* JYW: 每次打开就会分配一个client，把它加入当前的evdev设备的client_list链表中 */
+	spinlock_t client_lock;             /* JYW: protects client_list */
+	struct mutex mutex;                 /* JYW: 操作evdev数据结构的互斥锁 */
+	struct device dev;                  /* JYW: evdev设备 */
+	struct cdev cdev;                   /* JYW: 字符设备 */
+	bool exist;                         /* JYW: 是否存在当前设备的标记 */
 };
 
 struct evdev_client {
@@ -187,6 +187,7 @@ static void __pass_event(struct evdev_client *client,
 	client->buffer[client->head++] = *event;
 	client->head &= client->bufsize - 1;
 
+    /* JYW: 若APP没有及时取走缓冲区中的数据，则溢出 */
 	if (unlikely(client->head == client->tail)) {
 		/*
 		 * This effectively "drops" all unconsumed events, leaving
@@ -348,6 +349,7 @@ static int evdev_ungrab(struct evdev *evdev, struct evdev_client *client)
 	return 0;
 }
 
+/* JYW: 将client绑定到当前evdev中 */
 static void evdev_attach_client(struct evdev *evdev,
 				struct evdev_client *client)
 {
@@ -365,6 +367,7 @@ static void evdev_detach_client(struct evdev *evdev,
 	synchronize_rcu();
 }
 
+/* JYW: 打开了具体输入设备的open方法 */
 static int evdev_open_device(struct evdev *evdev)
 {
 	int retval;
@@ -385,10 +388,12 @@ static int evdev_open_device(struct evdev *evdev)
 	return retval;
 }
 
+/* JYW: 关闭eventX节点 */
 static void evdev_close_device(struct evdev *evdev)
 {
 	mutex_lock(&evdev->mutex);
 
+    /* JYW: 若所有的句柄被关闭了 */
 	if (evdev->exist && !--evdev->open)
 		input_close_device(&evdev->handle);
 
@@ -432,17 +437,21 @@ static int evdev_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
+/* JYW: 计算缓冲区的大小 */
 static unsigned int evdev_compute_buffer_size(struct input_dev *dev)
 {
 	unsigned int n_events =
 		max(dev->hint_events_per_packet * EVDEV_BUF_PACKETS,
 		    EVDEV_MIN_BUFFER_SIZE);
 
+    /* JYW: 最接近n_events的最大2的指数次幂 */
 	return roundup_pow_of_two(n_events);
 }
 
+/* JYW: 打开一个event节点 */
 static int evdev_open(struct inode *inode, struct file *file)
 {
+    /* JYW: 首先获取当前的evdev设备 */
 	struct evdev *evdev = container_of(inode->i_cdev, struct evdev, cdev);
 	unsigned int bufsize = evdev_compute_buffer_size(evdev->handle.dev);
 	unsigned int size = sizeof(struct evdev_client) +
@@ -461,6 +470,7 @@ static int evdev_open(struct inode *inode, struct file *file)
 	client->evdev = evdev;
 	evdev_attach_client(evdev, client);
 
+    /* JYW: 打开绑定的input_dev的open函数 */
 	error = evdev_open_device(evdev);
 	if (error)
 		goto err_free_client;
@@ -513,6 +523,7 @@ static ssize_t evdev_write(struct file *file, const char __user *buffer,
 	return retval;
 }
 
+/* JYW: 从缓冲区中取出input_event */
 static int evdev_fetch_next_event(struct evdev_client *client,
 				  struct input_event *event)
 {
@@ -521,6 +532,7 @@ static int evdev_fetch_next_event(struct evdev_client *client,
 	spin_lock_irq(&client->buffer_lock);
 
 	have_event = client->packet_head != client->tail;
+    /* JYW: 若缓冲区中有事件 */
 	if (have_event) {
 		*event = client->buffer[client->tail++];
 		client->tail &= client->bufsize - 1;
@@ -531,22 +543,28 @@ static int evdev_fetch_next_event(struct evdev_client *client,
 	return have_event;
 }
 
+/* JYW: 读取eventX节点时 */
 static ssize_t evdev_read(struct file *file, char __user *buffer,
 			  size_t count, loff_t *ppos)
 {
+    /* JYW: 首先获取当前的evdev_client结构 */
 	struct evdev_client *client = file->private_data;
+    /* JYW: 获取当前的evdev结构 */
 	struct evdev *evdev = client->evdev;
 	struct input_event event;
 	size_t read = 0;
 	int error;
 
+    /* JYW: 必须保证读取的字节数大于或者等于input_event_size() */
 	if (count != 0 && count < input_event_size())
 		return -EINVAL;
 
 	for (;;) {
+        /* JYW: 必须确保当前的evdev存在 */
 		if (!evdev->exist || client->revoked)
 			return -ENODEV;
 
+        /* JYW: 若缓冲区中没有数据，且以非阻塞模式打开，则直接返回-EAGAIN，通知APP再次尝试 */
 		if (client->packet_head == client->tail &&
 		    (file->f_flags & O_NONBLOCK))
 			return -EAGAIN;
@@ -555,9 +573,11 @@ static ssize_t evdev_read(struct file *file, char __user *buffer,
 		 * count == 0 is special - no IO is done but we check
 		 * for error conditions (see above).
 		 */
+		/* JYW: 若传入的是0，则直接返回 */
 		if (count == 0)
 			break;
 
+        /* JYW: 若缓冲区中有数据，则拷贝一定数量的数据 */
 		while (read + input_event_size() <= count &&
 		       evdev_fetch_next_event(client, &event)) {
 
@@ -570,6 +590,7 @@ static ssize_t evdev_read(struct file *file, char __user *buffer,
 		if (read)
 			break;
 
+        /* JYW: 若没有事件上报，则阻塞，直到有数据或者evdev不存在 */
 		if (!(file->f_flags & O_NONBLOCK)) {
 			error = wait_event_interruptible(evdev->wait,
 					client->packet_head != client->tail ||
@@ -1143,6 +1164,7 @@ static void evdev_cleanup(struct evdev *evdev)
  * Create new evdev device. Note that input core serializes calls
  * to connect and disconnect.
  */
+/* JYW: 绑定具体的input_dev,与之建立连接，最终创建了一个event节点 */
 static int evdev_connect(struct input_handler *handler, struct input_dev *dev,
 			 const struct input_device_id *id)
 {
@@ -1151,6 +1173,7 @@ static int evdev_connect(struct input_handler *handler, struct input_dev *dev,
 	int dev_no;
 	int error;
 
+    /* JYW: 分配一个新的minor号，为(13,64)~(13,95) */
 	minor = input_get_new_minor(EVDEV_MINOR_BASE, EVDEV_MINORS, true);
 	if (minor < 0) {
 		error = minor;
@@ -1158,6 +1181,7 @@ static int evdev_connect(struct input_handler *handler, struct input_dev *dev,
 		return error;
 	}
 
+    /* JYW: evdev_connect的结果是分配创建了一个struct evdev结构 */
 	evdev = kzalloc(sizeof(struct evdev), GFP_KERNEL);
 	if (!evdev) {
 		error = -ENOMEM;
@@ -1175,9 +1199,10 @@ static int evdev_connect(struct input_handler *handler, struct input_dev *dev,
 	if (dev_no < EVDEV_MINOR_BASE + EVDEV_MINORS)
 		dev_no -= EVDEV_MINOR_BASE;
 	dev_set_name(&evdev->dev, "event%d", dev_no);
-
+	/* JYW: 绑定一个输入设备 */
 	evdev->handle.dev = input_get_device(dev);
 	evdev->handle.name = dev_name(&evdev->dev);
+	/* JYW: 绑定一个驱动，对于evdev驱动为evdev_handler */
 	evdev->handle.handler = handler;
 	evdev->handle.private = evdev;
 
@@ -1187,10 +1212,13 @@ static int evdev_connect(struct input_handler *handler, struct input_dev *dev,
 	evdev->dev.release = evdev_free;
 	device_initialize(&evdev->dev);
 
+    /* JYW: 核心就是 list_add_tail_rcu(&handle->d_node, &dev->h_list) */
+    /* 以后dev上有数据要发送时，便可以在dev中搜索这个链表，找到handle,再调用handle->handler->event()把数据传到了event驱动中。*/
 	error = input_register_handle(&evdev->handle);
 	if (error)
 		goto err_free_evdev;
 
+    /* JYW: 创建一个edev字符设备 */
 	cdev_init(&evdev->cdev, &evdev_fops);
 	evdev->cdev.kobj.parent = &evdev->dev.kobj;
 	error = cdev_add(&evdev->cdev, evdev->dev.devt, 1);
@@ -1238,13 +1266,16 @@ static struct input_handler evdev_handler = {
 	.connect	= evdev_connect,
 	.disconnect	= evdev_disconnect,
 	.legacy_minors	= true,
+	/* JYW: evdev_handler所表示的设备文件范围为(13,64)和(13,96)*/
 	.minor		= EVDEV_MINOR_BASE,
 	.name		= "evdev",
 	.id_table	= evdev_ids,
 };
 
+/* JYW: evdev模块的初始化 */
 static int __init evdev_init(void)
 {
+    /* JYW: 注册事件驱动 */
 	return input_register_handler(&evdev_handler);
 }
 

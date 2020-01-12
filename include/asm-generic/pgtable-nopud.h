@@ -35,6 +35,7 @@ static inline void pgd_clear(pgd_t *pgd)	{ }
  */
 #define set_pgd(pgdptr, pgdval)			set_pud((pud_t *)(pgdptr), (pud_t) { pgdval })
 
+/* JYW：返回进程页表对应的pud目录项；由于是2级页表，这里没有实现转换 */
 static inline pud_t * pud_offset(pgd_t * pgd, unsigned long address)
 {
 	return (pud_t *)pgd;

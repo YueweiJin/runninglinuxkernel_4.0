@@ -10,10 +10,19 @@
 #include "fat.h"
 
 struct fatent_operations {
+	/* JYW: 根据entry的编号（簇的索引），计算entry所在的位置
+	 * FAT32 fat_ent_blocknr
+	 */
 	void (*ent_blocknr)(struct super_block *, int, int *, sector_t *);
+	/* JYW: 指向簇索引的指针
+	 * FAT32 fat32_ent_set_ptr
+	 */
 	void (*ent_set_ptr)(struct fat_entry *, int);
 	int (*ent_bread)(struct super_block *, struct fat_entry *,
 			 int, sector_t);
+	/* JYW: 根据簇的索引获取下一个簇号 
+	 * FAT32 fat32_ent_get
+	 */
 	int (*ent_get)(struct fat_entry *);
 	void (*ent_put)(struct fat_entry *, int);
 	int (*ent_next)(struct fat_entry *);
@@ -31,6 +40,7 @@ static void fat12_ent_blocknr(struct super_block *sb, int entry,
 	*blocknr = sbi->fat_start + (bytes >> sb->s_blocksize_bits);
 }
 
+/* JYW: 根据entry的编号（簇的索引），计算entry所在的位置 */
 static void fat_ent_blocknr(struct super_block *sb, int entry,
 			    int *offset, sector_t *blocknr)
 {
@@ -61,6 +71,7 @@ static void fat16_ent_set_ptr(struct fat_entry *fatent, int offset)
 	fatent->u.ent16_p = (__le16 *)(fatent->bhs[0]->b_data + offset);
 }
 
+/* JYW: 指向簇索引的指针  */
 static void fat32_ent_set_ptr(struct fat_entry *fatent, int offset)
 {
 	WARN_ON(offset & (4 - 1));
@@ -99,6 +110,7 @@ err:
 	return -EIO;
 }
 
+/* JYW: 读fat分配表，读到后保存到fat_entry的bhs，并将offset放到u.ent32_p中 */
 static int fat_ent_bread(struct super_block *sb, struct fat_entry *fatent,
 			 int offset, sector_t blocknr)
 {
@@ -113,6 +125,7 @@ static int fat_ent_bread(struct super_block *sb, struct fat_entry *fatent,
 		return -EIO;
 	}
 	fatent->nr_bhs = 1;
+	/* JYW: 指向簇索引的指针  */
 	ops->ent_set_ptr(fatent, offset);
 	return 0;
 }
@@ -144,6 +157,7 @@ static int fat16_ent_get(struct fat_entry *fatent)
 	return next;
 }
 
+/* JYW: 根据簇的索引获取下一个簇号 */
 static int fat32_ent_get(struct fat_entry *fatent)
 {
 	int next = le32_to_cpu(*fatent->u.ent32_p) & 0x0fffffff;
@@ -286,6 +300,7 @@ static inline void unlock_fat(struct msdos_sb_info *sbi)
 	mutex_unlock(&sbi->fat_lock);
 }
 
+/* JYW: entry访问方式初始化 */
 void fat_ent_access_init(struct super_block *sb)
 {
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
@@ -294,6 +309,7 @@ void fat_ent_access_init(struct super_block *sb)
 
 	switch (sbi->fat_bits) {
 	case 32:
+		/* JYW: 代表一个簇的编号占用多少bit，FAT32占用4字节 */
 		sbi->fatent_shift = 2;
 		sbi->fatent_ops = &fat32_ops;
 		break;
@@ -318,6 +334,7 @@ static void mark_fsinfo_dirty(struct super_block *sb)
 	__mark_inode_dirty(sbi->fsinfo_inode, I_DIRTY_SYNC);
 }
 
+/* JYW: 更新指向簇索引的指针 fat32_ent_set_ptr */
 static inline int fat_ent_update_ptr(struct super_block *sb,
 				     struct fat_entry *fatent,
 				     int offset, sector_t blocknr)
@@ -344,10 +361,12 @@ static inline int fat_ent_update_ptr(struct super_block *sb,
 				return 0;
 		}
 	}
+	/* JYW: 指向簇索引的指针 fat32_ent_set_ptr */
 	ops->ent_set_ptr(fatent, offset);
 	return 1;
 }
 
+/* JYW: 根据entry值，读取并返回下一个簇号 */
 int fat_ent_read(struct inode *inode, struct fat_entry *fatent, int entry)
 {
 	struct super_block *sb = inode->i_sb;
@@ -356,21 +375,26 @@ int fat_ent_read(struct inode *inode, struct fat_entry *fatent, int entry)
 	int err, offset;
 	sector_t blocknr;
 
+	/* JYW: 判断簇的范围是否在2~max_cluster之间 */
 	if (entry < FAT_START_ENT || sbi->max_cluster <= entry) {
 		fatent_brelse(fatent);
 		fat_fs_error(sb, "invalid access to FAT (entry 0x%08x)", entry);
 		return -EIO;
 	}
 
+	/* JYW: 设置entry的簇号 */
 	fatent_set_entry(fatent, entry);
+	/* JYW: 根据entry的编号（簇的索引），计算entry所在的位置 */
 	ops->ent_blocknr(sb, entry, &offset, &blocknr);
 
+	/* JYW: 更新指向簇索引的指针 fat32_ent_set_ptr */
 	if (!fat_ent_update_ptr(sb, fatent, offset, blocknr)) {
 		fatent_brelse(fatent);
 		err = ops->ent_bread(sb, fatent, offset, blocknr);
 		if (err)
 			return err;
 	}
+	/* JYW: 根据簇的索引获取下一个簇号 */ 
 	return ops->ent_get(fatent);
 }
 
@@ -432,6 +456,7 @@ static inline int fat_ent_next(struct msdos_sb_info *sbi,
 	return 0;
 }
 
+/* JYW: 获取entry所在的block */
 static inline int fat_ent_read_block(struct super_block *sb,
 				     struct fat_entry *fatent)
 {
@@ -440,7 +465,9 @@ static inline int fat_ent_read_block(struct super_block *sb,
 	int offset;
 
 	fatent_brelse(fatent);
+	/* JYW: 根据entry的编号（簇的索引），计算entry所在的位置 */
 	ops->ent_blocknr(sb, fatent->entry, &offset, &blocknr);
+	/* JYW: 读fat分配表，读到后保存到fat_entry的bhs，并将offset放到u.ent32_p中 */
 	return ops->ent_bread(sb, fatent, offset, blocknr);
 }
 
@@ -485,16 +512,20 @@ int fat_alloc_clusters(struct inode *inode, int *cluster, int nr_cluster)
 	fatent_init(&prev_ent);
 	fatent_init(&fatent);
 	fatent_set_entry(&fatent, sbi->prev_free + 1);
+	/* JYW: 遍历当前所有的簇号，直到找到一个空闲簇 */
 	while (count < sbi->max_cluster) {
 		if (fatent.entry >= sbi->max_cluster)
 			fatent.entry = FAT_START_ENT;
 		fatent_set_entry(&fatent, fatent.entry);
+		/* JYW: 获取entry所在的block */
 		err = fat_ent_read_block(sb, &fatent);
 		if (err)
 			goto out;
 
 		/* Find the free entries in a block */
 		do {
+			/* JYW: 根据簇的索引获取下一个簇号 */
+			/* JYW: 表示当前的簇为空闲的 */
 			if (ops->ent_get(&fatent) == FAT_ENT_FREE) {
 				int entry = fatent.entry;
 
@@ -550,6 +581,7 @@ out:
 	return err;
 }
 
+/* JYW: 得到当前空闲的簇的总和，即磁盘上有多少剩余空间 */
 int fat_free_clusters(struct inode *inode, int cluster)
 {
 	struct super_block *sb = inode->i_sb;
@@ -564,6 +596,7 @@ int fat_free_clusters(struct inode *inode, int cluster)
 	fatent_init(&fatent);
 	lock_fat(sbi);
 	do {
+		/* JYW: 根据entry值，读取并返回下一个簇号 */
 		cluster = fat_ent_read(inode, &fatent, cluster);
 		if (cluster < 0) {
 			err = cluster;
@@ -574,7 +607,6 @@ int fat_free_clusters(struct inode *inode, int cluster)
 			err = -EIO;
 			goto error;
 		}
-
 		if (sbi->options.discard) {
 			/*
 			 * Issue discard for the sectors we no longer

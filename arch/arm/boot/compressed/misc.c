@@ -142,6 +142,13 @@ void __stack_chk_fail(void)
 extern int do_decompress(u8 *input, int len, u8 *output, void (*error)(char *x));
 
 
+/*
+ * JYW: 
+ * r0-output_start:         内核解压后的目的地址
+ * r1-free_mem_ptr_p:       堆空间的起始地址
+ * r2-free_mem_ptr_end_p:   堆空间的结束地址
+ * r3-arch_id:              机器码
+ */
 void
 decompress_kernel(unsigned long output_start, unsigned long free_mem_ptr_p,
 		unsigned long free_mem_ptr_end_p,

@@ -484,6 +484,7 @@ static int do_task_stat(struct seq_file *m, struct pid_namespace *ns,
 	seq_put_decimal_ll(m, ' ', task->exit_signal);
 	seq_put_decimal_ll(m, ' ', task_cpu(task));
 	seq_put_decimal_ull(m, ' ', task->rt_priority);
+    /* JYW: 调度策略 */
 	seq_put_decimal_ull(m, ' ', task->policy);
 	seq_put_decimal_ull(m, ' ', delayacct_blkio_ticks(task));
 	seq_put_decimal_ull(m, ' ', cputime_to_clock_t(gtime));

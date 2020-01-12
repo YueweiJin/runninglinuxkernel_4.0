@@ -23,6 +23,7 @@
 /* Definition of memblock flags. */
 #define MEMBLOCK_HOTPLUG	0x1	/* hotpluggable region */
 
+/* JYW: 表示一块memblock区域 */
 struct memblock_region {
 	phys_addr_t base;
 	phys_addr_t size;
@@ -32,6 +33,7 @@ struct memblock_region {
 #endif
 };
 
+/* JYW: memblock类型 */
 struct memblock_type {
 	unsigned long cnt;	/* number of regions */
 	unsigned long max;	/* size of the allocated array */
@@ -39,6 +41,7 @@ struct memblock_type {
 	struct memblock_region *regions;
 };
 
+/* JYW: 用来管理启动时的内存 */
 struct memblock {
 	bool bottom_up;  /* is bottom up direction? */
 	phys_addr_t current_limit;

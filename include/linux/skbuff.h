@@ -194,6 +194,7 @@ struct sk_buff;
 #if (65536/PAGE_SIZE + 1) < 16
 #define MAX_SKB_FRAGS 16UL
 #else
+/* JYW: SKB最多可以容纳17个片段 */
 #define MAX_SKB_FRAGS (65536/PAGE_SIZE + 1)
 #endif
 
@@ -327,6 +328,7 @@ struct skb_shared_info {
 	void *		destructor_arg;
 
 	/* must be last field, see pskb_expand_head() */
+    /* JYW: SKB最多可以容纳17个片段 */
 	skb_frag_t	frags[MAX_SKB_FRAGS];
 };
 
@@ -770,6 +772,7 @@ bool skb_try_coalesce(struct sk_buff *to, struct sk_buff *from,
 struct sk_buff *__alloc_skb(unsigned int size, gfp_t priority, int flags,
 			    int node);
 struct sk_buff *build_skb(void *data, unsigned int frag_size);
+/* JYW: 分配skb及数据区 */
 static inline struct sk_buff *alloc_skb(unsigned int size,
 					gfp_t priority)
 {

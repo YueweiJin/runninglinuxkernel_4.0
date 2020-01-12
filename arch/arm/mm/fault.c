@@ -128,6 +128,7 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
 /*
  * Oops.  The kernel tried to access some page that wasn't present.
  */
+/* JYW: 若找不到异常处理，最终只能oops */
 static void
 __do_kernel_fault(struct mm_struct *mm, unsigned long addr, unsigned int fsr,
 		  struct pt_regs *regs)
@@ -135,6 +136,7 @@ __do_kernel_fault(struct mm_struct *mm, unsigned long addr, unsigned int fsr,
 	/*
 	 * Are we prepared to handle this kernel fault?
 	 */
+	/* JYW: 若找不到异常处理，最终只能oops */
 	if (fixup_exception(regs))
 		return;
 
@@ -207,6 +209,7 @@ void do_bad_area(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
  * If we encountered a write fault, we must have write permission, otherwise
  * we allow any permission.
  */
+/* JYW: 判断vma属性是否具有可读写或可执行等权限，如果没有则返回false */
 static inline bool access_error(unsigned int fsr, struct vm_area_struct *vma)
 {
 	unsigned int mask = VM_READ | VM_WRITE | VM_EXEC;
@@ -219,6 +222,7 @@ static inline bool access_error(unsigned int fsr, struct vm_area_struct *vma)
 	return vma->vm_flags & mask ? false : true;
 }
 
+/* JYW: do_page_fault的核心接口 */
 static int __kprobes
 __do_page_fault(struct mm_struct *mm, unsigned long addr, unsigned int fsr,
 		unsigned int flags, struct task_struct *tsk)
@@ -226,8 +230,13 @@ __do_page_fault(struct mm_struct *mm, unsigned long addr, unsigned int fsr,
 	struct vm_area_struct *vma;
 	int fault;
 
+	/* JYW: 首先通过addr来找到所在的vma结构 */
 	vma = find_vma(mm, addr);
 	fault = VM_FAULT_BADMAP;
+	/* JYW:
+	 * 如果找不到，索命addr地址还没有在进程地址空间中，返回VM_FAULT_BADMAP
+	 * 错误 
+	 */
 	if (unlikely(!vma))
 		goto out;
 	if (unlikely(vma->vm_start > addr))
@@ -238,11 +247,14 @@ __do_page_fault(struct mm_struct *mm, unsigned long addr, unsigned int fsr,
 	 * memory access, so we can handle it.
 	 */
 good_area:
+	/* JYW: 判断vma属性是否具有可读写或可执行等权限，如果没有则返回false */
 	if (access_error(fsr, vma)) {
+		/* JYW: 错误类型为VM_FAULT_BADACCESS */
 		fault = VM_FAULT_BADACCESS;
 		goto out;
 	}
 
+	/* JYW: 缺页异常的核心处理函数 */
 	return handle_mm_fault(mm, vma, addr & PAGE_MASK, flags);
 
 check_stack:
@@ -271,14 +283,13 @@ do_page_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 	/* Enable interrupts if they were enabled in the parent context. */
 	if (interrupts_enabled(regs))
 		local_irq_enable();
-
-	/*
-	 * If we're in an interrupt or have no user
-	 * context, we must not take the fault..
-	 */
+	/* If we're in an interrupt or have no user * context, we must not take the fault..  */
+       	/* JYW:
+	 * 如果在中断上下文或禁止抢占状态，或者在内核线程上下文，则跳到__do_kernel_fault */
 	if (in_atomic() || !mm)
 		goto no_context;
 
+	/* JYW: 如果是用户模式 */
 	if (user_mode(regs))
 		flags |= FAULT_FLAG_USER;
 	if (fsr & FSR_WRITE)
@@ -290,9 +301,11 @@ do_page_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 	 * we can bug out early if this is from code which shouldn't.
 	 */
 	if (!down_read_trylock(&mm->mmap_sem)) {
+		/* JYW: 如果发生在内核空间，且没有找到异常表，则跳到__do_kernel_fault */
 		if (!user_mode(regs) && !search_exception_tables(regs->ARM_pc))
 			goto no_context;
 retry:
+		/* JYW: 如果发生在用户空间，则等待锁持有者释放 */
 		down_read(&mm->mmap_sem);
 	} else {
 		/*
@@ -308,6 +321,7 @@ retry:
 #endif
 	}
 
+	/* JYW: 核心接口 */
 	fault = __do_page_fault(mm, addr, fsr, flags, tsk);
 
 	/* If we need to retry but a fatal signal is pending, handle the
@@ -348,6 +362,7 @@ retry:
 	/*
 	 * Handle the "normal" case first - VM_FAULT_MAJOR / VM_FAULT_MINOR
 	 */
+	/* JYW: 如果没有返回下面的错误类型，说明缺页异常就处理完成 */
 	if (likely(!(fault & (VM_FAULT_ERROR | VM_FAULT_BADMAP | VM_FAULT_BADACCESS))))
 		return 0;
 
@@ -355,15 +370,18 @@ retry:
 	 * If we are in kernel mode at this point, we
 	 * have no context to handle this fault with.
 	 */
+	/* JYW: 如果返回错误且处于内核模式，则跳转到__do_kernel_fault()来处理 */
 	if (!user_mode(regs))
 		goto no_context;
 
+	/* JYW: 当前系统没有足够的内存 */
 	if (fault & VM_FAULT_OOM) {
 		/*
 		 * We ran out of memory, call the OOM killer, and return to
 		 * userspace (which will retry the fault, or kill us if we
 		 * got oom-killed)
 		 */
+		/* JYW: 触发OOM机制 */
 		pagefault_out_of_memory();
 		return 0;
 	}
@@ -384,11 +402,13 @@ retry:
 		code = fault == VM_FAULT_BADACCESS ?
 			SEGV_ACCERR : SEGV_MAPERR;
 	}
-
+	/* JYW: 最后调用__do_user_fault()来给进程发信号 */
 	__do_user_fault(tsk, addr, fsr, sig, code, regs);
 	return 0;
 
 no_context:
+	/* JYW:
+	 * 错误发生在内核模式，如果内核无法处理，只能调用__do_kernel_fault()来发送OOPS错误 */
 	__do_kernel_fault(mm, addr, fsr, regs);
 	return 0;
 }
@@ -511,10 +531,14 @@ do_bad(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 	return 1;
 }
 
+/* JYW: 描述一条失效状态的处理方案 */
 struct fsr_info {
+	/* JYW: 修复这条失效状态的函数指针 */
 	int	(*fn)(unsigned long addr, unsigned int fsr, struct pt_regs *regs);
+	/* JYW: 处理失败时Linux内核要发送的信号类型 */
 	int	sig;
 	int	code;
+	/* JYW: 失效状态的名称 */
 	const char *name;
 };
 
@@ -547,8 +571,11 @@ do_DataAbort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 	const struct fsr_info *inf = fsr_info + fsr_fs(fsr);
 	struct siginfo info;
 
+	/* JYW: 跳转到对应状态的处理方案 */
 	if (!inf->fn(addr, fsr & ~FSR_LNX_PF, regs))
 		return;
+
+	/* JYW: 如果无法处理...... */
 
 	pr_alert("Unhandled fault: %s (0x%03x) at 0x%08lx\n",
 		inf->name, fsr, addr);

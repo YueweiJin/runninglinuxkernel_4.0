@@ -171,6 +171,7 @@ int __sync_blockdev(struct block_device *bdev, int wait)
  * Write out and wait upon all the dirty data associated with a block
  * device via its mapping.  Does not take the superblock lock.
  */
+/* JYW: 同步块设备上的脏数据 */
 int sync_blockdev(struct block_device *bdev)
 {
 	return __sync_blockdev(bdev, 1);
@@ -182,6 +183,7 @@ EXPORT_SYMBOL(sync_blockdev);
  * device.   Filesystem data as well as the underlying block
  * device.  Takes the superblock lock.
  */
+/* JYW: 同步bdev上的文件系统及超级块，最后同步块设备 */
 int fsync_bdev(struct block_device *bdev)
 {
 	struct super_block *sb = get_super(bdev);
@@ -1571,6 +1573,7 @@ static int blkdev_close(struct inode * inode, struct file * filp)
 	return 0;
 }
 
+/* JYW: 块设备ioctl接口 */
 static long block_ioctl(struct file *file, unsigned cmd, unsigned long arg)
 {
 	struct block_device *bdev = I_BDEV(file->f_mapping->host);
@@ -1666,6 +1669,7 @@ const struct file_operations def_blk_fops = {
 	.write_iter	= blkdev_write_iter,
 	.mmap		= generic_file_mmap,
 	.fsync		= blkdev_fsync,
+	/* JYW: 块设备ioctl接口 */
 	.unlocked_ioctl	= block_ioctl,
 #ifdef CONFIG_COMPAT
 	.compat_ioctl	= compat_blkdev_ioctl,

@@ -308,6 +308,7 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
 
 	/* Decode the IRQs and address ranges */
 	for (i = 0; i < AMBA_NR_IRQS; i++)
+		/* JYW: 从节点中解析中断号 */
 		dev->irq[i] = irq_of_parse_and_map(node, i);
 
 	ret = of_address_to_resource(node, 0, &dev->res);
@@ -485,6 +486,7 @@ EXPORT_SYMBOL(of_platform_bus_probe);
  *
  * Returns 0 on success, < 0 on failure.
  */
+/* JYW: 根据设备树展开平台设备 */
 int of_platform_populate(struct device_node *root,
 			const struct of_device_id *matches,
 			const struct of_dev_auxdata *lookup,
@@ -498,6 +500,12 @@ int of_platform_populate(struct device_node *root,
 		return -EINVAL;
 
 	for_each_child_of_node(root, child) {
+		/* JYW:
+		 * 枚举总线上的设备，最终解析DTS中的相关信息，把相关信息添加到struct
+		 * device中
+		 *
+		 * 如: of_amba_device_create()
+		 */
 		rc = of_platform_bus_create(child, matches, lookup, parent, true);
 		if (rc)
 			break;

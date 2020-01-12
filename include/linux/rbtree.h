@@ -46,9 +46,11 @@ struct rb_root {
 
 #define rb_parent(r)   ((struct rb_node *)((r)->__rb_parent_color & ~3))
 
+/* JYW: 用来初始化一颗空的红黑树 */
 #define RB_ROOT	(struct rb_root) { NULL, }
+/* JYW: 根据成员地址获取结构体地址 */
 #define	rb_entry(ptr, type, member) container_of(ptr, type, member)
-
+/* JYW: 判断是否位空 */
 #define RB_EMPTY_ROOT(root)  ((root)->rb_node == NULL)
 
 /* 'empty' nodes are nodes that are known not to be inserted in an rbtree */

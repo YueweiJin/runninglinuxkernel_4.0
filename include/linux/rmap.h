@@ -105,6 +105,7 @@ static inline void put_anon_vma(struct anon_vma *anon_vma)
 		__put_anon_vma(anon_vma);
 }
 
+/* JYW: 获得anon_vma结构体 */
 static inline struct anon_vma *page_anon_vma(struct page *page)
 {
 	if (((unsigned long)page->mapping & PAGE_MAPPING_FLAGS) !=

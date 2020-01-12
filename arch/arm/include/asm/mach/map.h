@@ -14,9 +14,13 @@
 
 #include <asm/io.h>
 
+/* JYW: 内存映射描述符，用于给该区域建立映射 */
 struct map_desc {
+	/* JYW: 虚拟地址的起始地址 */
 	unsigned long virtual;
+	/* JYW: 物理地址的开始地址的页帧号 */
 	unsigned long pfn;
+	/* JYW: 内存区间的大小 */
 	unsigned long length;
 	unsigned int type;
 };

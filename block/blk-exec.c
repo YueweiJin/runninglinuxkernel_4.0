@@ -48,6 +48,7 @@ static void blk_end_sync_rq(struct request *rq, int error)
  * Note:
  *    This function will invoke @done directly if the queue is dead.
  */
+/* JYW: 把请求插入请求队列 */
 void blk_execute_rq_nowait(struct request_queue *q, struct gendisk *bd_disk,
 			   struct request *rq, int at_head,
 			   rq_end_io_fn *done)
@@ -87,6 +88,7 @@ void blk_execute_rq_nowait(struct request_queue *q, struct gendisk *bd_disk,
 	}
 
 	__elv_add_request(q, rq, where);
+    /* JYW: scsi_request_fn */
 	__blk_run_queue(q);
 	/* the queue is stopped so it won't be run */
 	if (is_pm_resume)
@@ -106,6 +108,7 @@ EXPORT_SYMBOL_GPL(blk_execute_rq_nowait);
  *    Insert a fully prepared request at the back of the I/O scheduler queue
  *    for execution and wait for completion.
  */
+/* JYW: 执行请求 */
 int blk_execute_rq(struct request_queue *q, struct gendisk *bd_disk,
 		   struct request *rq, int at_head)
 {
@@ -121,6 +124,7 @@ int blk_execute_rq(struct request_queue *q, struct gendisk *bd_disk,
 	}
 
 	rq->end_io_data = &wait;
+    /* JYW: 把请求插入请求队列 */
 	blk_execute_rq_nowait(q, bd_disk, rq, at_head, blk_end_sync_rq);
 
 	/* Prevent hang_check timer from firing at us during very long I/O */

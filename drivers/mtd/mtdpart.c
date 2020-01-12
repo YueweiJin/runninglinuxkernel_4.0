@@ -38,11 +38,13 @@ static LIST_HEAD(mtd_partitions);
 static DEFINE_MUTEX(mtd_partitions_mutex);
 
 /* Our partition node structure */
+/* JYW: 表示一个分区 */
 struct mtd_part {
-	struct mtd_info mtd;
-	struct mtd_info *master;
-	uint64_t offset;
-	struct list_head list;
+	struct mtd_info mtd;        /* JYW: 分区信息, 大部分由master决定 */
+	struct mtd_info *master;    /* JYW: 该分区的主分区，大部分成员由其主分区mtd_part->master决定 */
+	uint64_t offset;            /* JYW: 该分区的偏移量 */
+
+    struct list_head list;      /* JYW: 将mtd_part链成一个链表mtd_partitons */
 };
 
 /*
@@ -634,7 +636,8 @@ EXPORT_SYMBOL_GPL(mtd_del_partition);
  * We don't register the master, or expect the caller to have done so,
  * for reasons of data integrity.
  */
-
+/* JYW: 如果MTD设备存在多个分区，那么使用该函数注册MTD设备 */
+/* JYW: master就是这个MTD原始设备，parts即NAND的分区信息，nbparts指有几个分区。 */
 int add_mtd_partitions(struct mtd_info *master,
 		       const struct mtd_partition *parts,
 		       int nbparts)
@@ -643,6 +646,13 @@ int add_mtd_partitions(struct mtd_info *master,
 	uint64_t cur_offset = 0;
 	int i;
 
+    /*
+	 * JYW: 
+     *  [    2.529082] Creating 3 MTD partitions on "hinand":
+     *  [    2.533910] 0x000000200000-0x000002d00000 : "flash_sys0"
+     *  [    2.667009] 0x000002d00000-0x000005800000 : "flash_sys1"
+     *  [    2.799872] 0x000005800000-0x000008000000 : "data_config"
+     */
 	printk(KERN_NOTICE "Creating %d MTD partitions on \"%s\":\n", nbparts, master->name);
 
 	for (i = 0; i < nbparts; i++) {

@@ -166,6 +166,7 @@ static int icmp_filter(const struct sock *sk, const struct sk_buff *skb)
  * RFC 1122: SHOULD pass TOS value up to the transport layer.
  * -> It does. And not only TOS, but all IP header.
  */
+/* JYW: 处理原始套接字的接收 */
 static int raw_v4_input(struct sk_buff *skb, const struct iphdr *iph, int hash)
 {
 	struct sock *sk;
@@ -182,7 +183,7 @@ static int raw_v4_input(struct sk_buff *skb, const struct iphdr *iph, int hash)
 	sk = __raw_v4_lookup(net, __sk_head(head), iph->protocol,
 			     iph->saddr, iph->daddr,
 			     skb->dev->ifindex);
-
+    /* JYW: 循环调用，直到遍历完，因此如果多开几个测试程序，所有的程序都能接收到 */
 	while (sk) {
 		delivered = 1;
 		if ((iph->protocol != IPPROTO_ICMP || !icmp_filter(sk, skb)) &&
@@ -192,6 +193,7 @@ static int raw_v4_input(struct sk_buff *skb, const struct iphdr *iph, int hash)
 
 			/* Not releasing hash table! */
 			if (clone)
+                /* JYW: 符合条件的每个SOCK都会调用raw_rcv */
 				raw_rcv(sk, clone);
 		}
 		sk = __raw_v4_lookup(net, sk_next(sk), iph->protocol,
@@ -203,6 +205,7 @@ out:
 	return delivered;
 }
 
+/* JYW: 原始套接字的接收处理 */
 int raw_local_deliver(struct sk_buff *skb, int protocol)
 {
 	int hash;
@@ -321,6 +324,10 @@ static int raw_rcv_skb(struct sock *sk, struct sk_buff *skb)
 	return NET_RX_SUCCESS;
 }
 
+/*
+ * JYW: 原始套接字接收
+ *      #可以通过/proc/net/raw查看到系统中raw相关的信息#
+ */
 int raw_rcv(struct sock *sk, struct sk_buff *skb)
 {
 	if (!xfrm4_policy_check(sk, XFRM_POLICY_IN, skb)) {
@@ -329,7 +336,7 @@ int raw_rcv(struct sock *sk, struct sk_buff *skb)
 		return NET_RX_DROP;
 	}
 	nf_reset(skb);
-
+    /* JYW: 接收到的报文是包含L3的头的，但是不包含L2的头 */
 	skb_push(skb, skb->data - skb_network_header(skb));
 
 	raw_rcv_skb(sk, skb);

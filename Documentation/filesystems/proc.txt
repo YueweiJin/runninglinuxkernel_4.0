@@ -732,6 +732,7 @@ directory cache, and so on).
 
 ..............................................................................
 
+/* JYW: 查看伙伴系统信息 */
 > cat /proc/buddyinfo
 
 Node 0, zone      DMA      0      4      5      4      4      3 ...
@@ -750,6 +751,8 @@ available in ZONE_NORMAL, etc...
 
 More information relevant to external fragmentation can be found in
 pagetypeinfo.
+
+/* JYW: 查看伙伴系统的外部碎片情况 */
 
 > cat /proc/pagetypeinfo
 Page block order: 9
@@ -792,6 +795,7 @@ reclaimed to achieve this.
 
 ..............................................................................
 
+/* JYW: 查看meminfo信息 */
 meminfo:
 
 Provides information about distribution and utilization of memory.  This
@@ -918,6 +922,7 @@ VmallocChunk: largest contiguous block of vmalloc area which is free
 
 ..............................................................................
 
+/* JYW: 查看vmalloc信息 */
 vmallocinfo:
 
 Provides information about vmalloced/vmaped areas. One line per area,
@@ -962,6 +967,7 @@ on the kind of area :
 
 ..............................................................................
 
+/* JYW: 查看软中断计数情况 */
 softirqs:
 
 Provides counts of softirq handlers serviced since boot time, for each cpu.
@@ -1109,6 +1115,7 @@ Table 1-9: Network info in /proc/net
 You can  use  this  information  to see which network devices are available in
 your system and how much traffic was routed over those devices:
 
+/* JYW: 查看当前有哪些网络设备，及收发情况 */
   > cat /proc/net/dev 
   Inter-|Receive                                                   |[... 
    face |bytes    packets errs drop fifo frame compressed multicast|[... 

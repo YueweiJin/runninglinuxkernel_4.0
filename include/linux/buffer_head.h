@@ -16,8 +16,10 @@
 
 #ifdef CONFIG_BLOCK
 
+/* JYW: 缓冲区首部的通用标志 */
 enum bh_state_bits {
 	BH_Uptodate,	/* Contains valid data */
+	/* JYW: 表示缓冲区中的数据必须写回块设备 */
 	BH_Dirty,	/* Is dirty */
 	BH_Lock,	/* Is locked */
 	BH_Req,		/* Has been submitted for I/O */
@@ -59,21 +61,27 @@ typedef void (bh_end_io_t)(struct buffer_head *bh, int uptodate);
  * a page (via a page_mapping) and for wrapping bio submission
  * for backward compatibility reasons (e.g. submit_bh).
  */
+/* JYW: 块缓冲区描述符 */
 struct buffer_head {
 	unsigned long b_state;		/* buffer state bitmap (see above) */
 	struct buffer_head *b_this_page;/* circular list of page's buffers */
+	/* JYW: 所在的page */
 	struct page *b_page;		/* the page this bh is mapped to */
 
+	/* JYW: 与块设备相关的块号 */
 	sector_t b_blocknr;		/* start block number */
 	size_t b_size;			/* size of mapping */
+	/* JYW: 放在缓冲区页内的位置 */
 	char *b_data;			/* pointer to data within the page */
 
 	struct block_device *b_bdev;
+	/* JYW: io完成方法 */
 	bh_end_io_t *b_end_io;		/* I/O completion */
  	void *b_private;		/* reserved for b_end_io */
 	struct list_head b_assoc_buffers; /* associated with another mapping */
 	struct address_space *b_assoc_map;	/* mapping this buffer is
 						   associated with */
+	/* JYW: 块使用计数器 */
 	atomic_t b_count;		/* users using this buffer_head */
 };
 
@@ -134,6 +142,7 @@ BUFFER_FNS(Defer_Completion, defer_completion)
 #define bh_offset(bh)		((unsigned long)(bh)->b_data & ~PAGE_MASK)
 
 /* If we *know* page->private refers to buffer_heads */
+/* JYW: 获取page的私有类型buffer head */
 #define page_buffers(page)					\
 	({							\
 		BUG_ON(!PagePrivate(page));			\
@@ -262,11 +271,14 @@ void buffer_init(void);
  * inline definitions
  */
 
+/* JYW: 将块缓冲区描述符绑定到page */
 static inline void attach_page_buffers(struct page *page,
 		struct buffer_head *head)
 {
+	/* JYW: 增加page引用计数 */
 	page_cache_get(page);
 	SetPagePrivate(page);
+	/* JYW: 私有类型为块缓冲区描述符 */
 	set_page_private(page, (unsigned long)head);
 }
 
@@ -332,6 +344,7 @@ map_bh(struct buffer_head *bh, struct super_block *sb, sector_t block)
 	bh->b_size = sb->s_blocksize;
 }
 
+/* JYW: 把当前进程插入等待队列，直到I/O完成，即缓冲区首部的BH_Lock标志被清0 */
 static inline void wait_on_buffer(struct buffer_head *bh)
 {
 	might_sleep();
@@ -358,6 +371,7 @@ static inline struct buffer_head *getblk_unmovable(struct block_device *bdev,
 	return __getblk_gfp(bdev, block, size, 0);
 }
 
+/* JYW: 获取对应的buffer_head，若不存在会分配page并加入页高速缓存，返回对应buffer_head */
 static inline struct buffer_head *__getblk(struct block_device *bdev,
 					   sector_t block,
 					   unsigned size)

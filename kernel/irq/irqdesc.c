@@ -98,6 +98,7 @@ int nr_irqs = NR_IRQS;
 EXPORT_SYMBOL_GPL(nr_irqs);
 
 static DEFINE_MUTEX(sparse_irq_lock);
+/* JYW: 使用位图来管理所有的中断号 */
 static DECLARE_BITMAP(allocated_irqs, IRQ_BITMAP_BITS);
 
 #ifdef CONFIG_SPARSE_IRQ
@@ -142,6 +143,7 @@ void irq_unlock_sparse(void)
 	mutex_unlock(&sparse_irq_lock);
 }
 
+/* JYW: 分配irq_desc结构 */
 static struct irq_desc *alloc_desc(int irq, int node, struct module *owner)
 {
 	struct irq_desc *desc;
@@ -200,6 +202,7 @@ static int alloc_descs(unsigned int start, unsigned int cnt, int node,
 	int i;
 
 	for (i = 0; i < cnt; i++) {
+		/* JYW: 分配irq_desc结构 */
 		desc = alloc_desc(start + i, node, owner);
 		if (!desc)
 			goto err;
@@ -451,6 +454,7 @@ __irq_alloc_descs(int irq, unsigned int from, unsigned int cnt, int node,
 
 	mutex_lock(&sparse_irq_lock);
 
+	/* JYW: 从allocated_irqs位图中查找第一个连续cnt为0的比特位区域 */
 	start = bitmap_find_next_zero_area(allocated_irqs, IRQ_BITMAP_BITS,
 					   from, cnt, 0);
 	ret = -EEXIST;
@@ -463,6 +467,7 @@ __irq_alloc_descs(int irq, unsigned int from, unsigned int cnt, int node,
 			goto err;
 	}
 
+	/* JYW: 置位位图，表示已经占用 */
 	bitmap_set(allocated_irqs, start, cnt);
 	mutex_unlock(&sparse_irq_lock);
 	return alloc_descs(start, cnt, node, owner);

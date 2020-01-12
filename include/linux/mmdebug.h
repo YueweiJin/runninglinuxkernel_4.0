@@ -14,6 +14,7 @@ void dump_vma(const struct vm_area_struct *vma);
 void dump_mm(const struct mm_struct *mm);
 
 #ifdef CONFIG_DEBUG_VM
+/* JYW: 需要打开CONFIG_DEBUG_VM配置才会有效 */
 #define VM_BUG_ON(cond) BUG_ON(cond)
 #define VM_BUG_ON_PAGE(cond, page)					\
 	do {								\

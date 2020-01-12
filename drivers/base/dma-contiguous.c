@@ -113,12 +113,16 @@ void __init dma_contiguous_reserve(phys_addr_t limit)
 
 	pr_debug("%s(limit %08lx)\n", __func__, (unsigned long)limit);
 
+	/* JYW: 优先从cmdline中解析大小 */
 	if (size_cmdline != -1) {
+		/* JYW: 设置CMA大小 */
 		selected_size = size_cmdline;
+		/* JYW: 设置CMA基址*/
 		selected_base = base_cmdline;
 		selected_limit = min_not_zero(limit_cmdline, limit);
 		if (base_cmdline + size_cmdline == limit_cmdline)
 			fixed = true;
+	/* JYW: 从配置文件中配置CMA相关参数 */
 	} else {
 #ifdef CONFIG_CMA_SIZE_SEL_MBYTES
 		selected_size = size_bytes;
@@ -159,12 +163,14 @@ void __init dma_contiguous_reserve(phys_addr_t limit)
  * If @fixed is true, reserve contiguous area at exactly @base.  If false,
  * reserve in range from @base to @limit.
  */
+/* JYW: 保留一块连续的cma区域 */
 int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
 				       phys_addr_t limit, struct cma **res_cma,
 				       bool fixed)
 {
 	int ret;
 
+	/* JYW: 保留一块连续的cma区域 */
 	ret = cma_declare_contiguous(base, size, limit, 0, 0, fixed, res_cma);
 	if (ret)
 		return ret;
@@ -187,12 +193,14 @@ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
  * global one. Requires architecture specific dev_get_cma_area() helper
  * function.
  */
+/* JYW: 分配CMA内存 */
 struct page *dma_alloc_from_contiguous(struct device *dev, int count,
 				       unsigned int align)
 {
 	if (align > CONFIG_CMA_ALIGNMENT)
 		align = CONFIG_CMA_ALIGNMENT;
 
+	/* JYW: 分配CMA内存 */
 	return cma_alloc(dev_get_cma_area(dev), count, align);
 }
 

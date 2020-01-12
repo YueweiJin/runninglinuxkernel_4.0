@@ -268,6 +268,7 @@ static inline void lowest_xent_key(const struct ubifs_info *c,
  * @inum: inode number
  * @block: block number
  */
+/* JYW: 计算数据节点的哈希 */
 static inline void data_key_init(const struct ubifs_info *c,
 				 union ubifs_key *key, ino_t inum,
 				 unsigned int block)

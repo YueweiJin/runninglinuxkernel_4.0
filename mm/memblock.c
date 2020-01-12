@@ -59,6 +59,7 @@ static int memblock_memory_in_slab __initdata_memblock = 0;
 static int memblock_reserved_in_slab __initdata_memblock = 0;
 
 /* inline so we don't get a warning when pr_debug is compiled out */
+/* JYW: 判断memblock的类型 */
 static __init_memblock const char *
 memblock_type_name(struct memblock_type *type)
 {
@@ -580,6 +581,7 @@ int __init_memblock memblock_add_node(phys_addr_t base, phys_addr_t size,
 	return memblock_add_range(&memblock.memory, base, size, nid, 0);
 }
 
+/* JYW: 添加内存块 */
 int __init_memblock memblock_add(phys_addr_t base, phys_addr_t size)
 {
 	return memblock_add_range(&memblock.memory, base, size,
@@ -681,7 +683,6 @@ int __init_memblock memblock_remove(phys_addr_t base, phys_addr_t size)
 {
 	return memblock_remove_range(&memblock.memory, base, size);
 }
-
 
 int __init_memblock memblock_free(phys_addr_t base, phys_addr_t size)
 {

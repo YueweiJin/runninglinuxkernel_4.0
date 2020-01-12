@@ -186,11 +186,15 @@ static bool pfmemalloc_active __read_mostly;
  * footprint.
  *
  */
+/* JYW: 对象缓存池 */
 struct array_cache {
+    /* JYW: 可用的对象数目 */
 	unsigned int avail;
 	unsigned int limit;
 	unsigned int batchcount;
+    /* JYW: 移除一个对象时，置1；收缩时，置0 */
 	unsigned int touched;
+    /* JYW: 保存对象的实体 */
 	void *entry[];	/*
 			 * Must have this definition in here for the proper
 			 * alignment of array_cache. Also simplifies accessing
@@ -675,6 +679,7 @@ static void init_arraycache(struct array_cache *ac, int limit, int batch)
 	}
 }
 
+/* JYW: 共享对象缓冲池new_shared，为多核CPU间共享空闲对象 */
 static struct array_cache *alloc_arraycache(int node, int entries,
 					    int batchcount, gfp_t gfp)
 {
@@ -767,6 +772,7 @@ static void *__ac_get_obj(struct kmem_cache *cachep, struct array_cache *ac,
 	return objp;
 }
 
+/* JYW: 获取一个slab对象 */
 static inline void *ac_get_obj(struct kmem_cache *cachep,
 			struct array_cache *ac, gfp_t flags, bool force_refill)
 {
@@ -1379,6 +1385,7 @@ static void __init set_up_node(struct kmem_cache *cachep, int index)
  * Initialisation.  Called after the page allocator have been initialised and
  * before smp_init().
  */
+/* JYW: slab初始化 */
 void __init kmem_cache_init(void)
 {
 	int i;
@@ -1455,6 +1462,7 @@ void __init kmem_cache_init(void)
 		}
 	}
 
+    /* JYW: 创建kmalloc cache */
 	create_kmalloc_caches(ARCH_KMALLOC_FLAGS);
 }
 
@@ -2123,6 +2131,7 @@ __kmem_cache_create (struct kmem_cache *cachep, unsigned long flags)
 	 * unaligned accesses for some archs when redzoning is used, and makes
 	 * sure any on-slab bufctl's are also correctly aligned.
 	 */
+	/* JYW: 必须确保size和机器字长对齐 */
 	if (size & (BYTES_PER_WORD - 1)) {
 		size += (BYTES_PER_WORD - 1);
 		size &= ~(BYTES_PER_WORD - 1);
@@ -2205,7 +2214,7 @@ __kmem_cache_create (struct kmem_cache *cachep, unsigned long flags)
 	 */
 	if (FREELIST_BYTE_INDEX && size < SLAB_OBJ_MIN_SIZE)
 		size = ALIGN(SLAB_OBJ_MIN_SIZE, cachep->align);
-
+    /* JYW: 计算需要多少个页面及容纳多少个对象 */
 	left_over = calculate_slab_order(cachep, size, cachep->align, flags);
 
 	if (!cachep->num)
@@ -2578,6 +2587,7 @@ static void slab_map_pages(struct kmem_cache *cache, struct page *page,
  * Grow (by 1) the number of slabs within a cache.  This is called by
  * kmem_cache_alloc() when there are no active objs left in a cache.
  */
+/* JYW: 从伙伴系统分配一个slab挂接到slabs_free链表 */
 static int cache_grow(struct kmem_cache *cachep,
 		gfp_t flags, int nodeid, struct page *page)
 {
@@ -2646,6 +2656,7 @@ static int cache_grow(struct kmem_cache *cachep,
 	spin_lock(&n->list_lock);
 
 	/* Make slab active. */
+    /* JYW: 将page挂接到slabs_free链表 */
 	list_add_tail(&page->lru, &(n->slabs_free));
 	STATS_INC_GROWN(cachep);
 	n->free_objects += cachep->num;
@@ -2744,6 +2755,7 @@ static void *cache_free_debugcheck(struct kmem_cache *cachep, void *objp,
 #define cache_free_debugcheck(x,objp,z) (objp)
 #endif
 
+/* JYW: 当本地CPU缓存中没有空闲对象时，则尝试填充 */
 static void *cache_alloc_refill(struct kmem_cache *cachep, gfp_t flags,
 							bool force_refill)
 {
@@ -2757,6 +2769,7 @@ static void *cache_alloc_refill(struct kmem_cache *cachep, gfp_t flags,
 	if (unlikely(force_refill))
 		goto force_grow;
 retry:
+    /* JYW: 获取本地对象缓冲池ac */
 	ac = cpu_cache_get(cachep);
 	batchcount = ac->batchcount;
 	if (!ac->touched && batchcount > BATCHREFILL_LIMIT) {
@@ -2767,12 +2780,14 @@ retry:
 		 */
 		batchcount = BATCHREFILL_LIMIT;
 	}
+    /* JYW: 获取slab节点n */
 	n = get_node(cachep, node);
 
 	BUG_ON(ac->avail > 0 || !n);
 	spin_lock(&n->list_lock);
 
 	/* See if we can refill from the shared array */
+    /* JYW: 从共享对象缓冲池填充空闲对象到本地对象缓冲池 */
 	if (n->shared && transfer_objects(ac, n->shared, batchcount)) {
 		n->shared->touched = 1;
 		goto alloc_done;
@@ -2789,7 +2804,7 @@ retry:
 			if (entry == &n->slabs_free)
 				goto must_grow;
 		}
-
+        /* JYW: 从slabs_partial或者slabs_free链表中摘出一个page */
 		page = list_entry(entry, struct page, lru);
 		check_spinlock_acquired(cachep);
 
@@ -2811,8 +2826,10 @@ retry:
 
 		/* move slabp to correct slabp list: */
 		list_del(&page->lru);
+        /* JYW: 如果页面上的全部对象被用完后，加入到slabs_full链表 */
 		if (page->active == cachep->num)
 			list_add(&page->lru, &n->slabs_full);
+        /* JYW: 否则加入到slabs_partial链表 */
 		else
 			list_add(&page->lru, &n->slabs_partial);
 	}
@@ -2825,6 +2842,7 @@ alloc_done:
 	if (unlikely(!ac->avail)) {
 		int x;
 force_grow:
+        /* JYW: 从伙伴系统分配一个slab挂接到slabs_free链表 */
 		x = cache_grow(cachep, flags | GFP_THISNODE, node, NULL);
 
 		/* cache_grow can reenable interrupts, then ac could change. */
@@ -2840,6 +2858,7 @@ force_grow:
 	}
 	ac->touched = 1;
 
+    /* JYW: 获取一个slab对象 */
 	return ac_get_obj(cachep, ac, flags, force_refill);
 }
 
@@ -2913,6 +2932,7 @@ static bool slab_should_failslab(struct kmem_cache *cachep, gfp_t flags)
 	return should_failslab(cachep->object_size, flags, cachep->flags);
 }
 
+/* JYW: 分配一个slab对象 */
 static inline void *____cache_alloc(struct kmem_cache *cachep, gfp_t flags)
 {
 	void *objp;
@@ -2920,10 +2940,12 @@ static inline void *____cache_alloc(struct kmem_cache *cachep, gfp_t flags)
 	bool force_refill = false;
 
 	check_irq_off();
-
+    /* JYW: 获取slab描述符中本地对象缓冲池ac */
 	ac = cpu_cache_get(cachep);
+    /* JYW: 首次为0，不会走进来 */
 	if (likely(ac->avail)) {
 		ac->touched = 1;
+        /* JYW: 获取一个slab对象 */
 		objp = ac_get_obj(cachep, ac, flags, false);
 
 		/*
@@ -2938,6 +2960,7 @@ static inline void *____cache_alloc(struct kmem_cache *cachep, gfp_t flags)
 	}
 
 	STATS_INC_ALLOCMISS(cachep);
+    /* JYW: 当本地CPU缓存中没有空闲对象时，则尝试填充 */
 	objp = cache_alloc_refill(cachep, flags, force_refill);
 	/*
 	 * the 'ac' may be updated by cache_alloc_refill(),
@@ -3164,6 +3187,7 @@ slab_alloc_node(struct kmem_cache *cachep, gfp_t flags, int nodeid,
 		 * to other nodes. It may fail while we still have
 		 * objects on other nodes available.
 		 */
+        /* JYW: 分配一个slab对象 */
 		ptr = ____cache_alloc(cachep, flags);
 		if (ptr)
 			goto out;
@@ -3668,7 +3692,7 @@ static int __do_tune_cpucache(struct kmem_cache *cachep, int limit,
 {
 	struct array_cache __percpu *cpu_cache, *prev;
 	int cpu;
-
+    /* JYW: 分配per CPU对象缓冲池 */
 	cpu_cache = alloc_kmem_cache_cpus(cachep, limit, batchcount);
 	if (!cpu_cache)
 		return -ENOMEM;
@@ -3912,33 +3936,43 @@ void get_slabinfo(struct kmem_cache *cachep, struct slabinfo *sinfo)
 
 		check_irq_on();
 		spin_lock_irq(&n->list_lock);
-
+        /* JYW: 遍历slabs_full链表 */
 		list_for_each_entry(page, &n->slabs_full, lru) {
 			if (page->active != cachep->num && !error)
 				error = "slabs_full accounting error";
+            /* JYW: 统计活跃的slab对象数 */
 			active_objs += cachep->num;
+            /* JYW: 统计活跃的slab个数 */
 			active_slabs++;
 		}
+        /* JYW: 遍历slabs_partial链表 */
 		list_for_each_entry(page, &n->slabs_partial, lru) {
 			if (page->active == cachep->num && !error)
 				error = "slabs_partial accounting error";
 			if (!page->active && !error)
 				error = "slabs_partial accounting error";
+            /* JYW: 统计活跃的slab对象数 */
 			active_objs += page->active;
+            /* JYW: 统计活跃的slab个数 */
 			active_slabs++;
 		}
+        /* JYW: 遍历slabs_free链表 */
 		list_for_each_entry(page, &n->slabs_free, lru) {
 			if (page->active && !error)
 				error = "slabs_free accounting error";
+            /* JYW: 统计slab个数 */
 			num_slabs++;
 		}
+        /* JYW: 统计所有的空闲对象个数 */
 		free_objects += n->free_objects;
 		if (n->shared)
 			shared_avail += n->shared->avail;
 
 		spin_unlock_irq(&n->list_lock);
 	}
+    /* JYW: 统计总的slab个数 */
 	num_slabs += active_slabs;
+    /* JYW: 统计总的slab对象个数(包括active和free的) */
 	num_objs = num_slabs * cachep->num;
 	if (num_objs - active_objs != free_objects && !error)
 		error = "free_objects accounting error";
@@ -3947,9 +3981,13 @@ void get_slabinfo(struct kmem_cache *cachep, struct slabinfo *sinfo)
 	if (error)
 		printk(KERN_ERR "slab: cache %s error: %s\n", name, error);
 
+    /* JYW: 总的活跃的slab对象数 */
 	sinfo->active_objs = active_objs;
+    /* JYW: 总的slab对象个数(包括active和free的) */
 	sinfo->num_objs = num_objs;
+    /* JYW: 总的活跃的slab个数 */
 	sinfo->active_slabs = active_slabs;
+    /* JYW: 总的slab个数 */
 	sinfo->num_slabs = num_slabs;
 	sinfo->shared_avail = shared_avail;
 	sinfo->limit = cachep->limit;
@@ -4018,6 +4056,12 @@ ssize_t slabinfo_write(struct file *file, const char __user *buffer,
 		return -EINVAL;
 	*tmp = '\0';
 	tmp++;
+    /*
+     * JYW:
+     *      limit：每个cpu可以缓存的对象的最大数量
+     *      batchcount：缓存为空时转换到每个 CPU 缓存中全局缓存对象的最大数量
+     *      shared：说明了对称多处理器（Symmetric MultiProcessing，SMP）系统的共享行为
+     */
 	if (sscanf(tmp, " %d %d %d", &limit, &batchcount, &shared) != 3)
 		return -EINVAL;
 

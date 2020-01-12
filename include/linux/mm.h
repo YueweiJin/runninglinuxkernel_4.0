@@ -335,6 +335,7 @@ static inline int get_freepage_migratetype(struct page *page)
 /*
  * Drop a ref, return true if the refcount fell to zero (the page has no users)
  */
+/* JYW: 释放page引用计数，并判断是否引用计数为0 */
 static inline int put_page_testzero(struct page *page)
 {
 	VM_BUG_ON_PAGE(atomic_read(&page->_count) == 0, page);
@@ -549,6 +550,7 @@ static inline void get_page(struct page *page)
 	atomic_inc(&page->_count);
 }
 
+/* JYW: 根据虚拟地址找到对应的复合页面的地址 */
 static inline struct page *virt_to_head_page(const void *x)
 {
 	struct page *page = virt_to_page(x);
@@ -1045,6 +1047,7 @@ struct address_space *page_file_mapping(struct page *page)
 	return page->mapping;
 }
 
+/* JYW: 判断page是否属于匿名页 */
 static inline int PageAnon(struct page *page)
 {
 	return ((unsigned long)page->mapping & PAGE_MAPPING_ANON) != 0;
@@ -1503,6 +1506,7 @@ int __pte_alloc_kernel(pmd_t *pmd, unsigned long address);
  * Remove it when 4level-fixup.h has been removed.
  */
 #if defined(CONFIG_MMU) && !defined(__ARCH_HAS_4LEVEL_HACK)
+/* JYW: 对于2级页表，pud_alloc(mm, pgd, addr)返回的是pgd的值 */
 static inline pud_t *pud_alloc(struct mm_struct *mm, pgd_t *pgd, unsigned long address)
 {
 	return (unlikely(pgd_none(*pgd)) && __pud_alloc(mm, pgd, address))?
@@ -2035,6 +2039,7 @@ extern struct vm_area_struct * find_vma_prev(struct mm_struct * mm, unsigned lon
 
 /* Look up the first VMA which intersects the interval start_addr..end_addr-1,
    NULL if none.  Assume start_addr < end_addr. */
+/* JYW: 查找一个和start_addr和end_addr存在重叠的一个VMA */
 static inline struct vm_area_struct * find_vma_intersection(struct mm_struct * mm, unsigned long start_addr, unsigned long end_addr)
 {
 	struct vm_area_struct * vma = find_vma(mm,start_addr);

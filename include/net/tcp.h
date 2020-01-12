@@ -54,6 +54,10 @@ void tcp_time_wait(struct sock *sk, int state, int timeo);
 
 #define MAX_TCP_HEADER	(128 + MAX_HEADER)
 #define MAX_TCP_OPTION_SPACE 40
+#if 1 /* JYW */
+#define TCP_MIN_SND_MSS		48
+#define TCP_MIN_GSO_SIZE	(TCP_MIN_SND_MSS - MAX_TCP_OPTION_SPACE)
+#endif
 
 /*
  * Never offer a window over 32767 without using window scaling. Some
@@ -1121,12 +1125,17 @@ static inline int tcp_win_from_space(int space)
 }
 
 /* Note: caller must be prepared to deal with negative returns */
+/* JYW: 应用程序和TCP层合力确定的通告窗口基准值
+ *     ，它简单来讲就是(rcvbuf - sk_rmem_alloc)中的纯数据部分
+ *     ，缩放比例就是本文开始提到的(n-1) / n
+ */
 static inline int tcp_space(const struct sock *sk)
 {
 	return tcp_win_from_space(sk->sk_rcvbuf -
 				  atomic_read(&sk->sk_rmem_alloc));
 }
 
+/* JYW: 分为"network" buffer : tp->rcv_wnd 和 "application buffer" */
 static inline int tcp_full_space(const struct sock *sk)
 {
 	return tcp_win_from_space(sk->sk_rcvbuf);

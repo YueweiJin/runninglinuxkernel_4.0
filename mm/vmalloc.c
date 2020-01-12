@@ -445,6 +445,7 @@ found:
 	va->va_start = addr;
 	va->va_end = addr + size;
 	va->flags = 0;
+    /* JYW: 找到新的区块hole后，将该hole注册到红黑树中 */
 	__insert_vmap_area(va);
 	free_vmap_cache = &va->rb_node;
 	spin_unlock(&vmap_area_lock);
@@ -1312,6 +1313,7 @@ static struct vm_struct *__get_vm_area_node(unsigned long size,
 	struct vmap_area *va;
 	struct vm_struct *area;
 
+    /* JYW: 不允许在中断上下文调用 */
 	BUG_ON(in_interrupt());
 	if (flags & VM_IOREMAP)
 		align = 1ul << clamp(fls(size), PAGE_SHIFT, IOREMAP_MAX_ORDER);
@@ -1324,6 +1326,7 @@ static struct vm_struct *__get_vm_area_node(unsigned long size,
 	if (unlikely(!area))
 		return NULL;
 
+    /* JYW: 若没有VM_NO_GUARD标志，则需要多分配一个页面作为安全垫 */
 	if (!(flags & VM_NO_GUARD))
 		size += PAGE_SIZE;
 
@@ -1563,6 +1566,7 @@ static void *__vmalloc_area_node(struct vm_struct *area, gfp_t gfp_mask,
 	const gfp_t nested_gfp = (gfp_mask & GFP_RECLAIM_MASK) | __GFP_ZERO;
 	const gfp_t alloc_mask = gfp_mask | __GFP_NOWARN;
 
+    /* JYW: 计算分配内存大小有几个页面 */
 	nr_pages = get_vm_area_size(area) >> PAGE_SHIFT;
 	array_size = (nr_pages * sizeof(struct page *));
 
@@ -1582,6 +1586,7 @@ static void *__vmalloc_area_node(struct vm_struct *area, gfp_t gfp_mask,
 		return NULL;
 	}
 
+    /* JYW: 分配每个物理页面 */
 	for (i = 0; i < area->nr_pages; i++) {
 		struct page *page;
 
@@ -1637,6 +1642,7 @@ void *__vmalloc_node_range(unsigned long size, unsigned long align,
 	void *addr;
 	unsigned long real_size = size;
 
+    /* JYW: 必须是页面对齐 */
 	size = PAGE_ALIGN(size);
 	if (!size || (size >> PAGE_SHIFT) > totalram_pages)
 		goto fail;

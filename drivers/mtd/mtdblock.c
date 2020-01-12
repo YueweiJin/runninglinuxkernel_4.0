@@ -34,8 +34,9 @@
 #include <linux/mutex.h>
 #include <linux/major.h>
 
-
+/* JYW: mtdblock设备 */
 struct mtdblk_dev {
+	/* JYW: 对应的转换层设备 */
 	struct mtd_blktrans_dev mbd;
 	int count;
 	struct mutex cache_mutex;
@@ -54,7 +55,6 @@ struct mtdblk_dev {
  * and to speed things up, we locally cache a whole flash sector while it is
  * being written to until a different sector is required.
  */
-
 static void erase_callback(struct erase_info *done)
 {
 	wait_queue_head_t *wait_q = (wait_queue_head_t *)done->priv;
@@ -109,7 +109,6 @@ static int erase_write (struct mtd_info *mtd, unsigned long pos,
 	return 0;
 }
 
-
 static int write_cached_data (struct mtdblk_dev *mtdblk)
 {
 	struct mtd_info *mtd = mtdblk->mbd.mtd;
@@ -137,7 +136,6 @@ static int write_cached_data (struct mtdblk_dev *mtdblk)
 	mtdblk->cache_state = STATE_EMPTY;
 	return 0;
 }
-
 
 static int do_cached_write (struct mtdblk_dev *mtdblk, unsigned long pos,
 			    int len, const char *buf)
@@ -326,17 +324,21 @@ static void mtdblock_release(struct mtd_blktrans_dev *mbd)
 	pr_debug("ok\n");
 }
 
+/* JYW: mtdblock的cache刷入方法 */
 static int mtdblock_flush(struct mtd_blktrans_dev *dev)
 {
 	struct mtdblk_dev *mtdblk = container_of(dev, struct mtdblk_dev, mbd);
 
 	mutex_lock(&mtdblk->cache_mutex);
+	/* JYW: 刷入mtdblock层的缓存 */
 	write_cached_data(mtdblk);
 	mutex_unlock(&mtdblk->cache_mutex);
+	/* JYW: 刷入mtd上的缓存 */
 	mtd_sync(dev->mtd);
 	return 0;
 }
 
+/* JYW: 添加一个mtdblock设备 */
 static void mtdblock_add_mtd(struct mtd_blktrans_ops *tr, struct mtd_info *mtd)
 {
 	struct mtdblk_dev *dev = kzalloc(sizeof(*dev), GFP_KERNEL);
@@ -353,6 +355,7 @@ static void mtdblock_add_mtd(struct mtd_blktrans_ops *tr, struct mtd_info *mtd)
 	if (!(mtd->flags & MTD_WRITEABLE))
 		dev->mbd.readonly = 1;
 
+	/* JYW: 添加mtd转换层设备 */
 	if (add_mtd_blktrans_dev(&dev->mbd))
 		kfree(dev);
 }
@@ -362,6 +365,7 @@ static void mtdblock_remove_dev(struct mtd_blktrans_dev *dev)
 	del_mtd_blktrans_dev(dev);
 }
 
+/* JYW: mtdblock转换层描述符 */
 static struct mtd_blktrans_ops mtdblock_tr = {
 	.name		= "mtdblock",
 	.major		= MTD_BLOCK_MAJOR,
@@ -379,6 +383,7 @@ static struct mtd_blktrans_ops mtdblock_tr = {
 
 static int __init init_mtdblock(void)
 {
+	/* JYW: 注册mtdblock转换层 */
 	return register_mtd_blktrans(&mtdblock_tr);
 }
 

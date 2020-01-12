@@ -40,12 +40,17 @@
 #define	RED_INACTIVE	0x09F911029D74E35BULL	/* when obj is inactive */
 #define	RED_ACTIVE	0xD84156C5635688C0ULL	/* when obj is active */
 
+/* JYW: object未使用时，填充red zone和red left pad为0xbb */
 #define SLUB_RED_INACTIVE	0xbb
+/* JYW: object使用时，填充red zone和red left pad为0xcc  */
 #define SLUB_RED_ACTIVE		0xcc
 
 /* ...and for poisoning */
+/* JYW: 用来填充未初始化的object区域 */
 #define	POISON_INUSE	0x5a	/* for use-uninitialised poisoning */
+/* JYW: 用来检测use-after-free */
 #define POISON_FREE	0x6b	/* for use-after-free poisoning */
+/* JYW: object可用区域的最后一个字节填充 */
 #define	POISON_END	0xa5	/* end-byte of poisoning */
 
 /********** arch/$ARCH/mm/init.c **********/

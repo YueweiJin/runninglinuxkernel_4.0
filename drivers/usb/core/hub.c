@@ -534,6 +534,7 @@ static int get_hub_status(struct usb_device *hdev,
 /*
  * USB 2.0 spec Section 11.24.2.7
  */
+/* JYW: HUb的一个标准请求，一次控制传输就可以完成 */
 static int get_port_status(struct usb_device *hdev, int port1,
 		struct usb_port_status *data)
 {
@@ -548,6 +549,7 @@ static int get_port_status(struct usb_device *hdev, int port1,
 	return status;
 }
 
+/* JYW: 获取hub端口状态 */
 static int hub_port_status(struct usb_hub *hub, int port1,
 		u16 *status, u16 *change)
 {
@@ -5123,6 +5125,7 @@ static const struct usb_device_id hub_id_table[] = {
 
 MODULE_DEVICE_TABLE (usb, hub_id_table);
 
+/* JYW: 表示一个hub驱动 */
 static struct usb_driver hub_driver = {
 	.name =		"hub",
 	.probe =	hub_probe,
@@ -5137,8 +5140,10 @@ static struct usb_driver hub_driver = {
 	.supports_autosuspend =	1,
 };
 
+/* JYW: USB hub初始化 */
 int usb_hub_init(void)
 {
+	/* JYW: 注册一个hub驱动 */
 	if (usb_register(&hub_driver) < 0) {
 		printk(KERN_ERR "%s: can't register hub driver\n",
 			usbcore_name);
@@ -5151,6 +5156,7 @@ int usb_hub_init(void)
 	 * device was gone before the EHCI controller had handed its port
 	 * over to the companion full-speed controller.
 	 */
+	/* JYW: 分配一个工作队列 */
 	hub_wq = alloc_workqueue("usb_hub_wq", WQ_FREEZABLE, 0);
 	if (hub_wq)
 		return 0;

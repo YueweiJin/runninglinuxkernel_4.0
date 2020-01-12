@@ -63,7 +63,9 @@ struct gic_chip_data {
 	u32 __percpu *saved_ppi_enable;
 	u32 __percpu *saved_ppi_conf;
 #endif
+	/* JYW: 所属的domain */
 	struct irq_domain *domain;
+	/* JYW: 系统支持的所有的中断数目-16 */
 	unsigned int gic_irqs;
 #ifdef CONFIG_GIC_NON_BANKED
 	void __iomem *(*get_base)(union gic_base *);
@@ -97,6 +99,7 @@ struct irq_chip gic_arch_extn = {
 #define MAX_GIC_NR	1
 #endif
 
+/* JYW: 用于管理所有的gic_chip */
 static struct gic_chip_data gic_data[MAX_GIC_NR] __read_mostly;
 
 #ifdef CONFIG_GIC_NON_BANKED
@@ -790,6 +793,7 @@ void __init gic_init_physaddr(struct device_node *node)
 #define gic_init_physaddr(node)  do { } while (0)
 #endif
 
+/* JYW: 将irq和hwirq进行映射 */
 static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
 				irq_hw_number_t hw)
 {
@@ -813,6 +817,7 @@ static void gic_irq_domain_unmap(struct irq_domain *d, unsigned int irq)
 	gic_routable_irq_domain_ops->unmap(d, irq);
 }
 
+/* JYW: 解析出硬件中断号存放在hwirq中 */
 static int gic_irq_domain_xlate(struct irq_domain *d,
 				struct device_node *controller,
 				const u32 *intspec, unsigned int intsize,
@@ -872,12 +877,14 @@ static int gic_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
 	unsigned int type = IRQ_TYPE_NONE;
 	struct of_phandle_args *irq_data = arg;
 
+	/* JYW: 解析出硬件中断号存放在hwirq中 */
 	ret = gic_irq_domain_xlate(domain, irq_data->np, irq_data->args,
 				   irq_data->args_count, &hwirq, &type);
 	if (ret)
 		return ret;
 
 	for (i = 0; i < nr_irqs; i++)
+		/* JYW: 将irq和hwirq进行映射 */
 		gic_irq_domain_map(domain, virq + i, hwirq + i);
 
 	return 0;
@@ -1004,6 +1011,7 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
 		 * For secondary GICs, skip over PPIs, too.
 		 */
 		if (gic_nr == 0 && (irq_start & 31) > 0) {
+			/* JYW: 对于root GIC，base为16 */
 			hwirq_base = 16;
 			if (irq_start != -1)
 				irq_start = (irq_start & ~31) + 16;
@@ -1011,8 +1019,12 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
 			hwirq_base = 32;
 		}
 
+		/* JYW: 系统支持的所有的中断数目-16
+		 * 因为root GIC的0～15号HW interrupt 是for IPI的 
+		 */
 		gic_irqs -= hwirq_base; /* calculate # of irqs to allocate */
 
+		/* JYW: 申请gic_irqs个IRQ资源 */
 		irq_base = irq_alloc_descs(irq_start, 16, gic_irqs,
 					   numa_node_id());
 		if (IS_ERR_VALUE(irq_base)) {
@@ -1021,6 +1033,7 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
 			irq_base = irq_start;
 		}
 
+		/* JYW: 向系统创建irq domain,并创建映射 */
 		gic->domain = irq_domain_add_legacy(node, gic_irqs, irq_base,
 					hwirq_base, &gic_irq_domain_ops, gic);
 	}
@@ -1080,6 +1093,16 @@ gic_of_init(struct device_node *node, struct device_node *parent)
 	gic_cnt++;
 	return 0;
 }
+/*
+ * JYW:
+ *   IRQCHIP_DECLARE(gic_400, "arm,gic-400", gic_of_init);
+ * => OF_DECLARE_2(irqchip, gic_v400, "arm,gic-400", compat, gic_of_init)
+ * =>_OF_DECLARE(irqchip, gic_v400, "arm,gic-400", compat,  of_init_fn_2)
+ * => static const struct of_device_id __of_table_gic_v400		\
+ *		__used __section(__irqchip_of_table)			\
+ *		 = { .compatible = "arm,gic-400",				\
+ *		     .data = gic_of_init  }
+ */
 IRQCHIP_DECLARE(gic_400, "arm,gic-400", gic_of_init);
 IRQCHIP_DECLARE(arm11mp_gic, "arm,arm11mp-gic", gic_of_init);
 IRQCHIP_DECLARE(arm1176jzf_dc_gic, "arm,arm1176jzf-devchip-gic", gic_of_init);

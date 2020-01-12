@@ -570,6 +570,7 @@ __vma_address(struct page *page, struct vm_area_struct *vma)
 	return vma->vm_start + ((pgoff - vma->vm_pgoff) << PAGE_SHIFT);
 }
 
+/* JYW: 获取page所对应的线性地址 */
 inline unsigned long
 vma_address(struct page *page, struct vm_area_struct *vma)
 {
@@ -1355,6 +1356,7 @@ static int page_not_mapped(struct page *page)
  * SWAP_FAIL	- the page is unswappable
  * SWAP_MLOCK	- page is mlocked.
  */
+/* JYW: 尝试清空所有引用该页描述符对应页框的页表项 */
 int try_to_unmap(struct page *page, enum ttu_flags flags)
 {
 	int ret;
@@ -1426,6 +1428,7 @@ void __put_anon_vma(struct anon_vma *anon_vma)
 		anon_vma_free(root);
 }
 
+/* JYW: 获得anon_vma结构体 */
 static struct anon_vma *rmap_walk_anon_lock(struct page *page,
 					struct rmap_walk_control *rwc)
 {
@@ -1440,6 +1443,7 @@ static struct anon_vma *rmap_walk_anon_lock(struct page *page,
 	 * are holding mmap_sem. Users without mmap_sem are required to
 	 * take a reference count to prevent the anon_vma disappearing
 	 */
+	/* JYW: 获得anon_vma结构体 */
 	anon_vma = page_anon_vma(page);
 	if (!anon_vma)
 		return NULL;
@@ -1469,13 +1473,16 @@ static int rmap_walk_anon(struct page *page, struct rmap_walk_control *rwc)
 	struct anon_vma_chain *avc;
 	int ret = SWAP_AGAIN;
 
+	/* JYW: 获得anon_vma结构体 */
 	anon_vma = rmap_walk_anon_lock(page, rwc);
 	if (!anon_vma)
 		return ret;
 
 	pgoff = page_to_pgoff(page);
 	anon_vma_interval_tree_foreach(avc, &anon_vma->rb_root, pgoff, pgoff) {
+		/* JYW: 扫描anon_vma的vam树 */
 		struct vm_area_struct *vma = avc->vma;
+		/* JYW: 获取page所对应的线性地址 */
 		unsigned long address = vma_address(page, vma);
 
 		if (rwc->invalid_vma && rwc->invalid_vma(vma, rwc->arg))

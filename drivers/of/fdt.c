@@ -718,7 +718,8 @@ const void * __init of_flat_dt_match_machine(const void *default_match,
 		return NULL;
 	}
 
-	pr_info("Machine model: %s\n", of_flat_dt_get_machine_name());
+	/* JYW: 打印machine名称 */
+	pr_info("JYW=> %s: Machine model: %s\n", __func__, of_flat_dt_get_machine_name());
 
 	return best_data;
 }
@@ -853,9 +854,11 @@ u64 __init dt_mem_next_cell(int s, const __be32 **cellp)
 /**
  * early_init_dt_scan_memory - Look for an parse memory nodes
  */
+/* JYW: 扫描内存信息，添加到memblock */
 int __init early_init_dt_scan_memory(unsigned long node, const char *uname,
 				     int depth, void *data)
 {
+	/* JYW: 获取node的device_type属性 */
 	const char *type = of_get_flat_dt_prop(node, "device_type", NULL);
 	const __be32 *reg, *endp;
 	int l;
@@ -892,7 +895,10 @@ int __init early_init_dt_scan_memory(unsigned long node, const char *uname,
 			continue;
 		pr_debug(" - %llx ,  %llx\n", (unsigned long long)base,
 		    (unsigned long long)size);
+		printk("JYW=>  %s: base: %llx , size: %llx\n", __func__, (unsigned long long)base,
+		    (unsigned long long)size);
 
+		/* JYW: 将dtb中的解析到的memory添加到memblock */
 		early_init_dt_add_memory_arch(base, size);
 	}
 
@@ -939,19 +945,24 @@ int __init early_init_dt_scan_chosen(unsigned long node, const char *uname,
 #ifdef CONFIG_HAVE_MEMBLOCK
 #define MAX_PHYS_ADDR	((phys_addr_t)~0)
 
+/* JYW: 将dtb中的解析到的memory添加到memblock */
 void __init __weak early_init_dt_add_memory_arch(u64 base, u64 size)
 {
 	const u64 phys_offset = __pa(PAGE_OFFSET);
 
 	if (!PAGE_ALIGNED(base)) {
+		/* JYW: size必须超过一个页面 */
 		if (size < PAGE_SIZE - (base & ~PAGE_MASK)) {
 			pr_warn("Ignoring memory block 0x%llx - 0x%llx\n",
 				base, base + size);
 			return;
 		}
+		/* JYW: size保持页面对齐 */
 		size -= PAGE_SIZE - (base & ~PAGE_MASK);
+		/* JYW: base保持页面对齐 */
 		base = PAGE_ALIGN(base);
 	}
+	/* JYW: 确保按页面对齐 */
 	size &= PAGE_MASK;
 
 	if (base > MAX_PHYS_ADDR) {
@@ -977,6 +988,7 @@ void __init __weak early_init_dt_add_memory_arch(u64 base, u64 size)
 		size -= phys_offset - base;
 		base = phys_offset;
 	}
+	/* JYW: 添加到memblock */
 	memblock_add(base, size);
 }
 
@@ -1022,7 +1034,7 @@ bool __init early_init_dt_verify(void *params)
 	return true;
 }
 
-
+/* JYW: 扫描初始化用到的dtb节点 */
 void __init early_init_dt_scan_nodes(void)
 {
 	/* Retrieve various information from the /chosen node */
@@ -1032,6 +1044,7 @@ void __init early_init_dt_scan_nodes(void)
 	of_scan_flat_dt(early_init_dt_scan_root, NULL);
 
 	/* Setup memory, calling early_init_dt_add_memory_arch */
+	/* JYW: 扫描内存信息，添加到memblock */
 	of_scan_flat_dt(early_init_dt_scan_memory, NULL);
 }
 

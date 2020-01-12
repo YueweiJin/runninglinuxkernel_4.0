@@ -33,14 +33,18 @@ static inline pte_t get_top_pte(unsigned long va)
 	return *ptep;
 }
 
+/* JYW: 返回进程页表对应的pmd目录项，这里由于是2级页表，等于pud */
 static inline pmd_t *pmd_off_k(unsigned long virt)
 {
 	return pmd_offset(pud_offset(pgd_offset_k(virt), virt), virt);
 }
 
+/* JYW: 描述内存区间类型以及相应的权限和属性信息 */
 struct mem_type {
+	/* JYW: 用于页面表项的控制位和标志位 */
 	pteval_t prot_pte;
 	pteval_t prot_pte_s2;
+	/* JYW: 用于一级页表项的控制位和标志位 */
 	pmdval_t prot_l1;
 	pmdval_t prot_sect;
 	unsigned int domain;

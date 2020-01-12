@@ -147,6 +147,7 @@ struct irq_domain;
  * cleaned up the direct references and switched everything over to
  * irq_data.
  */
+/* JYW: irq chip 的私有数据 */
 struct irq_data {
 	u32			mask;
 	unsigned int		irq;
@@ -158,6 +159,7 @@ struct irq_data {
 #ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
 	struct irq_data		*parent_data;
 #endif
+	/* JYW: 和外设specific handler相关的私有数据 */
 	void			*handler_data;
 	void			*chip_data;
 	struct msi_desc		*msi_desc;

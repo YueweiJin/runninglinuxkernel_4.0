@@ -3388,6 +3388,7 @@ struct file *shmem_kernel_file_setup(const char *name, loff_t size, unsigned lon
  * @size: size to be set for the file
  * @flags: VM_NORESERVE suppresses pre-accounting of the entire object size
  */
+/* JYW: 在tmpfs下面建立一个unlinked文件 */
 struct file *shmem_file_setup(const char *name, loff_t size, unsigned long flags)
 {
 	return __shmem_file_setup(name, size, flags, 0);

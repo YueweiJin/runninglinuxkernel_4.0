@@ -206,6 +206,7 @@ struct sk_buff *__alloc_skb(unsigned int size, gfp_t gfp_mask,
 	u8 *data;
 	bool pfmemalloc;
 
+    /* JYW：由传入的参数来决定用哪个缓冲池来分配 */
 	cache = (flags & SKB_ALLOC_FCLONE)
 		? skbuff_fclone_cache : skbuff_head_cache;
 
@@ -213,6 +214,7 @@ struct sk_buff *__alloc_skb(unsigned int size, gfp_t gfp_mask,
 		gfp_mask |= __GFP_MEMALLOC;
 
 	/* Get the HEAD */
+    /* JYW: 从指定缓存池中分配一个skb结构体 */
 	skb = kmem_cache_alloc_node(cache, gfp_mask & ~__GFP_DMA, node);
 	if (!skb)
 		goto out;
@@ -225,6 +227,7 @@ struct sk_buff *__alloc_skb(unsigned int size, gfp_t gfp_mask,
 	 */
 	size = SKB_DATA_ALIGN(size);
 	size += SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
+    /* JYW: 这里分配的大小包括了skb_shared_info的大小 */
 	data = kmalloc_reserve(size, gfp_mask, node, &pfmemalloc);
 	if (!data)
 		goto nodata;
@@ -467,13 +470,13 @@ static struct sk_buff *__alloc_rx_skb(unsigned int length, gfp_t gfp_mask,
 	struct sk_buff *skb = NULL;
 	unsigned int fragsz = SKB_DATA_ALIGN(length) +
 			      SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
-
+    /* JYW: NAPI网卡驱动一般是 GFP_ATOMIC 的而非 GFP_KERNEL，所以一般走if分支  */
 	if (fragsz <= PAGE_SIZE && !(gfp_mask & (__GFP_WAIT | GFP_DMA))) {
 		void *data;
 
 		if (sk_memalloc_socks())
 			gfp_mask |= __GFP_MEMALLOC;
-
+        /* JYW: frag方式分配内存 */
 		data = (flags & SKB_ALLOC_NAPI) ?
 			__napi_alloc_frag(fragsz, gfp_mask) :
 			__netdev_alloc_frag(fragsz, gfp_mask);
@@ -484,6 +487,7 @@ static struct sk_buff *__alloc_rx_skb(unsigned int length, gfp_t gfp_mask,
 				put_page(virt_to_head_page(data));
 		}
 	} else {
+	    /* JYW：普通方式分配内存 */
 		skb = __alloc_skb(length, gfp_mask,
 				  SKB_ALLOC_RX, NUMA_NO_NODE);
 	}

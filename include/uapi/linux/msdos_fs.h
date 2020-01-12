@@ -59,6 +59,7 @@
 	MSDOS_SB(s)->fat_bits == 16 ? 0xFF00 : 0xF00) | (x))
 
 /* start of data cluster's entry (number of reserved clusters) */
+/* JYW: 簇号是从2开始的 */
 #define FAT_START_ENT	2
 
 /* maximum number of clusters */
@@ -71,15 +72,18 @@
 /* bad cluster mark */
 #define BAD_FAT12	0xFF7
 #define BAD_FAT16	0xFFF7
+/* JYW: 表示一个坏簇 */
 #define BAD_FAT32	0x0FFFFFF7
 
 /* standard EOF */
 #define EOF_FAT12	0xFFF
 #define EOF_FAT16	0xFFFF
+/* JYW: 文件最后一个簇 */
 #define EOF_FAT32	0x0FFFFFFF
 
 #define FAT_ENT_FREE	(0)
 #define FAT_ENT_BAD	(BAD_FAT32)
+/* JYW: 文件最后一个簇 */
 #define FAT_ENT_EOF	(EOF_FAT32)
 
 #define FAT_FSINFO_SIG1	0x41615252
@@ -107,21 +111,37 @@ struct __fat_dirent {
 /*Android kernel has used 0x12, so we use 0x13*/
 #define FAT_IOCTL_GET_VOLUME_ID		_IOR('r', 0x13, __u32)
 
+/* JYW: 启动扇区 */
 struct fat_boot_sector {
+	/* JYW: 忽略，在汇编当中0xEB是跳转指令，0x58是跳转的地址，而0x90则是空指令 */
+	/* JYW: 对应的汇编是EB 58 90 对应汇编代码即为JUMP 0x58; NOP; */
 	__u8	ignored[3];	/* Boot strap short or near jump */
+	/* JYW: 表示OEM，这里即为“MSDOS5.0” */
 	__u8	system_id[8];	/* Name - can be used to special case
 				   partition manager volumes */
+	/* JYW: 从0x000B开始的79个字节的数据叫做BPB（BIOS Paramter Block） */
+	/* JYW: 0xB: 每扇区字节数，通常为0x200=256 */
 	__u8	sector_size[2];	/* bytes per logical sector */
+	/* JYW: 0xD: 每簇扇区数，通常为8 == 2KB */
 	__u8	sec_per_clus;	/* sectors/cluster */
+	/* JYW: 0xE: 保留扇区数，已经包含了引导扇区数，可理解为FAT表的起始位置 */
 	__le16	reserved;	/* reserved sectors */
+	/* JYW: 0x10: fat个数，通常为0x2 */
 	__u8	fats;		/* number of FATs */
+	/* JYW: 0x11: 根目录项数，FAT32以突破该限制，无效 */
 	__u8	dir_entries[2];	/* root directory entries */
+	/* JYW: 0x13: 扇区总数，小于32M使用,通常为0 */
 	__u8	sectors[2];	/* number of sectors */
+	/* JYW: 0x15: 存储介质描述符 */
 	__u8	media;		/* media code */
+	/* JYW: 0x16: 每FAT表占用扇区数 ，小于32M使用, 通常为0 */
 	__le16	fat_length;	/* sectors/FAT */
+	/* JYW: 0x18: 逻辑每磁道扇区数 */
 	__le16	secs_track;	/* sectors per track */
+	/* JYW: 0x1A: 逻辑磁头数, 通常0xFF */
 	__le16	heads;		/* number of heads */
 	__le32	hidden;		/* hidden sectors (unused) */
+	/* JYW: 大于32M使用 */
 	__le32	total_sect;	/* number of sectors (if sectors == 0) */
 
 	union {
@@ -139,23 +159,29 @@ struct fat_boot_sector {
 
 		struct {
 			/* only used by FAT32 */
+			/* JYW: 每fat表扇区数,大于32M使用 */
 			__le32	length;		/* sectors/FAT */
 			__le16	flags;		/* bit 8: fat mirroring,
 						   low 4: active fat */
 			__u8	version[2];	/* major, minor filesystem
 						   version */
+			/* JYW: 根目录起始簇, 一般为2 */
 			__le32	root_cluster;	/* first cluster in
 						   root directory */
+			/* JYW: boot占用扇区数，通常为0 */
 			__le16	info_sector;	/* filesystem info sector */
+			/* JYW: 备份引导扇区位置 */
 			__le16	backup_boot;	/* backup boot sector */
 			__le16	reserved2[6];	/* Unused */
 			/* Extended BPB Fields for FAT32 */
 			__u8	drive_number;   /* Physical drive number */
 			__u8    state;       	/* undocumented, but used
 						   for mount state. */
+			/* JYW: 扩展引导标记 */
 			__u8	signature;  /* extended boot signature */
 			__u8	vol_id[4];	/* volume ID */
 			__u8	vol_label[11];	/* volume label */
+			/* JYW: 转成字符即“FAT32” */
 			__u8	fs_type[8];		/* file system type */
 			/* other fields are not added here */
 		} fat32;
@@ -171,16 +197,22 @@ struct fat_boot_fsinfo {
 	__le32   reserved2[4];
 };
 
+/* JYW: 短文件名目录项 */
 struct msdos_dir_entry {
+	/* JYW: 8.3 格式 */
 	__u8	name[MSDOS_NAME];/* name and extension */
+	/* JYW: 属性字节 */
 	__u8	attr;		/* attribute bits */
 	__u8    lcase;		/* Case for base and extension */
 	__u8	ctime_cs;	/* Creation time, centiseconds (0-199) */
 	__le16	ctime;		/* Creation time */
 	__le16	cdate;		/* Creation date */
 	__le16	adate;		/* Last access date */
+	/* JYW: 起始簇高16位  */
 	__le16	starthi;	/* High 16 bits of cluster in FAT32 */
+	/* JYW: 起始簇低16位 */
 	__le16	time,date,start;/* time, date and first cluster */
+	/* JYW: 文件大小 */
 	__le32	size;		/* file size (in bytes) */
 };
 

@@ -1333,6 +1333,7 @@ struct uncached_list {
 	struct list_head	head;
 };
 
+/* JYW: percpu类型的，未缓存链表 */
 static DEFINE_PER_CPU_ALIGNED(struct uncached_list, rt_uncached_list);
 
 static void rt_add_uncached_list(struct rtable *rt)
@@ -1387,6 +1388,7 @@ static bool rt_cache_valid(const struct rtable *rt)
 		!rt_is_expired(rt);
 }
 
+/* JYW: 设置下一跳 */
 static void rt_set_nexthop(struct rtable *rt, __be32 daddr,
 			   const struct fib_result *res,
 			   struct fib_nh_exception *fnhe,
@@ -1539,6 +1541,13 @@ static void ip_handle_martian_source(struct net_device *dev,
 }
 
 /* called in rcu_read_lock() section */
+/* JYW:
+ * 创建的路由缓存项是一个输入转发路由缓存项，即接口接收到一个数据包，通过查找路由确定是需要转发时  * ，则会调用该函数调用输入路由缓存项，其input函数设置为
+ * ip_forward，其output函数为，ip_output
+ */
+/*
+ * JYW: 当调用该函数前，已经找到了一个从saddr->daddr的路由项;
+ */
 static int __mkroute_input(struct sk_buff *skb,
 			   const struct fib_result *res,
 			   struct in_device *in_dev,
@@ -1603,6 +1612,7 @@ static int __mkroute_input(struct sk_buff *skb,
 		}
 	}
 
+	/* JYW: 创建路由缓存项 */
 	rth = rt_dst_alloc(out_dev->dev,
 			   IN_DEV_CONF_GET(in_dev, NOPOLICY),
 			   IN_DEV_CONF_GET(out_dev, NOXFRM), do_cache);
@@ -1622,7 +1632,9 @@ static int __mkroute_input(struct sk_buff *skb,
 	INIT_LIST_HEAD(&rth->rt_uncached);
 	RT_CACHE_STAT_INC(in_slow_tot);
 
+	/* JYW: 使用ip_forward处理 */
 	rth->dst.input = ip_forward;
+	/* JYW: 使用ip_output处理 */
 	rth->dst.output = ip_output;
 
 	rt_set_nexthop(rth, daddr, res, fnhe, res->fi, res->type, itag);
@@ -2732,6 +2744,7 @@ static __net_initdata struct pernet_operations ipv4_inetpeer_ops = {
 struct ip_rt_acct __percpu *ip_rt_acct __read_mostly;
 #endif /* CONFIG_IP_ROUTE_CLASSID */
 
+/* JYW: 路由子系统初始化 */
 int __init ip_rt_init(void)
 {
 	int rc = 0;
@@ -2743,6 +2756,7 @@ int __init ip_rt_init(void)
 
 	prandom_bytes(ip_idents, IP_IDENTS_SZ * sizeof(*ip_idents));
 
+	/* JYW: 初始化rt_uncached_list */
 	for_each_possible_cpu(cpu) {
 		struct uncached_list *ul = &per_cpu(rt_uncached_list, cpu);
 
@@ -2755,6 +2769,7 @@ int __init ip_rt_init(void)
 		panic("IP: failed to allocate ip_rt_acct\n");
 #endif
 
+	/* JYW: 创建路由缓存结构体内存池对象 */
 	ipv4_dst_ops.kmem_cachep =
 		kmem_cache_create("ip_dst_cache", sizeof(struct rtable), 0,
 				  SLAB_HWCACHE_ALIGN|SLAB_PANIC, NULL);

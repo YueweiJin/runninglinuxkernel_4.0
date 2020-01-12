@@ -447,6 +447,7 @@ static int insert_dent(struct ubifs_info *c, int lnum, int offs, int len,
  * This function validates directory or extended attribute entry node @dent.
  * Returns zero if the node is all right and a %-EINVAL if not.
  */
+/* JYW: 判断读取的目录项或扩展属性项节点是否有效 */
 int ubifs_validate_entry(struct ubifs_info *c,
 			 const struct ubifs_dent_node *dent)
 {

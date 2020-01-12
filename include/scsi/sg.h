@@ -39,7 +39,7 @@ typedef struct sg_iovec /* same structure as used by readv() Linux system */
     size_t iov_len;             /* Length in bytes  */
 } sg_iovec_t;
 
-
+/* JYW */
 typedef struct sg_io_hdr
 {
     int interface_id;           /* [i] 'S' for SCSI generic (required) */

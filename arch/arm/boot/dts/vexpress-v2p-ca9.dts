@@ -14,6 +14,7 @@
 	arm,hbi = <0x191>;
 	arm,vexpress,site = <0xf>;
 	compatible = "arm,vexpress,v2p-ca9", "arm,vexpress";
+	/* JYW: 表示外设的中断请求线连接到了gic控制器上 */
 	interrupt-parent = <&gic>;
 	#address-cells = <1>;
 	#size-cells = <1>;
@@ -61,7 +62,7 @@
 			next-level-cache = <&L2>;
 		};
 	};
-
+        /* JYW: 内存的起始地址位0x60000000，大小为0x40000000，总计1GB */
 	memory@60000000 {
 		device_type = "memory";
 		reg = <0x60000000 0x40000000>;
@@ -154,14 +155,21 @@
 	watchdog@1e000620 {
 		compatible = "arm,cortex-a9-twd-wdt";
 		reg = <0x1e000620 0x20>;
+		/* JYW: 分别表示中断号、中断触发类型 */
 		interrupts = <1 14 0xf04>;
 	};
 
+	/* JYW: 表示一个中断控制器 */
 	gic: interrupt-controller@1e001000 {
 		compatible = "arm,cortex-a9-gic";
+		/* JYW:
+		 * 该中断控制器用多少个cell（一个cell就是一个32-bit的单元）描述一个外设的interrupt
+		 * request line。？具体每个cell表示什么样的含义由interrupt controller自己定义
+		 */
 		#interrupt-cells = <3>;
 		#address-cells = <0>;
 		interrupt-controller;
+		/* JYW: */
 		reg = <0x1e001000 0x1000>,
 		      <0x1e000100 0x100>;
 	};

@@ -933,7 +933,10 @@ static int __init ignore_loglevel_setup(char *str)
 	return 0;
 }
 
+/* JYW:
+ * 通过在bootargs中设置ignore_loglevel来忽略打印级别，以保证所有消息都被打印到控制台 */
 early_param("ignore_loglevel", ignore_loglevel_setup);
+/* JYW: 系统启动后，用户还可以通过/sys/module/printk/parameters/ignore_loglevel文件动态来设置是否忽略打印级别  */
 module_param(ignore_loglevel, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(ignore_loglevel,
 		 "ignore loglevel setting (prints all kernel messages to the console)");
@@ -1399,11 +1402,14 @@ static void call_console_drivers(int level, const char *text, size_t len)
 
 	trace_console(text, len);
 
+	/* JYW: 打印等级比控制台级别低且未忽略打印等级情况下,不输出到控制台 */
 	if (level >= console_loglevel && !ignore_loglevel)
 		return;
 	if (!console_drivers)
 		return;
 
+	/* JYW:
+	 * 打印等级高或者忽略了打印等级时，调用控制台的write方法从控制台打印 */
 	for_each_console(con) {
 		if (exclusive_console && con != exclusive_console)
 			continue;
