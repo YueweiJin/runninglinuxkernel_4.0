@@ -84,6 +84,7 @@ clocks_calc_mult_shift(u32 *mult, u32 *shift, u32 from, u32 to, u32 maxsec)
 		if ((tmp >> sftacc) == 0)
 			break;
 	}
+    /* JYW: mult = (NSEC_PER_SEC<<shift)/HW counter input frequency */
 	*mult = tmp;
 	*shift = sft;
 }
@@ -575,6 +576,7 @@ static void __clocksource_select(bool skipcur)
 			override_name[0] = 0;
 		} else
 			/* Override clocksource can be used. */
+            /* JYW: 把用户指定的设为best */
 			best = cs;
 		break;
 	}
@@ -593,6 +595,7 @@ static void __clocksource_select(bool skipcur)
  * Select the clocksource with the best rating, or the clocksource,
  * which is selected by userspace override.
  */
+/* JYW: 选择一个最佳的clocksource */
 static void clocksource_select(void)
 {
 	return __clocksource_select(false);
@@ -658,6 +661,7 @@ static void clocksource_enqueue(struct clocksource *cs)
  * This *SHOULD NOT* be called directly! Please use the
  * clocksource_updatefreq_hz() or clocksource_updatefreq_khz helper functions.
  */
+/* JYW: 根据输入频率，计算mult/shift 以及 max_idle_ns */
 void __clocksource_updatefreq_scale(struct clocksource *cs, u32 scale, u32 freq)
 {
 	u64 sec;
@@ -733,6 +737,7 @@ EXPORT_SYMBOL_GPL(__clocksource_register_scale);
  *
  * Returns -EBUSY if registration fails, zero otherwise.
  */
+/* JYW: 向下提供时钟源的注册接口 */
 int clocksource_register(struct clocksource *cs)
 {
 	/* calculate max adjustment for given mult/shift */

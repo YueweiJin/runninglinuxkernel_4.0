@@ -93,22 +93,33 @@ enum clock_event_mode {
  * @list:		list head for the management code
  * @owner:		module reference
  */
+/* JYW: 时钟事件设备，抽象一个可以产生clock event的timer硬件设备 */
 struct clock_event_device {
+    /* JYW: 产生了clock event的时候调用的handler。
+     * 一般而言，底层的clock event chip driver会注册中断处理函数，
+     * 在硬件timer中断到来的时候调用timer中断handler，
+     * 而在这个中断handler中再调用event_handler,
+     * 参考实例：sp804_timer_interrupt
+     */
 	void			(*event_handler)(struct clock_event_device *);
 	int			(*set_next_event)(unsigned long evt,
 						  struct clock_event_device *);
 	int			(*set_next_ktime)(ktime_t expires,
 						  struct clock_event_device *);
+    /* JYW: 下次事件的时间 */
 	ktime_t			next_event;
 	u64			max_delta_ns;
+    /* JYW: 用来控制精度，如果是1的话精度太高，影响性能 */
 	u64			min_delta_ns;
 	u32			mult;
 	u32			shift;
+    /* JYW: 事件模式 */
 	enum clock_event_mode	mode;
 	unsigned int		features;
 	unsigned long		retries;
 
 	void			(*broadcast)(const struct cpumask *mask);
+    /* JYW: 设置模式 */
 	void			(*set_mode)(enum clock_event_mode mode,
 					    struct clock_event_device *);
 	void			(*suspend)(struct clock_event_device *);
@@ -118,8 +129,10 @@ struct clock_event_device {
 
 	const char		*name;
 	int			rating;
+    /* JYW: 使用的中断号 */
 	int			irq;
 	int			bound_on;
+    /* JYW: 附在哪个CPU core上 */
 	const struct cpumask	*cpumask;
 	struct list_head	list;
 	struct module		*owner;
@@ -146,11 +159,14 @@ static inline unsigned long div_sc(unsigned long ticks, unsigned long nsec,
 }
 
 /* Clock event layer functions */
+/* JYW: 向上层/底层提供操作clock event的通用API */
+
 extern u64 clockevent_delta2ns(unsigned long latch,
 			       struct clock_event_device *evt);
+/* JYW: 底层的timer硬件驱动会调用clockevents_register_device函数向系统注册clock event device */
 extern void clockevents_register_device(struct clock_event_device *dev);
 extern int clockevents_unbind_device(struct clock_event_device *ced, int cpu);
-
+/* JYW: 底层的clock event chip driver可以调用clockevents_config对该设备进行配置 */
 extern void clockevents_config(struct clock_event_device *dev, u32 freq);
 extern void clockevents_config_and_register(struct clock_event_device *dev,
 					    u32 freq, unsigned long min_delta,
@@ -158,10 +174,12 @@ extern void clockevents_config_and_register(struct clock_event_device *dev,
 
 extern int clockevents_update_freq(struct clock_event_device *ce, u32 freq);
 
+/* JYW: 更换一个新的事件时钟设备 */
 extern void clockevents_exchange_device(struct clock_event_device *old,
 					struct clock_event_device *new);
 extern void clockevents_set_mode(struct clock_event_device *dev,
 				 enum clock_event_mode mode);
+/* JYW: 设定clock event device的触发event的时间参数 */
 extern int clockevents_program_event(struct clock_event_device *dev,
 				     ktime_t expires, bool force);
 

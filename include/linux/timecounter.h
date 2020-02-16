@@ -36,10 +36,15 @@
  * @mult:		cycle to nanosecond multiplier
  * @shift:		cycle to nanosecond divisor (power of two)
  */
+/* JYW：基于clocksource之上，抽象一个free running的counter，从0开始，不断累加            */
 struct cyclecounter {
+    /* JYW: 获取当前的counter value，单位是cycle */
 	cycle_t (*read)(const struct cyclecounter *cc);
+    /* JYW: 该count有多少个bit */
 	cycle_t mask;
+    /* JYW: 转换成ns需要的乘积因子 */
 	u32 mult;
+    /* JYW: 转换成ns需要的右移因子 */
 	u32 shift;
 };
 
@@ -61,6 +66,7 @@ struct cyclecounter {
  * @mask:		bit mask for maintaining the 'frac' field
  * @frac:		accumulated fractional nanoseconds
  */
+/* JYW: 构架在cycle counter之上，使用纳秒这样的时间单位而不是cycle数目，这样的设计会让用户接口变得更加友好 */
 struct timecounter {
 	const struct cyclecounter *cc;
 	cycle_t cycle_last;
@@ -94,6 +100,8 @@ static inline void timecounter_adjtime(struct timecounter *tc, s64 delta)
 {
 	tc->nsec += delta;
 }
+
+/* JYW: 给上层驱动提供的timercounter时间服务 */
 
 /**
  * timecounter_init - initialize a time counter

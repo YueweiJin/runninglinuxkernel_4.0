@@ -62,12 +62,14 @@ struct module;
  * @resume:		resume function for the clocksource, if necessary
  * @owner:		module reference, must be set by clocksource in modules
  */
+/* JYW: 自由运行计数器的硬件抽象 */
 struct clocksource {
 	/*
 	 * Hotpath data, fits in a single cache line when the
 	 * clocksource itself is cacheline aligned.
 	 */
 	cycle_t (*read)(struct clocksource *cs);
+    /* JYW: 是最大的cycle数目，除以频率就是能表示的最大的时间范围（以秒为单位） */
 	cycle_t mask;
 	u32 mult;
 	u32 shift;
@@ -147,10 +149,10 @@ static inline u32 clocksource_khz2mult(u32 khz, u32 shift_constant)
  */
 static inline u32 clocksource_hz2mult(u32 hz, u32 shift_constant)
 {
-	/*  hz = cyc/(Billion ns)
-	 *  mult/2^shift  = ns/cyc
+	/*  hz = cyc/(Billion ns)          ====> JYW: 这里的cyc表示HZ
+	 *  mult/2^shift  = ns/cyc·        ====> JYW: Linux开发人员定义了这个等式，用于避免浮点运算
 	 *  mult = ns/cyc * 2^shift
-	 *  mult = 1Billion/hz * 2^shift
+	 *  mult = 1Billion/hz * 2^shift    ===> JYW: 这里的hz是频率
 	 *  mult = 1000000000 * 2^shift / hz
 	 *  mult = (1000000000<<shift) / hz
 	 */
@@ -172,12 +174,13 @@ static inline u32 clocksource_hz2mult(u32 hz, u32 shift_constant)
  *
  * XXX - This could use some mult_lxl_ll() asm optimization
  */
+/* JYW: 将cycle值转换为ns (Xns = cycles / F * ns/sec, ) */
 static inline s64 clocksource_cyc2ns(cycle_t cycles, u32 mult, u32 shift)
 {
 	return ((u64) cycles * mult) >> shift;
 }
 
-
+/* JYW: 向下提供时钟源的注册接口 */
 extern int clocksource_register(struct clocksource*);
 extern int clocksource_unregister(struct clocksource*);
 extern void clocksource_touch_watchdog(void);
@@ -202,6 +205,7 @@ __clocksource_register_scale(struct clocksource *cs, u32 scale, u32 freq);
 extern void
 __clocksource_updatefreq_scale(struct clocksource *cs, u32 scale, u32 freq);
 
+/* JYW: 调用者给出输入clock频率，需要在注册过程中计算mult、shift和max_idle_ns */
 static inline int clocksource_register_hz(struct clocksource *cs, u32 hz)
 {
 	return __clocksource_register_scale(cs, 1, hz);

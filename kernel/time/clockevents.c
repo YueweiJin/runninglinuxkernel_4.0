@@ -21,6 +21,7 @@
 #include "tick-internal.h"
 
 /* The registered clock event devices */
+/* JYW: 管理系统中所有注册的active状态的时钟事件设备 */
 static LIST_HEAD(clockevent_devices);
 static LIST_HEAD(clockevents_released);
 /* Protection for the above */
@@ -238,6 +239,7 @@ static int clockevents_program_min_delta(struct clock_event_device *dev)
  *
  * Returns 0 on success, -ETIME when the event is in the past.
  */
+/* JYW: 设定clock event device的触发event的时间参数 */
 int clockevents_program_event(struct clock_event_device *dev, ktime_t expires,
 			      bool force)
 {
@@ -377,6 +379,7 @@ EXPORT_SYMBOL_GPL(clockevents_unbind);
  * clockevents_register_device - register a clock event device
  * @dev:	device to register
  */
+/* JYW: 底层的timer硬件驱动会调用clockevents_register_device函数向系统注册clock event device */
 void clockevents_register_device(struct clock_event_device *dev)
 {
 	unsigned long flags;
@@ -388,7 +391,7 @@ void clockevents_register_device(struct clock_event_device *dev)
 	}
 
 	raw_spin_lock_irqsave(&clockevents_lock, flags);
-
+    /* JYW: 添加到全局链表头中 */
 	list_add(&dev->list, &clockevent_devices);
 	tick_check_new_device(dev);
 	clockevents_notify_released();
@@ -397,10 +400,11 @@ void clockevents_register_device(struct clock_event_device *dev)
 }
 EXPORT_SYMBOL_GPL(clockevents_register_device);
 
+/* JYW: 底层的clock event chip driver可以调用clockevents_config对该设备进行配置 */
 void clockevents_config(struct clock_event_device *dev, u32 freq)
 {
 	u64 sec;
-
+    /* JYW: 如果不支持oneshot模式，后面的配置是没有意义的，直接返回 */
 	if (!(dev->features & CLOCK_EVT_FEAT_ONESHOT))
 		return;
 
@@ -493,6 +497,7 @@ void clockevents_handle_noop(struct clock_event_device *dev)
  *
  * Called from the notifier chain. clockevents_lock is held already
  */
+/* JYW: 更换一个新的事件时钟设备 */
 void clockevents_exchange_device(struct clock_event_device *old,
 				 struct clock_event_device *new)
 {
@@ -616,6 +621,7 @@ struct bus_type clockevents_subsys = {
 	.dev_name       = "clockevent",
 };
 
+/* JYW: 定义一个tick_percpu_dev */
 static DEFINE_PER_CPU(struct device, tick_percpu_dev);
 static struct tick_device *tick_get_tick_dev(struct device *dev);
 
@@ -706,10 +712,13 @@ static int __init tick_init_sysfs(void)
 
 		dev->id = cpu;
 		dev->bus = &clockevents_subsys;
+        /* JYW: 创建/sys/devices/system/clockevents/clockeventsX/目录 */
 		err = device_register(dev);
 		if (!err)
+            /* JYW: 创建/sys/devices/system/clockevents/clockeventsX/current_device 文目录件       */
 			err = device_create_file(dev, &dev_attr_current_device);
 		if (!err)
+            /* JYW: 创建/sys/devices/system/clockevents/clockeventsX/unbind_device 文目录件       */
 			err = device_create_file(dev, &dev_attr_unbind_device);
 		if (err)
 			return err;
@@ -719,6 +728,7 @@ static int __init tick_init_sysfs(void)
 
 static int __init clockevents_init_sysfs(void)
 {
+    /* JYW: 创建/sys/devices/system/clockevents目录 */
 	int err = subsys_system_register(&clockevents_subsys, NULL);
 
 	if (!err)

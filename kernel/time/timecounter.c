@@ -18,12 +18,16 @@
 #include <linux/export.h>
 #include <linux/timecounter.h>
 
+/* JYW: 初始化一个timecounter */
 void timecounter_init(struct timecounter *tc,
 		      const struct cyclecounter *cc,
 		      u64 start_tstamp)
 {
+    /* JYW: 使用哪个cyclecounter */
 	tc->cc = cc;
+    /* JYW: 获取初始化时刻的HW cycle值 */
 	tc->cycle_last = cc->read(cc);
+    /* JYW: 设定ns的基准值 */
 	tc->nsec = start_tstamp;
 	tc->mask = (1ULL << cc->shift) - 1;
 	tc->frac = 0;
@@ -62,6 +66,7 @@ static u64 timecounter_read_delta(struct timecounter *tc)
 	return ns_offset;
 }
 
+/* JYW: 获取自从上次以来的ns数 */
 u64 timecounter_read(struct timecounter *tc)
 {
 	u64 nsec;
