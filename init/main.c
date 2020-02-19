@@ -196,6 +196,7 @@ static int __init obsolete_checksetup(char *line)
  * This should be approx 2 Bo*oMips to start (note initial shift), and will
  * still work even if initially too large, it will just take slightly longer
  */
+/* JYW: 最终就会产生loop_per_jiffy全部变量来保存单jiffy的短循环数 */
 unsigned long loops_per_jiffy = (1<<12);
 EXPORT_SYMBOL(loops_per_jiffy);
 

@@ -27,12 +27,14 @@ extern unsigned long loops_per_jiffy;
 #define MAX_UDELAY_MS	5
 #endif
 
+/* JYW: 基于udelay */
 #ifndef mdelay
 #define mdelay(n) (\
 	(__builtin_constant_p(n) && (n)<=MAX_UDELAY_MS) ? udelay((n)*1000) : \
 	({unsigned long __ms=(n); while (__ms--) udelay(1000);}))
 #endif
 
+/* JYW: 基于udelay */
 #ifndef ndelay
 static inline void ndelay(unsigned long x)
 {
@@ -43,10 +45,12 @@ static inline void ndelay(unsigned long x)
 
 extern unsigned long lpj_fine;
 void calibrate_delay(void);
+/* JYW: 使用定时器 */
 void msleep(unsigned int msecs);
 unsigned long msleep_interruptible(unsigned int msecs);
 void usleep_range(unsigned long min, unsigned long max);
 
+/* JYW: 忙等x秒 */
 static inline void ssleep(unsigned int seconds)
 {
 	msleep(seconds * 1000);

@@ -1687,6 +1687,7 @@ void __init init_timers(void)
  * msleep - sleep safely even with waitqueue interruptions
  * @msecs: Time in milliseconds to sleep for
  */
+/* JYW: 使用定时器 */
 void msleep(unsigned int msecs)
 {
 	unsigned long timeout = msecs_to_jiffies(msecs) + 1;

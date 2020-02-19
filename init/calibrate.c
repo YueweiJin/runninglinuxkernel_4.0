@@ -282,6 +282,7 @@ void calibrate_delay(void)
 		if (!printed)
 			pr_info("Calibrating delay loop (skipped) "
 				"already calibrated this CPU");
+    /* JYW: 使用bootargs参数中的值 */
 	} else if (preset_lpj) {
 		lpj = preset_lpj;
 		if (!printed)
@@ -308,6 +309,7 @@ void calibrate_delay(void)
 			lpj/(500000/HZ),
 			(lpj/(5000/HZ)) % 100, lpj);
 
+    /* JYW: 最终就会产生loop_per_jiffy全部变量来保存单jiffy的短循环数 */
 	loops_per_jiffy = lpj;
 	printed = true;
 
