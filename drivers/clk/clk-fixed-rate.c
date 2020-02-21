@@ -56,6 +56,7 @@ EXPORT_SYMBOL_GPL(clk_fixed_rate_ops);
  * @fixed_rate: non-adjustable clock rate
  * @fixed_accuracy: non-adjustable clock rate
  */
+/* JYW: 向系统注册一个fixed rate clock，本质上就是一个clock的特例 */
 struct clk *clk_register_fixed_rate_with_accuracy(struct device *dev,
 		const char *name, const char *parent_name, unsigned long flags,
 		unsigned long fixed_rate, unsigned long fixed_accuracy)
@@ -126,12 +127,15 @@ void of_fixed_clk_setup(struct device_node *node)
 
 	of_property_read_string(node, "clock-output-names", &clk_name);
 
+    /* JYW: 向系统注册一个fixed rate clock，本质上就是一个clock的特例 */
 	clk = clk_register_fixed_rate_with_accuracy(NULL, clk_name, NULL,
 						    CLK_IS_ROOT, rate,
 						    accuracy);
 	if (!IS_ERR(clk))
+        /* JYW: 为device_node注册一个clock提供者 */
 		of_clk_add_provider(node, of_clk_src_simple_get, clk);
 }
 EXPORT_SYMBOL_GPL(of_fixed_clk_setup);
+/* JYW: 申明dtb中fixed-clock节点入口 */
 CLK_OF_DECLARE(fixed_clk, "fixed-clock", of_fixed_clk_setup);
 #endif

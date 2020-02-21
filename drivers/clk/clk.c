@@ -931,6 +931,7 @@ void clk_unprepare(struct clk *clk)
 }
 EXPORT_SYMBOL_GPL(clk_unprepare);
 
+/* JYW: 最终调用厂商的prepare方法 */
 static int clk_core_prepare(struct clk_core *clk)
 {
 	int ret = 0;
@@ -969,6 +970,7 @@ static int clk_core_prepare(struct clk_core *clk)
  * exclusive.  In fact clk_prepare must be called before clk_enable.
  * Returns 0 on success, -EERROR otherwise.
  */
+/* JYW: 最终调用厂商的clk方法 */
 int clk_prepare(struct clk *clk)
 {
 	int ret;
@@ -1084,6 +1086,7 @@ static int __clk_enable(struct clk *clk)
  * must be called before clk_enable.  Returns 0 on success, -EERROR
  * otherwise.
  */
+/* JYW: 开启时钟 */
 int clk_enable(struct clk *clk)
 {
 	unsigned long flags;
@@ -1359,6 +1362,7 @@ static unsigned long clk_core_get_rate(struct clk_core *clk)
  * is set, which means a recalc_rate will be issued.
  * If clk is NULL then returns 0.
  */
+/* JYW: 获取时钟频率 */
 unsigned long clk_get_rate(struct clk *clk)
 {
 	if (!clk)
@@ -2203,6 +2207,7 @@ EXPORT_SYMBOL_GPL(clk_is_match);
  * Initializes the lists in struct clk_core, queries the hardware for the
  * parent and rate and sets them both.
  */
+/* JYW: 初始化clk对象 */
 static int __clk_init(struct device *dev, struct clk *clk_user)
 {
 	int i, ret = 0;
@@ -2391,10 +2396,12 @@ struct clk *__clk_create_clk(struct clk_hw *hw, const char *dev_id,
 	if (!hw || IS_ERR(hw))
 		return (struct clk *) hw;
 
+    /* JYW: 创建一个clk对象 */
 	clk = kzalloc(sizeof(*clk), GFP_KERNEL);
 	if (!clk)
 		return ERR_PTR(-ENOMEM);
 
+    /* JYW: 关键hw->core */
 	clk->core = hw->core;
 	clk->dev_id = dev_id;
 	clk->con_id = con_id;
@@ -2427,6 +2434,7 @@ void __clk_free_clk(struct clk *clk)
  * rest of the clock API.  In the event of an error clk_register will return an
  * error code; drivers must test for an error code after calling clk_register.
  */
+/* JYW: 向clk子系统注册一个clk硬件对象 */
 struct clk *clk_register(struct device *dev, struct clk_hw *hw)
 {
 	int i, ret;
@@ -2484,6 +2492,7 @@ struct clk *clk_register(struct device *dev, struct clk_hw *hw)
 		goto fail_parent_names_copy;
 	}
 
+    /* JYW: 初始化clk对象 */
 	ret = __clk_init(dev, hw->clk);
 	if (!ret)
 		return hw->clk;
@@ -2872,6 +2881,7 @@ EXPORT_SYMBOL_GPL(of_clk_src_onecell_get);
  * @clk_src_get: callback for decoding clock
  * @data: context pointer for @clk_src_get callback.
  */
+/* JYW: 为device_node注册一个clock提供者 */
 int of_clk_add_provider(struct device_node *np,
 			struct clk *(*clk_src_get)(struct of_phandle_args *clkspec,
 						   void *data),
@@ -2885,6 +2895,7 @@ int of_clk_add_provider(struct device_node *np,
 		return -ENOMEM;
 
 	cp->node = of_node_get(np);
+    /* JYW: 关联clk对象 */
 	cp->data = data;
 	cp->get = clk_src_get;
 
@@ -2948,6 +2959,7 @@ struct clk *__of_clk_get_from_provider(struct of_phandle_args *clkspec,
 	return clk;
 }
 
+/* JYW: 从provider中获取一个clk对象 */
 struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec)
 {
 	struct clk *clk;
@@ -3058,6 +3070,7 @@ static int parent_ready(struct device_node *np)
  * and calls their initialization functions. It also does it by trying
  * to follow the dependencies.
  */
+/* JYW: 注册时钟树 */
 void __init of_clk_init(const struct of_device_id *matches)
 {
 	const struct of_device_id *match;
@@ -3070,6 +3083,7 @@ void __init of_clk_init(const struct of_device_id *matches)
 		matches = &__clk_of_table;
 
 	/* First prepare the list of the clocks providers */
+    /* JYW: 扫描匹配的时钟节点，添加到全局的clk_provider_list中 */
 	for_each_matching_node_and_match(np, matches, &match) {
 		struct clock_provider *parent =
 			kzalloc(sizeof(struct clock_provider),	GFP_KERNEL);

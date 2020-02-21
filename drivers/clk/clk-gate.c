@@ -41,6 +41,7 @@
  *
  * So, result is always: enable xor set2dis.
  */
+/* JYW: 门控时钟配置 */
 static void clk_gate_endisable(struct clk_hw *hw, int enable)
 {
 	struct clk_gate *gate = to_clk_gate(hw);
@@ -101,7 +102,9 @@ static int clk_gate_is_enabled(struct clk_hw *hw)
 }
 
 const struct clk_ops clk_gate_ops = {
+    /* JYW: 打开门控时钟 */
 	.enable = clk_gate_enable,
+    /* JYW: 关闭门控时钟 */
 	.disable = clk_gate_disable,
 	.is_enabled = clk_gate_is_enabled,
 };

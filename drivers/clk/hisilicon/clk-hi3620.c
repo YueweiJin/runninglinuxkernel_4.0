@@ -268,6 +268,7 @@ struct clk_mmc {
 
 #define to_mmc(_hw) container_of(_hw, struct clk_mmc, hw)
 
+/* JYW: 定义一组时钟 */
 static struct hisi_mmc_clock hi3620_mmc_clks[] __initdata = {
 	{ HI3620_SD_CIUCLK,	"sd_bclk1", "sd_clk", CLK_SET_RATE_PARENT, 0x1f8, 0, 0x1f8, 1, 3, 0x1f8, 4, 4, 0x1f8, 8, 4},
 	{ HI3620_MMC_CIUCLK1,   "mmc_bclk1", "mmc_clk1", CLK_SET_RATE_PARENT, 0x1f8, 12, 0x1f8, 13, 3, 0x1f8, 16, 4, 0x1f8, 20, 4},
@@ -422,6 +423,7 @@ static int mmc_clk_set_rate(struct clk_hw *hw, unsigned long rate,
 	return mmc_clk_set_timing(hw, rate);
 }
 
+/* JYW: 定义了厂商自己的clk操作方法，向系统注册一组clk */
 static struct clk_ops clk_mmc_ops = {
 	.prepare = mmc_clk_prepare,
 	.determine_rate = mmc_clk_determine_rate,
@@ -429,6 +431,7 @@ static struct clk_ops clk_mmc_ops = {
 	.recalc_rate = mmc_clk_recalc_rate,
 };
 
+/* JYW: 定义了厂商自己的clk操作方法，向系统注册一组clk */
 static struct clk *hisi_register_clk_mmc(struct hisi_mmc_clock *mmc_clk,
 			void __iomem *base, struct device_node *np)
 {

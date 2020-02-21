@@ -118,6 +118,7 @@ void __init time_init(void)
 		machine_desc->init_time();
 	} else {
 #ifdef CONFIG_COMMON_CLK
+        /* JYW: 注册时钟树 */
 		of_clk_init(NULL);
 #endif
 		clocksource_of_init();

@@ -229,6 +229,7 @@ struct clk_init_data {
  * @init: pointer to struct clk_init_data that contains the init data shared
  * with the common clock framework.
  */
+/* JYW: 硬件底层的clk对象 */
 struct clk_hw {
 	struct clk_core *core;
 	struct clk *clk;
@@ -605,6 +606,7 @@ struct of_device_id;
 
 typedef void (*of_clk_init_cb_t)(struct device_node *);
 
+/* JYW: 一组clk对象 */
 struct clk_onecell_data {
 	struct clk **clks;
 	unsigned int clk_num;

@@ -376,6 +376,7 @@ int divider_get_val(unsigned long rate, unsigned long parent_rate,
 }
 EXPORT_SYMBOL_GPL(divider_get_val);
 
+/* JYW: 设置频率 */
 static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
 				unsigned long parent_rate)
 {
@@ -408,6 +409,7 @@ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
 const struct clk_ops clk_divider_ops = {
 	.recalc_rate = clk_divider_recalc_rate,
 	.round_rate = clk_divider_round_rate,
+    /* JYW: 设置频率 */
 	.set_rate = clk_divider_set_rate,
 };
 EXPORT_SYMBOL_GPL(clk_divider_ops);
