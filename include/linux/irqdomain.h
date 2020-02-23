@@ -68,6 +68,7 @@ struct irq_domain_ops {
 	/* JYW:
 	 * 将指定的设备（node参数）上若干个（intsize参数）中断属性（intspec参数）翻译成HW
 	 * interrupt ID（out_hwirq参数）和trigger类型（out_type）
+     * GIC: gic_irq_domain_xlate
 	 */
 	int (*xlate)(struct irq_domain *d, struct device_node *node,
 		     const u32 *intspec, unsigned int intsize,
@@ -75,8 +76,10 @@ struct irq_domain_ops {
 
 #ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
 	/* extended V2 interfaces to support hierarchy irq_domains */
+    /* JYW: gic_irq_domain_alloc */
 	int (*alloc)(struct irq_domain *d, unsigned int virq,
 		     unsigned int nr_irqs, void *arg);
+    /* JYW: irq_domain_free_irqs_top */
 	void (*free)(struct irq_domain *d, unsigned int virq,
 		     unsigned int nr_irqs);
 	void (*activate)(struct irq_domain *d, struct irq_data *irq_data);
@@ -118,8 +121,9 @@ struct irq_domain {
 	 */
 	struct list_head link;
 	const char *name;
-	/* JYW: 回调函数 */
+	/* JYW: GIC：gic_irq_domain_hierarchy_ops  */
 	const struct irq_domain_ops *ops;
+    /* JYW: &gic_data[gic_nr] */
 	void *host_data;
 	unsigned int flags;
 

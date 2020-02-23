@@ -40,7 +40,9 @@
 #define NMI_MASK	(__IRQ_MASK(NMI_BITS)     << NMI_SHIFT)
 
 #define PREEMPT_OFFSET	(1UL << PREEMPT_SHIFT)
+/* JYW: 软中断抢占计数 */
 #define SOFTIRQ_OFFSET	(1UL << SOFTIRQ_SHIFT)
+/* JYW: 硬件中断抢占计数 */
 #define HARDIRQ_OFFSET	(1UL << HARDIRQ_SHIFT)
 #define NMI_OFFSET	(1UL << NMI_SHIFT)
 

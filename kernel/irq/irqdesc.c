@@ -345,6 +345,7 @@ void irq_init_desc(unsigned int irq)
  * @irq:	The irq number to handle
  *
  */
+/* JYW: 处理中断 */
 int generic_handle_irq(unsigned int irq)
 {
 	struct irq_desc *desc = irq_to_desc(irq);
@@ -373,6 +374,7 @@ int __handle_domain_irq(struct irq_domain *domain, unsigned int hwirq,
 	unsigned int irq = hwirq;
 	int ret = 0;
 
+    /* JYW: 准备进入硬件中断上下文的处理 */
 	irq_enter();
 
 #ifdef CONFIG_IRQ_DOMAIN
@@ -388,6 +390,7 @@ int __handle_domain_irq(struct irq_domain *domain, unsigned int hwirq,
 		ack_bad_irq(irq);
 		ret = -EINVAL;
 	} else {
+        /* JYW: 处理中断 */
 		generic_handle_irq(irq);
 	}
 

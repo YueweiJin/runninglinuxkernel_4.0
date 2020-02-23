@@ -64,8 +64,8 @@ int arch_show_interrupts(struct seq_file *p, int prec)
  * own 'handler'.  Used by platform code implementing C-based 1st
  * level decoding.
  */
-/* JYW: irq:  Í¨ÓÃ´¦Àíº¯Êı´ÓPICÖĞµÃµ½µÄÈí¼şÖĞ¶ÏºÅ 
- * JYW: regs: ±£´æÏÂÀ´µÄ±»ÖĞ¶ÏÈÎÎñµÄÖ´ĞĞÏÖ³¡£¬²»Í¬µÄ´¦ÀíÆ÷ÓĞ²»Í¬µÄÖ´ĞĞÏÖ³¡£¬Ò²¾ÍÊÇÓĞ²»Í¬µÄ¼Ä´æÆ÷    
+/* JYW: irq:  é€šç”¨å¤„ç†å‡½æ•°ä»PICä¸­å¾—åˆ°çš„è½¯ä»¶ä¸­æ–­å· 
+ * JYW: regs: ä¿å­˜ä¸‹æ¥çš„è¢«ä¸­æ–­ä»»åŠ¡çš„æ‰§è¡Œç°åœºï¼Œä¸åŒçš„å¤„ç†å™¨æœ‰ä¸åŒçš„æ‰§è¡Œç°åœºï¼Œä¹Ÿå°±æ˜¯æœ‰ä¸åŒçš„å¯„å­˜å™¨
  */
 void handle_IRQ(unsigned int irq, struct pt_regs *regs)
 {
@@ -75,7 +75,7 @@ void handle_IRQ(unsigned int irq, struct pt_regs *regs)
 /*
  * asm_do_IRQ is the interface to be used from assembly code.
  */
-/* JYW: ARM¼Ü¹¹£¬ÖĞ¶Ï´¦Àíº¯Êı×ÜÈë¿Úº¯Êı */
+/* JYW: ARMæ¶æ„ä¸­æ–­å…¥å£ */
 asmlinkage void __exception_irq_entry
 asm_do_IRQ(unsigned int irq, struct pt_regs *regs)
 {
@@ -102,7 +102,7 @@ void set_irq_flags(unsigned int irq, unsigned int iflags)
 }
 EXPORT_SYMBOL_GPL(set_irq_flags);
 
-/* JYW: ³õÊ¼»¯ÖĞ¶ÏµÄ´¦Àí¿ò¼Ü */
+/* JYW: åˆå§‹åŒ–ä¸­æ–­çš„å¤„ç†æ¡†æ¶ *//
 void __init init_IRQ(void)
 {
 	int ret;
@@ -128,7 +128,7 @@ void __init set_handle_irq(void (*handle_irq)(struct pt_regs *))
 {
 	if (handle_arch_irq)
 		return;
-
+    /* JYW: arm32 gic_handle_irq */
 	handle_arch_irq = handle_irq;
 }
 #endif

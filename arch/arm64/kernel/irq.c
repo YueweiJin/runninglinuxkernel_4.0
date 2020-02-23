@@ -40,6 +40,7 @@ int arch_show_interrupts(struct seq_file *p, int prec)
 	return 0;
 }
 
+/* JYW: arm32 GIC gic_handle_irq */
 void (*handle_arch_irq)(struct pt_regs *) = NULL;
 
 void __init set_handle_irq(void (*handle_irq)(struct pt_regs *))

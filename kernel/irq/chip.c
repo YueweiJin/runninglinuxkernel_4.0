@@ -76,6 +76,7 @@ EXPORT_SYMBOL(irq_set_irq_type);
  *
  *	Set the hardware irq controller data for an irq
  */
+/* JYW: 设置handler数据 */
 int irq_set_handler_data(unsigned int irq, void *data)
 {
 	unsigned long flags;
@@ -167,6 +168,7 @@ static void irq_state_clr_masked(struct irq_desc *desc)
 	irqd_clear(&desc->irq_data, IRQD_IRQ_MASKED);
 }
 
+/* JYW: 设置已经屏蔽的标志位 */
 static void irq_state_set_masked(struct irq_desc *desc)
 {
 	irqd_set(&desc->irq_data, IRQD_IRQ_MASKED);
@@ -267,6 +269,7 @@ static inline void mask_ack_irq(struct irq_desc *desc)
 	irq_state_set_masked(desc);
 }
 
+/* JYW: 对硬件进行操作屏蔽IRQ，并设置标志位 */
 void mask_irq(struct irq_desc *desc)
 {
 	if (desc->irq_data.chip->irq_mask) {
@@ -504,6 +507,7 @@ static void cond_unmask_eoi_irq(struct irq_desc *desc, struct irq_chip *chip)
  *	for modern forms of interrupt handlers, which handle the flow
  *	details in hardware, transparently.
  */
+/* JYW: 处理>32的SPI中断 */
 void
 handle_fasteoi_irq(unsigned int irq, struct irq_desc *desc)
 {
@@ -515,6 +519,7 @@ handle_fasteoi_irq(unsigned int irq, struct irq_desc *desc)
 		goto out;
 
 	desc->istate &= ~(IRQS_REPLAY | IRQS_WAITING);
+    /* JYW: 增加当前CPU上的对应中断计数以及中断总数 */
 	kstat_incr_irqs_this_cpu(irq, desc);
 
 	/*
@@ -523,6 +528,7 @@ handle_fasteoi_irq(unsigned int irq, struct irq_desc *desc)
 	 */
 	if (unlikely(!desc->action || irqd_irq_disabled(&desc->irq_data))) {
 		desc->istate |= IRQS_PENDING;
+        /* JYW: 对硬件进行操作屏蔽IRQ，并设置标志位 */
 		mask_irq(desc);
 		goto out;
 	}

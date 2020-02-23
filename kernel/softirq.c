@@ -322,6 +322,7 @@ asmlinkage __visible void do_softirq(void)
 /*
  * Enter an interrupt context.
  */
+/* JYW: 准备进入硬件中断上下文的处理 */
 void irq_enter(void)
 {
 	rcu_irq_enter();
@@ -335,6 +336,7 @@ void irq_enter(void)
 		_local_bh_enable();
 	}
 
+    /* JYW: 准备进入硬件中断处理 */
 	__irq_enter();
 }
 

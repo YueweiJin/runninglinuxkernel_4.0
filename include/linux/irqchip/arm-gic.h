@@ -13,6 +13,7 @@
 #define GIC_CPU_CTRL			0x00
 #define GIC_CPU_PRIMASK			0x04
 #define GIC_CPU_BINPOINT		0x08
+/* JYW: 中断应答 */
 #define GIC_CPU_INTACK			0x0c
 #define GIC_CPU_EOI			0x10
 #define GIC_CPU_RUNNINGPRI		0x14
@@ -27,16 +28,21 @@
 #define GICC_INT_SPURIOUS		1023
 #define GICC_DIS_BYPASS_MASK		0x1e0
 
+/* JYW: Distributor Control 寄存器 */
 #define GIC_DIST_CTRL			0x000
+/* JYW: 获取SOC平台厂商提供的GIC的具体信息，现在一般是该GIC能够支持最多多少个IRQ硬件中断源 */
 #define GIC_DIST_CTR			0x004
 #define GIC_DIST_IGROUP			0x080
+/* JYW: 中断使能寄存器 */
 #define GIC_DIST_ENABLE_SET		0x100
 #define GIC_DIST_ENABLE_CLEAR		0x180
 #define GIC_DIST_PENDING_SET		0x200
 #define GIC_DIST_PENDING_CLEAR		0x280
 #define GIC_DIST_ACTIVE_SET		0x300
 #define GIC_DIST_ACTIVE_CLEAR		0x380
+/* JYW: 优先级寄存器 */
 #define GIC_DIST_PRI			0x400
+/* JYW: 设定中断送到哪个process去 */
 #define GIC_DIST_TARGET			0x800
 #define GIC_DIST_CONFIG			0xc00
 #define GIC_DIST_SOFTINT		0xf00

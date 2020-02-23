@@ -77,7 +77,9 @@ enum {
 	IRQ_TYPE_EDGE_RISING	= 0x00000001,
 	IRQ_TYPE_EDGE_FALLING	= 0x00000002,
 	IRQ_TYPE_EDGE_BOTH	= (IRQ_TYPE_EDGE_FALLING | IRQ_TYPE_EDGE_RISING),
+    /* JYW: 高电平触发 */
 	IRQ_TYPE_LEVEL_HIGH	= 0x00000004,
+    /* JYW: 低电平触发 */
 	IRQ_TYPE_LEVEL_LOW	= 0x00000008,
 	IRQ_TYPE_LEVEL_MASK	= (IRQ_TYPE_LEVEL_LOW | IRQ_TYPE_LEVEL_HIGH),
 	IRQ_TYPE_SENSE_MASK	= 0x0000000f,
@@ -160,6 +162,9 @@ struct irq_data {
 	struct irq_data		*parent_data;
 #endif
 	/* JYW: 和外设specific handler相关的私有数据 */
+    /* JYW: GIC: struct gic_chip_data gic_data
+            <== irq_set_handler_data(irq, &gic_data[gic_nr])
+     */
 	void			*handler_data;
 	void			*chip_data;
 	struct msi_desc		*msi_desc;

@@ -50,6 +50,10 @@ struct pt_regs;
 struct irq_desc {
 	struct irq_data		irq_data;
 	unsigned int __percpu	*kstat_irqs;
+    /* JYW: GIC: gic_handle_cascade_irq */
+    /* JYW: GIC: <32   =====> handle_percpu_devid_irq
+     *           >=32  =====> handle_fasteoi_irq
+     */
 	irq_flow_handler_t	handle_irq;
 #ifdef CONFIG_IRQ_PREFLOW_FASTEOI
 	irq_preflow_handler_t	preflow_handler;
@@ -124,6 +128,9 @@ static inline struct msi_desc *irq_desc_get_msi_desc(struct irq_desc *desc)
  * handle an interrupt. If the descriptor is attached to an
  * irqchip-style controller then we call the ->handle_irq() handler,
  * and it calls __do_IRQ() if it's attached to an irqtype-style controller.
+ */
+/* JYW: GIC: <32   =====> handle_percpu_devid_irq
+ *           >=32  =====> handle_fasteoi_irq
  */
 static inline void generic_handle_irq_desc(unsigned int irq, struct irq_desc *desc)
 {

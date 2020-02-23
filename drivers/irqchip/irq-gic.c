@@ -86,6 +86,7 @@ static u8 gic_cpu_map[NR_GIC_CPU_IF] __read_mostly;
  * Supported arch specific GIC irq extension.
  * Default make them NULL.
  */
+/* JYW: 搜索过整个工程，没有地方赋值 */
 struct irq_chip gic_arch_extn = {
 	.irq_eoi	= NULL,
 	.irq_mask	= NULL,
@@ -102,6 +103,7 @@ struct irq_chip gic_arch_extn = {
 /* JYW: 用于管理所有的gic_chip */
 static struct gic_chip_data gic_data[MAX_GIC_NR] __read_mostly;
 
+/* JYW: 如果寄存器是非BANDED(不同CPU需要通过不同的地址来访问)*/
 #ifdef CONFIG_GIC_NON_BANKED
 static void __iomem *gic_get_percpu_base(union gic_base *base)
 {
@@ -134,12 +136,14 @@ static inline void gic_set_base_accessor(struct gic_chip_data *data,
 #define gic_set_base_accessor(d, f)
 #endif
 
+/* JYW: 获取GIC_DIST基地址 */
 static inline void __iomem *gic_dist_base(struct irq_data *d)
 {
 	struct gic_chip_data *gic_data = irq_data_get_irq_chip_data(d);
 	return gic_data_dist_base(gic_data);
 }
 
+/* JYW: 获取GIC_CPU基地址 */
 static inline void __iomem *gic_cpu_base(struct irq_data *d)
 {
 	struct gic_chip_data *gic_data = irq_data_get_irq_chip_data(d);
@@ -154,6 +158,7 @@ static inline unsigned int gic_irq(struct irq_data *d)
 /*
  * Routines to acknowledge, disable and enable interrupts
  */
+/* JYW: 写1表示禁止对应的中断分发到CPU接口 */
 static void gic_mask_irq(struct irq_data *d)
 {
 	u32 mask = 1 << (gic_irq(d) % 32);
@@ -166,6 +171,7 @@ static void gic_mask_irq(struct irq_data *d)
 	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
 }
 
+/* JYW: 写1表示使能对应的中断分发到CPU接口 */
 static void gic_unmask_irq(struct irq_data *d)
 {
 	u32 mask = 1 << (gic_irq(d) % 32);
@@ -178,6 +184,7 @@ static void gic_unmask_irq(struct irq_data *d)
 	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
 }
 
+/* JYW: 告知GIC对应的中断已经处理完毕 */
 static void gic_eoi_irq(struct irq_data *d)
 {
 	if (gic_arch_extn.irq_eoi) {
@@ -189,6 +196,7 @@ static void gic_eoi_irq(struct irq_data *d)
 	writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_EOI);
 }
 
+/* JYW: 中断触发类型配置 */
 static int gic_set_type(struct irq_data *d, unsigned int type)
 {
 	void __iomem *base = gic_dist_base(d);
@@ -210,6 +218,7 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
 	if (gic_arch_extn.irq_set_type)
 		gic_arch_extn.irq_set_type(d, type);
 
+    /* JYW: 中断触发类型配置 */
 	ret = gic_configure_irq(gicirq, type, base, NULL);
 
 	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
@@ -231,6 +240,11 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
 			    bool force)
 {
 	void __iomem *reg = gic_dist_base(d) + GIC_DIST_TARGET + (gic_irq(d) & ~3);
+    /* JYW: 由于GIC最大支持8个process，因此每个hw interrupt ID需要8个bit来表示送达的process。
+            每一个Interrupt Processor Targets Registers由32个bit组成，
+            因此每个Interrupt Processor Targets Registers可以表示4个HW interrupt ID的affinity，
+            因此shift就是计算该HW interrupt ID在寄存器中的偏移 
+    */
 	unsigned int cpu, shift = (gic_irq(d) % 4) * 8;
 	u32 val, mask, bit;
 	unsigned long flags;
@@ -240,6 +254,7 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
 	else
 		cpu = cpumask_first(mask_val);
 
+    /* JYW: 最大支持8个CPU */
 	if (cpu >= NR_GIC_CPU_IF || cpu >= nr_cpu_ids)
 		return -EINVAL;
 
@@ -255,6 +270,7 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
 #endif
 
 #ifdef CONFIG_PM
+/* JYW: 设定唤醒CPU的中断源 */
 static int gic_set_wake(struct irq_data *d, unsigned int on)
 {
 	int ret = -ENXIO;
@@ -269,6 +285,7 @@ static int gic_set_wake(struct irq_data *d, unsigned int on)
 #define gic_set_wake	NULL
 #endif
 
+/* JYW: 处理中断 */
 static void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
 {
 	u32 irqstat, irqnr;
@@ -279,10 +296,12 @@ static void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
 		irqstat = readl_relaxed(cpu_base + GIC_CPU_INTACK);
 		irqnr = irqstat & GICC_IAR_INT_ID_MASK;
 
+        /* JYW: 处理SPI中断 */
 		if (likely(irqnr > 15 && irqnr < 1021)) {
 			handle_domain_irq(gic->domain, irqnr, regs);
 			continue;
 		}
+        /* JYW: 处理IPI中断 */
 		if (irqnr < 16) {
 			writel_relaxed(irqstat, cpu_base + GIC_CPU_EOI);
 #ifdef CONFIG_SMP
@@ -294,6 +313,7 @@ static void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
 	} while (1);
 }
 
+/* JYW: 处理串行中断 */
 static void gic_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
 {
 	struct gic_chip_data *chip_data = irq_get_handler_data(irq);
@@ -304,9 +324,11 @@ static void gic_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
 	chained_irq_enter(chip, desc);
 
 	raw_spin_lock(&irq_controller_lock);
+    /* JYW: 中断应答 */
 	status = readl_relaxed(gic_data_cpu_base(chip_data) + GIC_CPU_INTACK);
 	raw_spin_unlock(&irq_controller_lock);
 
+    /* JYW：获取中断ID号 */
 	gic_irq = (status & GICC_IAR_INT_ID_MASK);
 	if (gic_irq == GICC_INT_SPURIOUS)
 		goto out;
@@ -315,12 +337,14 @@ static void gic_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
 	if (unlikely(gic_irq < 32 || gic_irq > 1020))
 		handle_bad_irq(cascade_irq, desc);
 	else
+        /* JYW: 处理外设中断 */
 		generic_handle_irq(cascade_irq);
 
  out:
 	chained_irq_exit(chip, desc);
 }
 
+/* JYW: 对应chip的操作方法 */
 static struct irq_chip gic_chip = {
 	.name			= "GIC",
 	.irq_mask		= gic_mask_irq,
@@ -334,6 +358,7 @@ static struct irq_chip gic_chip = {
 	.irq_set_wake		= gic_set_wake,
 };
 
+/* JYW: 初始化串联中断控制器处理接口 */
 void __init gic_cascade_irq(unsigned int gic_nr, unsigned int irq)
 {
 	if (gic_nr >= MAX_GIC_NR)
@@ -343,6 +368,7 @@ void __init gic_cascade_irq(unsigned int gic_nr, unsigned int irq)
 	irq_set_chained_handler(irq, gic_handle_cascade_irq);
 }
 
+/* JYW: 获取CPU亲缘性 */
 static u8 gic_get_cpumask(struct gic_chip_data *gic)
 {
 	void __iomem *base = gic_data_dist_base(gic);
@@ -362,6 +388,7 @@ static u8 gic_get_cpumask(struct gic_chip_data *gic)
 	return mask;
 }
 
+/* JYW: 使能全局中断信号 */
 static void gic_cpu_if_up(void)
 {
 	void __iomem *cpu_base = gic_data_cpu_base(&gic_data[0]);
@@ -376,7 +403,7 @@ static void gic_cpu_if_up(void)
 	writel_relaxed(bypass | GICC_ENABLE, cpu_base + GIC_CPU_CTRL);
 }
 
-
+/* JYW: Distributor初始化 */
 static void __init gic_dist_init(struct gic_chip_data *gic)
 {
 	unsigned int i;
@@ -428,6 +455,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
 	gic_cpu_if_up();
 }
 
+/* JYW: 禁止全局中断信号 */
 void gic_cpu_if_down(void)
 {
 	void __iomem *cpu_base = gic_data_cpu_base(&gic_data[0]);
@@ -933,6 +961,7 @@ static const struct irq_domain_ops gic_default_routable_irq_domain_ops = {
 const struct irq_domain_ops *gic_routable_irq_domain_ops =
 					&gic_default_routable_irq_domain_ops;
 
+/* JYW: GIC基本功能的初始化 */
 void __init gic_init_bases(unsigned int gic_nr, int irq_start,
 			   void __iomem *dist_base, void __iomem *cpu_base,
 			   u32 percpu_offset, struct device_node *node)
@@ -945,6 +974,7 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
 	BUG_ON(gic_nr >= MAX_GIC_NR);
 
 	gic = &gic_data[gic_nr];
+    /* JYW: 通常是BANKED方式 */
 #ifdef CONFIG_GIC_NON_BANKED
 	if (percpu_offset) { /* Frankein-GIC without banked registers... */
 		unsigned int cpu;
@@ -989,6 +1019,7 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
 	 * Find out how many interrupts are supported.
 	 * The GIC only supports up to 1020 interrupt sources.
 	 */
+    /* JYW: 计算支持的中断数量 */
 	gic_irqs = readl_relaxed(gic_data_dist_base(gic) + GIC_DIST_CTR) & 0x1f;
 	gic_irqs = (gic_irqs + 1) * 32;
 	if (gic_irqs > 1020)
@@ -1004,6 +1035,7 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
 			gic_irqs = nr_routable_irqs;
 		}
 
+        /* JYW: 分配并注册一个线性映射的irq_domain */
 		gic->domain = irq_domain_add_linear(node, gic_irqs, ops, gic);
 	} else {		/* Non-DT case */
 		/*
@@ -1057,7 +1089,7 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
 
 #ifdef CONFIG_OF
 static int gic_cnt __initdata;
-
+/* JYW: gic控制器初始化入口 */
 static int __init
 gic_of_init(struct device_node *node, struct device_node *parent)
 {
@@ -1075,15 +1107,18 @@ gic_of_init(struct device_node *node, struct device_node *parent)
 	cpu_base = of_iomap(node, 1);
 	WARN(!cpu_base, "unable to map gic cpu registers\n");
 
+    /* JYW: 如果不存在cpu-offset，则设置为0 (非BANKED寄存器访问方式) */
 	if (of_property_read_u32(node, "cpu-offset", &percpu_offset))
 		percpu_offset = 0;
 
+    /* JYW: GIC基本功能的初始化 */
 	gic_init_bases(gic_cnt, -1, dist_base, cpu_base, percpu_offset, node);
 	if (!gic_cnt)
 		gic_init_physaddr(node);
 
 	if (parent) {
 		irq = irq_of_parse_and_map(node, 0);
+        /* JYW: 初始化串联中断控制器处理接口 */
 		gic_cascade_irq(gic_cnt, irq);
 	}
 

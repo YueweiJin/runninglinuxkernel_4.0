@@ -194,6 +194,7 @@ static inline bool irqd_has_set(struct irq_data *d, unsigned int mask)
 	return d->state_use_accessors & mask;
 }
 
+/* JYW: 增加当前CPU上的对应中断计数以及中断总数 */
 static inline void kstat_incr_irqs_this_cpu(unsigned int irq, struct irq_desc *desc)
 {
 	__this_cpu_inc(*desc->kstat_irqs);

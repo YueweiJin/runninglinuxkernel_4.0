@@ -2290,6 +2290,7 @@ extern struct task_struct *idle_task(int cpu);
  *
  * Return: 1 if @p is an idle task. 0 otherwise.
  */
+/* JYW: PID为0的task为IDLE任务 */
 static inline bool is_idle_task(const struct task_struct *p)
 {
 	return p->pid == 0;

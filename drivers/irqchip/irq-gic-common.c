@@ -21,12 +21,15 @@
 
 #include "irq-gic-common.h"
 
+/* JYW: 中断触发类型配置 */
 int gic_configure_irq(unsigned int irq, unsigned int type,
 		       void __iomem *base, void (*sync_access)(void))
 {
 	u32 enablemask = 1 << (irq % 32);
 	u32 enableoff = (irq / 32) * 4;
+    /* JYW: 配置掩码，用来先清除对应的设置 */
 	u32 confmask = 0x2 << ((irq % 16) * 2);
+    /* JYW: 一个中断号对应2个bit来描述对应的触发类型：电平触发 or 边沿触发 */
 	u32 confoff = (irq / 16) * 4;
 	bool enabled = false;
 	u32 val, oldval;
@@ -37,8 +40,10 @@ int gic_configure_irq(unsigned int irq, unsigned int type,
 	 * for "irq", depending on "type".
 	 */
 	val = oldval = readl_relaxed(base + GIC_DIST_CONFIG + confoff);
+    /* JYW: 对应bit清零，表示设置电平触发 */
 	if (type & IRQ_TYPE_LEVEL_MASK)
 		val &= ~confmask;
+    /* JYW: 对应bit置一，表示设置边沿触发 */
 	else if (type & IRQ_TYPE_EDGE_BOTH)
 		val |= confmask;
 
