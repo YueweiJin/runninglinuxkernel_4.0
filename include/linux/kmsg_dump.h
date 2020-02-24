@@ -40,6 +40,7 @@ enum kmsg_dump_reason {
  */
 struct kmsg_dumper {
 	struct list_head list;
+    /* JYW: pstore_dump */
 	void (*dump)(struct kmsg_dumper *dumper, enum kmsg_dump_reason reason);
 	enum kmsg_dump_reason max_reason;
 	bool active;

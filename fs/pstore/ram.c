@@ -444,6 +444,7 @@ static int ramoops_init_prz(struct device *dev, struct ramoops_context *cxt,
 	return 0;
 }
 
+/* JYW: ramoops平台驱动入口 */
 static int ramoops_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -582,6 +583,7 @@ static int __exit ramoops_remove(struct platform_device *pdev)
 	return -EBUSY;
 }
 
+/* JYW: ramoops平台驱动 */
 static struct platform_driver ramoops_driver = {
 	.probe		= ramoops_probe,
 	.remove		= __exit_p(ramoops_remove),
