@@ -20,7 +20,9 @@
 
 struct clock_data {
 	ktime_t wrap_kt;
+    /* JYW: 注册时的ns值为新的纪元 */
 	u64 epoch_ns;
+    /* JYW: 注册时的cyc值为新的纪元 */
 	u64 epoch_cyc;
 	seqcount_t seq;
 	unsigned long rate;
@@ -49,6 +51,7 @@ static u64 notrace jiffy_sched_clock_read(void)
 	return (u64)(jiffies - INITIAL_JIFFIES);
 }
 
+/* JYW: sp804_read */
 static u64 __read_mostly (*read_sched_clock)(void) = jiffy_sched_clock_read;
 
 static inline u64 notrace cyc_to_ns(u64 cyc, u32 mult, u32 shift)
@@ -56,6 +59,7 @@ static inline u64 notrace cyc_to_ns(u64 cyc, u32 mult, u32 shift)
 	return (cyc * mult) >> shift;
 }
 
+/* JYW: 当前时间(ns) */
 unsigned long long notrace sched_clock(void)
 {
 	u64 epoch_ns;
@@ -80,6 +84,7 @@ unsigned long long notrace sched_clock(void)
 /*
  * Atomically update the sched_clock epoch.
  */
+/* JYW: 更新cys和ns */
 static void notrace update_sched_clock(void)
 {
 	unsigned long flags;
@@ -106,6 +111,7 @@ static enum hrtimer_restart sched_clock_poll(struct hrtimer *hrt)
 	return HRTIMER_RESTART;
 }
 
+/* JYW: 注册调度时钟 */
 void __init sched_clock_register(u64 (*read)(void), int bits,
 				 unsigned long rate)
 {
