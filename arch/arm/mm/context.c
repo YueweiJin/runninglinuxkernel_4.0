@@ -44,6 +44,7 @@
 
 static DEFINE_RAW_SPINLOCK(cpu_asid_lock);
 static atomic64_t asid_generation = ATOMIC64_INIT(ASID_FIRST_VERSION);
+/* JYW: 通过位图来管理，有128位 */
 static DECLARE_BITMAP(asid_map, NUM_USER_ASIDS);
 
 static DEFINE_PER_CPU(atomic64_t, active_asids);
@@ -174,6 +175,7 @@ static int is_reserved_asid(u64 asid)
 	return 0;
 }
 
+/* JYW: 发生ASID 硬件溢出，需要重新给进程分配ASID */
 static u64 new_context(struct mm_struct *mm, unsigned int cpu)
 {
 	static u32 cur_idx = 1;
@@ -197,6 +199,8 @@ static u64 new_context(struct mm_struct *mm, unsigned int cpu)
 			goto bump_gen;
 	}
 
+    /* JYW: 进程初始化时ASID为0，有上下文切换时才会分配ASID */
+
 	/*
 	 * Allocate a free ASID. If we can't find one, take a note of the
 	 * currently active ASIDs and mark the TLBs as requiring flushes.
@@ -208,9 +212,11 @@ static u64 new_context(struct mm_struct *mm, unsigned int cpu)
 	 */
 	asid = find_next_zero_bit(asid_map, NUM_USER_ASIDS, cur_idx);
 	if (asid == NUM_USER_ASIDS) {
+        /* JYW: 以分配满发生溢出 */
 		generation = atomic64_add_return(ASID_FIRST_VERSION,
 						 &asid_generation);
 		flush_context(cpu);
+        /* JYW: 从1开始分配 */
 		asid = find_next_zero_bit(asid_map, NUM_USER_ASIDS, 1);
 	}
 
@@ -223,6 +229,7 @@ bump_gen:
 	return asid;
 }
 
+/* JYW: 开启MMU以及ASID，走该接口 */
 void check_and_switch_context(struct mm_struct *mm, struct task_struct *tsk)
 {
 	unsigned long flags;
@@ -238,8 +245,10 @@ void check_and_switch_context(struct mm_struct *mm, struct task_struct *tsk)
 	 * speculative page table walking with the wrong TTBR.
 	 */
 	cpu_set_reserved_ttbr0();
-
+    /* JYW: linux把ASID存储在mm->context.id的低8位 (D7:D0) */
 	asid = atomic64_read(&mm->context.id);
+
+    /* JYW: 如果没有发生溢出，则不需要刷新TLB */
 	if (!((asid ^ atomic64_read(&asid_generation)) >> ASID_BITS)
 	    && atomic64_xchg(&per_cpu(active_asids, cpu), asid))
 		goto switch_mm_fastpath;
@@ -247,11 +256,13 @@ void check_and_switch_context(struct mm_struct *mm, struct task_struct *tsk)
 	raw_spin_lock_irqsave(&cpu_asid_lock, flags);
 	/* Check that our ASID belongs to the current generation. */
 	asid = atomic64_read(&mm->context.id);
+    /* JYW: 如果发生了溢出，则需要重新分配ASID */
 	if ((asid ^ atomic64_read(&asid_generation)) >> ASID_BITS) {
 		asid = new_context(mm, cpu);
 		atomic64_set(&mm->context.id, asid);
 	}
 
+    /* JYW: 清除当前cpu的TLB */
 	if (cpumask_test_and_clear_cpu(cpu, &tlb_flush_pending)) {
 		local_flush_bp_all();
 		local_flush_tlb_all();

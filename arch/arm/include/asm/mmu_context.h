@@ -112,7 +112,7 @@ enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
  * calling the CPU specific function when the mm hasn't
  * actually changed.
  */
-/* JYW: °ÑĞéÄâÄÚ´æ´ÓÉÏÒ»¸ö½ø³ÌÓ³ÉäÇĞ»»µ½ĞÂµÄ½ø³ÌÖĞ */
+/* JYW: æŠŠè™šæ‹Ÿå†…å­˜ä»ä¸Šä¸€ä¸ªè¿›ç¨‹æ˜ å°„åˆ‡æ¢åˆ°æ–°çš„è¿›ç¨‹ä¸­ */
 static inline void
 switch_mm(struct mm_struct *prev, struct mm_struct *next,
 	  struct task_struct *tsk)

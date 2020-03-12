@@ -5,6 +5,7 @@
 
 typedef struct {
 #ifdef CONFIG_CPU_HAS_ASID
+    /* JYW: linux把ASID存储在mm->context.id的低8位 (D7:D0) */
 	atomic64_t	id;
 #else
 	int		switch_pending;

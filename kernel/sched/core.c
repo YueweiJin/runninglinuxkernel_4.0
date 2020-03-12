@@ -2298,6 +2298,7 @@ context_switch(struct rq *rq, struct task_struct *prev,
 		atomic_inc(&oldmm->mm_count);
 		enter_lazy_tlb(oldmm, next);
 	} else
+        /* JYW: 把虚拟内存从上一个进程映射切换到新的进程中 */
 		switch_mm(oldmm, mm, next);
 
 	if (!prev->mm) {

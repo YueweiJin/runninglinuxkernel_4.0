@@ -243,6 +243,7 @@ static inline void __sync_icache_dcache(pte_t pteval)
 extern void __sync_icache_dcache(pte_t pteval);
 #endif
 
+/* JYW: 设置页表项 */
 static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
 			      pte_t *ptep, pte_t pteval)
 {
@@ -251,9 +252,11 @@ static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
 	if (addr < TASK_SIZE && pte_valid_user(pteval)) {
 		if (!pte_special(pteval))
 			__sync_icache_dcache(pteval);
+        /* JYW: 用户地址空间的页表才会设置nG标志 */
 		ext |= PTE_EXT_NG;
 	}
 
+    /* JYW: 设置页表项内容到硬件 */
 	set_pte_ext(ptep, pteval, ext);
 }
 
