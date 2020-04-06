@@ -495,6 +495,7 @@ static inline bool pci_is_root_bus(struct pci_bus *pbus)
  * Return true if the PCI device is bridge whether it has subordinate
  * or not.
  */
+/* JYW: 判断PCI设备是否是桥 */
 static inline bool pci_is_bridge(struct pci_dev *dev)
 {
 	return dev->hdr_type == PCI_HEADER_TYPE_BRIDGE ||

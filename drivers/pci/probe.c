@@ -824,7 +824,7 @@ int pci_scan_bridge(struct pci_bus *bus, struct pci_dev *dev, int max, int pass)
 			pci_bus_insert_busn_res(child, secondary, subordinate);
 			child->bridge_ctl = bctl;
 		}
-
+        /* JYW: 递归扫描 */
 		cmax = pci_scan_child_bus(child);
 		if (cmax > subordinate)
 			dev_warn(&dev->dev, "bridge has subordinate %02x but max busn %02x\n",
@@ -1456,6 +1456,7 @@ EXPORT_SYMBOL(pci_bus_read_dev_vendor_id);
  * Read the config data for a PCI device, sanity-check it
  * and fill in the dev structure...
  */
+/* JYW: 通过读取设备的配置空间的VID来确定设备是否存在 */
 static struct pci_dev *pci_scan_device(struct pci_bus *bus, int devfn)
 {
 	struct pci_dev *dev;
@@ -1553,6 +1554,7 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
 	WARN_ON(ret < 0);
 }
 
+/* JYW: 通过读取设备的配置空间的VID来确定设备是否存在 */
 struct pci_dev *pci_scan_single_device(struct pci_bus *bus, int devfn)
 {
 	struct pci_dev *dev;
@@ -1563,6 +1565,7 @@ struct pci_dev *pci_scan_single_device(struct pci_bus *bus, int devfn)
 		return dev;
 	}
 
+    /* JYW: 通过读取设备的配置空间的VID来确定设备是否存在 */
 	dev = pci_scan_device(bus, devfn);
 	if (!dev)
 		return NULL;
@@ -1626,6 +1629,7 @@ static int only_one_child(struct pci_bus *bus)
  *
  * Returns the number of new devices found.
  */
+/* JYW: 扫描总线下的设备 */
 int pci_scan_slot(struct pci_bus *bus, int devfn)
 {
 	unsigned fn, nr = 0;
@@ -1634,6 +1638,7 @@ int pci_scan_slot(struct pci_bus *bus, int devfn)
 	if (only_one_child(bus) && (devfn > 0))
 		return 0; /* Already scanned the entire slot */
 
+    /* JYW: 通过读取设备的配置空间的VID来确定设备是否存在 */
 	dev = pci_scan_single_device(bus, devfn);
 	if (!dev)
 		return 0;
@@ -1827,6 +1832,7 @@ void pcie_bus_configure_settings(struct pci_bus *bus)
 }
 EXPORT_SYMBOL_GPL(pcie_bus_configure_settings);
 
+/* JYW: 扫描孩子总线 */
 unsigned int pci_scan_child_bus(struct pci_bus *bus)
 {
 	unsigned int devfn, pass, max = bus->busn_res.start;
@@ -1835,6 +1841,7 @@ unsigned int pci_scan_child_bus(struct pci_bus *bus)
 	dev_dbg(&bus->dev, "scanning bus\n");
 
 	/* Go find them, Rover! */
+    /* JYW: 扫描总线下的设备 */
 	for (devfn = 0; devfn < 0x100; devfn += 8)
 		pci_scan_slot(bus, devfn);
 
@@ -1853,6 +1860,7 @@ unsigned int pci_scan_child_bus(struct pci_bus *bus)
 
 	for (pass = 0; pass < 2; pass++)
 		list_for_each_entry(dev, &bus->devices, bus_list) {
+            /* JYW: 如果是桥，则继续扫描桥下的总线 */
 			if (pci_is_bridge(dev))
 				max = pci_scan_bridge(bus, dev, max, pass);
 		}
@@ -1889,6 +1897,7 @@ void __weak pcibios_remove_bus(struct pci_bus *bus)
 {
 }
 
+/* JYW: 创建一条root bus */
 struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
 		struct pci_ops *ops, void *sysdata, struct list_head *resources)
 {
@@ -2057,6 +2066,7 @@ void pci_bus_release_busn_res(struct pci_bus *b)
 			res, ret ? "can not be" : "is");
 }
 
+/* JYW: PCI扫描主桥 */
 struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
 		struct pci_ops *ops, void *sysdata, struct list_head *resources)
 {
@@ -2071,6 +2081,7 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
 			break;
 		}
 
+    /* JYW: 创建一条root bus */
 	b = pci_create_root_bus(parent, bus, ops, sysdata, resources);
 	if (!b)
 		return NULL;
@@ -2082,6 +2093,7 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
 		pci_bus_insert_busn_res(b, bus, 255);
 	}
 
+    /* JYW: 扫描孩子总线 */
 	max = pci_scan_child_bus(b);
 
 	if (!found)
