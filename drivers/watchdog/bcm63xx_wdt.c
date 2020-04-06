@@ -70,6 +70,7 @@ static void bcm63xx_wdt_hw_stop(void)
 	bcm_writel(WDT_STOP_2, bcm63xx_wdt_device.regs + WDT_CTL_REG);
 }
 
+/* JYW: 看门狗重启前打印中断前进程的信息 */
 static void bcm63xx_wdt_isr(void *data)
 {
 	struct pt_regs *regs = get_irq_regs();

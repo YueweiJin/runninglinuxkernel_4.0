@@ -1042,6 +1042,7 @@ killed:
 	return -EAGAIN;
 }
 
+/* JYW: 获取进程的名字 */
 char *get_task_comm(char *buf, struct task_struct *tsk)
 {
 	/* buf must be at least sizeof(tsk->comm) in size */

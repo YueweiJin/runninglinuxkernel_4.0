@@ -134,10 +134,13 @@ unsigned long get_wchan(struct task_struct *p);
 extern struct task_struct *cpu_switch_to(struct task_struct *prev,
 					 struct task_struct *next);
 
+/* JYW: 用户态进入内核态时用户空间的上下文 */
 #define task_pt_regs(p) \
 	((struct pt_regs *)(THREAD_START_SP + task_stack_page(p)) - 1)
 
+/* JYW: 用户态进入内核态时用户空间的PC指针 */
 #define KSTK_EIP(tsk)	((unsigned long)task_pt_regs(tsk)->pc)
+/* JYW: 用户态进入内核态时用户空间的堆栈指针 */
 #define KSTK_ESP(tsk)	user_stack_pointer(task_pt_regs(tsk))
 
 /*

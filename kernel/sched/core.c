@@ -2276,6 +2276,10 @@ asmlinkage __visible void schedule_tail(struct task_struct *prev)
 /*
  * context_switch - switch to the new MM and the new thread's register state.
  */
+/*
+ * JYW: 上下文切换，主要分为两部分
+ *      1、进程地址空间切换；2、进程各自的CPU寄存器现场
+ */
 static inline struct rq *
 context_switch(struct rq *rq, struct task_struct *prev,
 	       struct task_struct *next)
@@ -2292,7 +2296,7 @@ context_switch(struct rq *rq, struct task_struct *prev,
 	 * one hypercall.
 	 */
 	arch_start_context_switch(prev);
-
+    /* JYW: 如果当前进程是内核进程，没有对应的用户空间，则就继续使用切换前的进程的地址空间 */
 	if (!mm) {
 		next->active_mm = oldmm;
 		atomic_inc(&oldmm->mm_count);
@@ -2315,6 +2319,11 @@ context_switch(struct rq *rq, struct task_struct *prev,
 
 	context_tracking_task_switch(prev, next);
 	/* Here we just switch the register state and the stack. */
+    /* JYW:
+     * 负责从上一个进程的处理器状态切换到新进程的处理器状态
+     *  包括保存、恢复栈信息和寄存器信息
+     */
+    /* JYW: 进程切换只会发生在内核态，即进程切换只需要考虑内核态的寄存器上下文切换 */
 	switch_to(prev, next, prev);
 	barrier();
 
@@ -2615,6 +2624,7 @@ static noinline void __schedule_bug(struct task_struct *prev)
 static inline void schedule_debug(struct task_struct *prev)
 {
 #ifdef CONFIG_SCHED_STACK_END_CHECK
+    /* JYW: 堆栈溢出检查 */
 	BUG_ON(unlikely(task_stack_end_corrupted(prev)));
 #endif
 	/*
@@ -7332,6 +7342,7 @@ void ___might_sleep(const char *file, int line, int preempt_offset)
 			in_atomic(), irqs_disabled(),
 			current->pid, current->comm);
 
+    /* JYW: 堆栈溢出检查 */
 	if (task_stack_end_corrupted(current))
 		printk(KERN_EMERG "Thread overran stack, or stack corrupted\n");
 

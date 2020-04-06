@@ -38,6 +38,7 @@ struct pt_regs;
  *
  * It's only valid to call this when @task is known to be blocked.
  */
+/* JYW: 获取当前进程调用的是哪个系统调用 */
 int syscall_get_nr(struct task_struct *task, struct pt_regs *regs);
 
 /**

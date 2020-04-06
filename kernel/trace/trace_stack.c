@@ -168,6 +168,7 @@ check_stack(unsigned long ip, unsigned long *stack)
 			i++;
 	}
 
+    /* JYW: 堆栈溢出检查 */
 	if (task_stack_end_corrupted(current)) {
 		print_max_stack();
 		BUG();

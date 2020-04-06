@@ -1120,6 +1120,7 @@ static void rcu_check_gp_kthread_starvation(struct rcu_state *rsp)
 /*
  * Dump stacks of all tasks running on stalled CPUs.
  */
+/* JYW: 打印对应CPU上运行队列中当前进程的保存上下文对应的堆栈帧 */
 static void rcu_dump_cpu_stacks(struct rcu_state *rsp)
 {
 	int cpu;

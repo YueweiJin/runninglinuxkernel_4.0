@@ -84,10 +84,13 @@ unsigned long get_wchan(struct task_struct *p);
 
 #define cpu_relax_lowlatency()                cpu_relax()
 
+/* JYW: 用户态（非异常模式）下的寄存器上下文存放位置 */
 #define task_pt_regs(p) \
 	((struct pt_regs *)(THREAD_START_SP + task_stack_page(p)) - 1)
 
+/* JYW: 用户态（非异常模式）下的PC指针 */
 #define KSTK_EIP(tsk)	task_pt_regs(tsk)->ARM_pc
+/* JYW: 用户态（非异常模式）下的SP指针 */
 #define KSTK_ESP(tsk)	task_pt_regs(tsk)->ARM_sp
 
 #ifdef CONFIG_SMP

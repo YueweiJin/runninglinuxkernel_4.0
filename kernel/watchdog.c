@@ -58,7 +58,7 @@ static unsigned long soft_lockup_nmi_warn;
 #ifdef CONFIG_HARDLOCKUP_DETECTOR
 static int hardlockup_panic =
 			CONFIG_BOOTPARAM_HARDLOCKUP_PANIC_VALUE;
-
+/* JYW: 打开宏后，默认开启 */
 static bool hardlockup_detector_enabled = true;
 /*
  * We may not want to enable hard lockup detection by default in all cases,
@@ -128,6 +128,7 @@ __setup("nosoftlockup", nosoftlockup_setup);
 #ifdef CONFIG_SMP
 static int __init softlockup_all_cpu_backtrace_setup(char *str)
 {
+    /* JYW: 将字符串转换为signed long型 */
 	sysctl_softlockup_all_cpu_backtrace =
 		!!simple_strtol(str, NULL, 0);
 	return 1;
@@ -142,6 +143,7 @@ __setup("softlockup_all_cpu_backtrace=", softlockup_all_cpu_backtrace_setup);
  * the thresholds with a factor: we make the soft threshold twice the amount of
  * time the hard threshold is.
  */
+/* JYW: 获取软锁定的超时时间 */
 static int get_softlockup_thresh(void)
 {
 	return watchdog_thresh * 2;
@@ -170,6 +172,7 @@ static void set_sample_period(void)
 }
 
 /* Commands for resetting the watchdog */
+/* JYW: 更新时间戳 */
 static void __touch_watchdog(void)
 {
 	__this_cpu_write(watchdog_touch_ts, get_timestamp());
@@ -223,10 +226,14 @@ void touch_softlockup_watchdog_sync(void)
 
 #ifdef CONFIG_HARDLOCKUP_DETECTOR
 /* watchdog detector functions */
+/* JYW: 检测是否发生了硬锁 */
 static int is_hardlockup(void)
 {
 	unsigned long hrint = __this_cpu_read(hrtimer_interrupts);
 
+    /* JYW: 检测原理：hrtimer_interrupts变量在时钟中断处理函数里没有更新，
+     *          意味着中断出了问题，可能被错误代码长时间的关中断了
+     */
 	if (__this_cpu_read(hrtimer_interrupts_saved) == hrint)
 		return 1;
 
@@ -235,11 +242,14 @@ static int is_hardlockup(void)
 }
 #endif
 
+/* JYW: 若喂狗线程喂狗超时，则说明发生了软锁定，返回锁定时间 */
 static int is_softlockup(unsigned long touch_ts)
 {
+    /* JYW: 获取当前时间戳 */
 	unsigned long now = get_timestamp();
 
 	/* Warn about unreasonable delays: */
+    /* JYW: 获取软锁定的超时时间 */
 	if (time_after(now, touch_ts + get_softlockup_thresh()))
 		return now - touch_ts;
 
@@ -257,6 +267,7 @@ static struct perf_event_attr wd_hw_attr = {
 };
 
 /* Callback function for perf event subsystem */
+/* JYW: 当PMU的计数器溢出时会触发NMI中断，对应的中断处理里程是watchdog_overflow_callback */
 static void watchdog_overflow_callback(struct perf_event *event,
 		 struct perf_sample_data *data,
 		 struct pt_regs *regs)
@@ -275,6 +286,7 @@ static void watchdog_overflow_callback(struct perf_event *event,
 	 * fired multiple times before we overflow'd.  If it hasn't
 	 * then this is a good indication the cpu is stuck
 	 */
+    /* JYW: 检测是否发生了硬锁 */
 	if (is_hardlockup()) {
 		int this_cpu = smp_processor_id();
 
@@ -309,7 +321,9 @@ static void watchdog_nmi_disable(unsigned int cpu);
 /* watchdog kicker functions */
 static enum hrtimer_restart watchdog_timer_fn(struct hrtimer *hrtimer)
 {
+    /* JYW: 获取时间戳 */
 	unsigned long touch_ts = __this_cpu_read(watchdog_touch_ts);
+    /* JYW: 获取中断前线程的pc、sp、fp等寄存器值 */
 	struct pt_regs *regs = get_irq_regs();
 	int duration;
 	int softlockup_all_cpu_backtrace = sysctl_softlockup_all_cpu_backtrace;
@@ -318,6 +332,7 @@ static enum hrtimer_restart watchdog_timer_fn(struct hrtimer *hrtimer)
 	watchdog_interrupt_count();
 
 	/* kick the softlockup detector */
+    /* JYW: 唤醒喂狗线程 */
 	wake_up_process(__this_cpu_read(softlockup_watchdog));
 
 	/* .. and repeat */
@@ -345,6 +360,7 @@ static enum hrtimer_restart watchdog_timer_fn(struct hrtimer *hrtimer)
 	 * indicate it is getting cpu time.  If it hasn't then
 	 * this is a good indication some task is hogging the cpu
 	 */
+    /* JYW: 若喂狗线程喂狗超时，则说明发生了软锁定，返回锁定时间 */
 	duration = is_softlockup(touch_ts);
 	if (unlikely(duration)) {
 		/*
@@ -383,13 +399,14 @@ static enum hrtimer_restart watchdog_timer_fn(struct hrtimer *hrtimer)
 				return HRTIMER_RESTART;
 			}
 		}
-
+        /* JYW: 打印软锁定信息 */
 		pr_emerg("BUG: soft lockup - CPU#%d stuck for %us! [%s:%d]\n",
 			smp_processor_id(), duration,
 			current->comm, task_pid_nr(current));
 		__this_cpu_write(softlockup_task_ptr_saved, current);
 		print_modules();
 		print_irqtrace_events(current);
+        /* JYW: 打印中断前的堆栈信息 */
 		if (regs)
 			show_regs(regs);
 		else
@@ -439,6 +456,7 @@ static void watchdog_enable(unsigned int cpu)
 		      HRTIMER_MODE_REL_PINNED);
 
 	/* initialize timestamp */
+    /* JYW: 设置FIFO 实时调度，优先级最高 */
 	watchdog_set_prio(SCHED_FIFO, MAX_RT_PRIO - 1);
 	__touch_watchdog();
 }
@@ -458,6 +476,7 @@ static void watchdog_cleanup(unsigned int cpu, bool online)
 	watchdog_disable(cpu);
 }
 
+/* JYW: 喂狗线程运行的条件 */
 static int watchdog_should_run(unsigned int cpu)
 {
 	return __this_cpu_read(hrtimer_interrupts) !=
@@ -472,10 +491,13 @@ static int watchdog_should_run(unsigned int cpu)
  * for more than 2*watchdog_thresh seconds then the debug-printout
  * triggers in watchdog_timer_fn().
  */
+/* JYW: percpu的喂狗接口 */
 static void watchdog(unsigned int cpu)
 {
+    /* JYW: 将hrtimer_interrupts变量更新到soft_lockup_hrtimer_cnt */
 	__this_cpu_write(soft_lockup_hrtimer_cnt,
 			 __this_cpu_read(hrtimer_interrupts));
+    /* JYW: 更新时间戳 */
 	__touch_watchdog();
 }
 
@@ -513,6 +535,7 @@ static int watchdog_nmi_enable(unsigned int cpu)
 	wd_attr->sample_period = hw_nmi_get_sample_period(watchdog_thresh);
 
 	/* Try to register using hardware perf events */
+    /* JYW: 注册一个硬件perf事件 watchdog_overflow_callback，每个CPU上会注册一个 */
 	event = perf_event_create_kernel_counter(wd_attr, cpu, NULL, watchdog_overflow_callback, NULL);
 
 handle_err:
@@ -572,6 +595,7 @@ static int watchdog_nmi_enable(unsigned int cpu) { return 0; }
 static void watchdog_nmi_disable(unsigned int cpu) { return; }
 #endif /* CONFIG_HARDLOCKUP_DETECTOR */
 
+/* JYW: percpu的喂狗线程 */
 static struct smp_hotplug_thread watchdog_threads = {
 	.store			= &softlockup_watchdog,
 	.thread_should_run	= watchdog_should_run,
@@ -630,6 +654,7 @@ static int watchdog_enable_all_cpus(bool sample_period_changed)
 	int err = 0;
 
 	if (!watchdog_running) {
+        /* JYW: 注册percpu的内核线程 */
 		err = smpboot_register_percpu_thread(&watchdog_threads);
 		if (err)
 			pr_err("Failed to create watchdog threads, disabled\n");
@@ -702,6 +727,7 @@ out:
 }
 #endif /* CONFIG_SYSCTL */
 
+/* JYW: 锁定检测模块初始化 */
 void __init lockup_detector_init(void)
 {
 	set_sample_period();

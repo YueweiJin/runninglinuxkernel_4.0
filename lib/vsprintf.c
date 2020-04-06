@@ -83,6 +83,7 @@ EXPORT_SYMBOL(simple_strtoul);
  *
  * This function is obsolete. Please use kstrtol instead.
  */
+/* JYW: 将字符串转换为signed long型 */
 long simple_strtol(const char *cp, char **endp, unsigned int base)
 {
 	if (*cp == '-')

@@ -183,7 +183,9 @@ perf_callchain(struct perf_event *event, struct pt_regs *regs)
 	}
 
 	if (user) {
+        /* JYW: 如果上下文信息是处于内核态 */
 		if (!user_mode(regs)) {
+            /* JYW: 是用户进程，则获取用户态进入内核态时用户空间的上下文 */
 			if  (current->mm)
 				regs = task_pt_regs(current);
 			else

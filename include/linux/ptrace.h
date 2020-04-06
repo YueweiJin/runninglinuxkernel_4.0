@@ -358,6 +358,7 @@ static inline void user_single_step_siginfo(struct task_struct *tsk,
 #define arch_ptrace_stop(code, info)		do { } while (0)
 #endif
 
+/* JYW: 当前进程用户态上下文 */
 #ifndef current_pt_regs
 #define current_pt_regs() task_pt_regs(current)
 #endif

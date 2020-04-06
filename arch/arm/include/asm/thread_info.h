@@ -56,6 +56,8 @@ struct thread_info {
 	struct exec_domain	*exec_domain;	/* execution domain */
 	__u32			cpu;		/* cpu */
 	__u32			cpu_domain;	/* cpu domain */
+    /* JYW: ARM32内核态切换的上下文 */
+    /* JYW: 进程切换只会发生在内核态，即进程切换只需要考虑内核态的寄存器上下文切换 */
 	struct cpu_context_save	cpu_context;	/* cpu context */
 	__u32			syscall;	/* syscall number */
 	__u8			used_cp[16];	/* thread used copro */
@@ -88,21 +90,26 @@ struct thread_info {
 /*
  * how to get the current stack pointer in C
  */
+/* JYW: 获取当前进程的SP寄存器值 */
 register unsigned long current_stack_pointer asm ("sp");
 
 /*
  * how to get the thread information struct from C
  */
+/* JYW: 获取当前进程的thread_info结构体 */
 static inline struct thread_info *current_thread_info(void) __attribute_const__;
 
+/* JYW: 获取当前进程的thread_info结构体 */
 static inline struct thread_info *current_thread_info(void)
 {
 	return (struct thread_info *)
 		(current_stack_pointer & ~(THREAD_SIZE - 1));
 }
 
+/* JYW: 保存的内核态上下文PC指针 */
 #define thread_saved_pc(tsk)	\
 	((unsigned long)(task_thread_info(tsk)->cpu_context.pc))
+/* JYW: 保存的内核态上下文SP指针 */
 #define thread_saved_sp(tsk)	\
 	((unsigned long)(task_thread_info(tsk)->cpu_context.sp))
 

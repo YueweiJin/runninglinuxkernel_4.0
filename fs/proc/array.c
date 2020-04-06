@@ -122,6 +122,7 @@ static const char * const task_state_array[] = {
 	"Z (zombie)",		/*  32 */
 };
 
+/* JYW: 获取进程的调度状态 */
 static inline const char *get_task_state(struct task_struct *tsk)
 {
 	unsigned int state = (tsk->state | tsk->exit_state) & TASK_REPORT;
@@ -364,18 +365,23 @@ static int do_task_stat(struct seq_file *m, struct pid_namespace *ns,
 	char tcomm[sizeof(task->comm)];
 	unsigned long flags;
 
+    /* JYW: 获取进程的调度状态 */
 	state = *get_task_state(task);
 	vsize = eip = esp = 0;
 	permitted = ptrace_may_access(task, PTRACE_MODE_READ | PTRACE_MODE_NOAUDIT);
 	mm = get_task_mm(task);
 	if (mm) {
+        /* JYW: 占用虚拟内存的大小 */
 		vsize = task_vsize(mm);
 		if (permitted) {
+            /* JYW: 用户态（非异常模式）下的PC指针 */
 			eip = KSTK_EIP(task);
+            /* JYW: 用户态（非异常模式）下的SP指针 */
 			esp = KSTK_ESP(task);
 		}
 	}
 
+    /* JYW: 获取进程的名字 */
 	get_task_comm(tcomm, task);
 
 	sigemptyset(&sigign);
@@ -393,6 +399,7 @@ static int do_task_stat(struct seq_file *m, struct pid_namespace *ns,
 			tty_nr = new_encode_dev(tty_devnum(sig->tty));
 		}
 
+        /* JYW: 获取线程的拥有数量 */
 		num_threads = get_nr_threads(task);
 		collect_sigign_sigcatch(task, &sigign, &sigcatch);
 
@@ -437,6 +444,7 @@ static int do_task_stat(struct seq_file *m, struct pid_namespace *ns,
 	/* scale priority and nice values from timeslices to -20..20 */
 	/* to make it look like a "normal" Unix priority/nice value  */
 	priority = task_prio(task);
+    /* JYW: 获取进程的nice值 */
 	nice = task_nice(task);
 
 	/* convert nsec -> ticks */
@@ -458,17 +466,22 @@ static int do_task_stat(struct seq_file *m, struct pid_namespace *ns,
 	seq_put_decimal_ll(m, ' ', cputime_to_clock_t(cutime));
 	seq_put_decimal_ll(m, ' ', cputime_to_clock_t(cstime));
 	seq_put_decimal_ll(m, ' ', priority);
+    /* JYW: 获取进程的nice值 */
 	seq_put_decimal_ll(m, ' ', nice);
+    /* JYW: 获取线程的拥有数量 */
 	seq_put_decimal_ll(m, ' ', num_threads);
 	seq_put_decimal_ull(m, ' ', 0);
 	seq_put_decimal_ull(m, ' ', start_time);
+    /* JYW: 占用虚拟内存的大小 */
 	seq_put_decimal_ull(m, ' ', vsize);
 	seq_put_decimal_ull(m, ' ', mm ? get_mm_rss(mm) : 0);
 	seq_put_decimal_ull(m, ' ', rsslim);
 	seq_put_decimal_ull(m, ' ', mm ? (permitted ? mm->start_code : 1) : 0);
 	seq_put_decimal_ull(m, ' ', mm ? (permitted ? mm->end_code : 1) : 0);
 	seq_put_decimal_ull(m, ' ', (permitted && mm) ? mm->start_stack : 0);
+    /* JYW: 用户态（非异常模式）下的SP指针 */
 	seq_put_decimal_ull(m, ' ', esp);
+    /* JYW: 用户态（非异常模式）下的PC指针 */
 	seq_put_decimal_ull(m, ' ', eip);
 	/* The signal information here is obsolete.
 	 * It must be decimal for Linux 2.0 compatibility.
@@ -482,6 +495,7 @@ static int do_task_stat(struct seq_file *m, struct pid_namespace *ns,
 	seq_put_decimal_ull(m, ' ', 0);
 	seq_put_decimal_ull(m, ' ', 0);
 	seq_put_decimal_ll(m, ' ', task->exit_signal);
+    /* JYW: 进程所在的CPU */
 	seq_put_decimal_ll(m, ' ', task_cpu(task));
 	seq_put_decimal_ull(m, ' ', task->rt_priority);
     /* JYW: 调度策略 */

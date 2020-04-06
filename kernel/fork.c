@@ -294,14 +294,18 @@ int __weak arch_dup_task_struct(struct task_struct *dst,
 	return 0;
 }
 
+/* JYW: 内核在创建栈的时候，会在栈底放一个幻数，用于堆栈溢出检查 */
 void set_task_stack_end_magic(struct task_struct *tsk)
 {
 	unsigned long *stackend;
 
+    /* JYW: 获取内核栈的底部 */
 	stackend = end_of_stack(tsk);
+    /* JYW: 设置一个幻数 */
 	*stackend = STACK_END_MAGIC;	/* for overflow detection */
 }
 
+/* JYW: 创建内核态的堆栈 */
 static struct task_struct *dup_task_struct(struct task_struct *orig)
 {
 	struct task_struct *tsk;
@@ -309,18 +313,22 @@ static struct task_struct *dup_task_struct(struct task_struct *orig)
 	int node = tsk_fork_get_node(orig);
 	int err;
 
+    /* JYW: 分配一个task struct 结构体 */
 	tsk = alloc_task_struct_node(node);
 	if (!tsk)
 		return NULL;
 
+    /* JYW: 分配2个页面作为进程内核态的堆栈 */
 	ti = alloc_thread_info_node(tsk, node);
 	if (!ti)
 		goto free_tsk;
 
+    /* JYW: 将原先进程的内核的thread_info拷贝过来 */
 	err = arch_dup_task_struct(tsk, orig);
 	if (err)
 		goto free_ti;
 
+    /* JYW: 作为进程内核态堆栈8KB的起始地址 */
 	tsk->stack = ti;
 #ifdef CONFIG_SECCOMP
 	/*
@@ -331,10 +339,11 @@ static struct task_struct *dup_task_struct(struct task_struct *orig)
 	 */
 	tsk->seccomp.filter = NULL;
 #endif
-
+    /* JYW: 将thread_info结构的task成员设置为tsk，后面就可以使用sp找到task struct了 */
 	setup_thread_stack(tsk, orig);
 	clear_user_return_notifier(tsk);
 	clear_tsk_need_resched(tsk);
+    /* JYW: 内核在创建栈的时候，会在栈底放一个幻数，用于堆栈溢出检查 */
 	set_task_stack_end_magic(tsk);
 
 #ifdef CONFIG_CC_STACKPROTECTOR

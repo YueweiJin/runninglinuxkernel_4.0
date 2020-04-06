@@ -332,6 +332,7 @@ struct task_struct *__switch_to(struct task_struct *prev,
 	fpsimd_thread_switch(next);
 	tls_thread_switch(next);
 	hw_breakpoint_thread_switch(next);
+    /* JYW: context id寄存器的切换 */
 	contextidr_thread_switch(next);
 
 	/*

@@ -402,6 +402,7 @@ static noinline void __init_refok rest_init(void)
 	 * The boot idle thread must execute schedule()
 	 * at least once to get things moving:
 	 */
+    /* JYW: 初始化idle进程的调度类 */
 	init_idle_bootup_task(current);
 	schedule_preempt_disabled();
 	/* Call into cpu_idle with preempt disabled */
@@ -500,6 +501,7 @@ asmlinkage __visible void __init start_kernel(void)
 	 * lockdep hash:
 	 */
 	lockdep_init();
+    /* JYW: 内核在创建栈的时候，会在栈底放一个幻数，用于堆栈溢出检查 */
 	set_task_stack_end_magic(&init_task);
 	smp_setup_processor_id();
 	debug_objects_early_init();
@@ -997,6 +999,7 @@ static noinline void __init kernel_init_freeable(void)
 	smp_prepare_cpus(setup_max_cpus);
 
 	do_pre_smp_initcalls();
+    /* JYW: 锁定检测模块初始化 */
 	lockup_detector_init();
 
 	smp_init();

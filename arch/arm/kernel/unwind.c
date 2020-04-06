@@ -468,6 +468,7 @@ int unwind_frame(struct stackframe *frame)
 	return URC_OK;
 }
 
+/* JYW: arm32 unwind方式栈回溯 */
 void unwind_backtrace(struct pt_regs *regs, struct task_struct *tsk)
 {
 	struct stackframe frame;
@@ -490,12 +491,14 @@ void unwind_backtrace(struct pt_regs *regs, struct task_struct *tsk)
 	} else {
 		/* task blocked in __switch_to */
 		frame.fp = thread_saved_fp(tsk);
+        /* JYW: 保存的内核态上下文SP指针 */
 		frame.sp = thread_saved_sp(tsk);
 		/*
 		 * The function calling __switch_to cannot be a leaf function
 		 * so LR is recovered from the stack.
 		 */
 		frame.lr = 0;
+        /* JYW: 保存的内核态上下文PC指针 */
 		frame.pc = thread_saved_pc(tsk);
 	}
 

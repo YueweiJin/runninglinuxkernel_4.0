@@ -199,6 +199,7 @@ void __vma_link_list(struct mm_struct *mm, struct vm_area_struct *vma,
 }
 
 /* Check if the vma is being used as a stack by this task */
+/* JYW: 检查当前VMA是否被用于进程的栈 */
 static int vm_is_stack_for_task(struct task_struct *t,
 				struct vm_area_struct *vma)
 {

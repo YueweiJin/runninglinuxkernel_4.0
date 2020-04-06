@@ -347,13 +347,16 @@ copy_thread(unsigned long clone_flags, unsigned long stack_start,
 	    unsigned long stk_sz, struct task_struct *p)
 {
 	struct thread_info *thread = task_thread_info(p);
+    /* JYW: 用户态进入内核态用户空间上下文存放位置 */
 	struct pt_regs *childregs = task_pt_regs(p);
 
 	memset(&thread->cpu_context, 0, sizeof(struct cpu_context_save));
 
 	if (likely(!(p->flags & PF_KTHREAD))) {
+        /* JYW: 拷贝用户态上下文 */
 		*childregs = *current_pt_regs();
 		childregs->ARM_r0 = 0;
+        /* JYW: 重新设置堆栈起始地址 */
 		if (stack_start)
 			childregs->ARM_sp = stack_start;
 	} else {
@@ -362,6 +365,10 @@ copy_thread(unsigned long clone_flags, unsigned long stack_start,
 		thread->cpu_context.r5 = stack_start;
 		childregs->ARM_cpsr = SVC_MODE;
 	}
+    /*
+     * JYW: 在schedule()里面最终会运行到switch_to()做上下文切换
+     *      在switch_to()完成之后，新线程的sp寄存器已经切换到线程自己的栈上，新线程的pc则成了ret_from_fork
+     */
 	thread->cpu_context.pc = (unsigned long)ret_from_fork;
 	thread->cpu_context.sp = (unsigned long)childregs;
 

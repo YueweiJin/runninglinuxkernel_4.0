@@ -1278,6 +1278,7 @@ enum perf_event_task_context {
 /* JYW: 表示一个进程 */
 struct task_struct {
 	volatile long state;	/* -1 unrunnable, 0 runnable, >0 stopped */
+    /* 进程内核态堆栈8KB的起始地址 */
 	void *stack;
 	atomic_t usage;
 	unsigned int flags;	/* per process flags, defined below */
@@ -1303,6 +1304,10 @@ struct task_struct {
 	int prio, static_prio, normal_prio;
     /* JYW: 实时优先级 */
 	unsigned int rt_priority;
+    /*
+     * JYW:
+     *      idle: idle_sched_class
+     */
 	const struct sched_class *sched_class;
 	struct sched_entity se;
 	struct sched_rt_entity rt;
@@ -1466,6 +1471,7 @@ struct task_struct {
 	unsigned long last_switch_count;
 #endif
 /* CPU-specific state of this task */
+    /* JYW: 内核态（SVC模式）下的寄存器上下文存放位置 */
 	struct thread_struct thread;
 /* filesystem information */
 	/* JYW: 表示文件系统信息 */
@@ -2563,6 +2569,7 @@ extern bool current_is_single_threaded(void);
 #define for_each_process_thread(p, t)	\
 	for_each_process(p) for_each_thread(p, t)
 
+/* JYW: 获取线程的拥有数量 */
 static inline int get_nr_threads(struct task_struct *tsk)
 {
 	return tsk->signal->nr_threads;
@@ -2711,6 +2718,7 @@ static inline void setup_thread_stack(struct task_struct *p, struct task_struct 
  * When the stack grows up, this is the highest address.
  * Beyond that position, we corrupt data on the next page.
  */
+/* JYW: 获取内核栈的底部 */
 static inline unsigned long *end_of_stack(struct task_struct *p)
 {
 #ifdef CONFIG_STACK_GROWSUP
@@ -2721,6 +2729,7 @@ static inline unsigned long *end_of_stack(struct task_struct *p)
 }
 
 #endif
+/* JYW: 堆栈溢出检查 */
 #define task_stack_end_corrupted(task) \
 		(*(end_of_stack(task)) != STACK_END_MAGIC)
 
@@ -2994,7 +3003,7 @@ static inline void ptrace_signal_wake_up(struct task_struct *t, bool resume)
  * Wrappers for p->thread_info->cpu access. No-op on UP.
  */
 #ifdef CONFIG_SMP
-
+/* JYW: 进程所在的CPU */
 static inline unsigned int task_cpu(const struct task_struct *p)
 {
 	return task_thread_info(p)->cpu;

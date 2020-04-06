@@ -211,6 +211,7 @@ static struct sysrq_key_op sysrq_showlocks_op = {
 #ifdef CONFIG_SMP
 static DEFINE_SPINLOCK(show_lock);
 
+/* JYW: backtrace每个CPU的保存上下文 */
 static void showacpu(void *dummy)
 {
 	unsigned long flags;
@@ -240,6 +241,7 @@ static void sysrq_handle_showallcpus(int key)
 	 * architecture has no support for it:
 	 */
 	if (!trigger_all_cpu_backtrace()) {
+        /* JYW: 获取中断前线程的pc、sp、fp等寄存器值 */
 		struct pt_regs *regs = get_irq_regs();
 
 		if (regs) {
@@ -258,8 +260,10 @@ static struct sysrq_key_op sysrq_showallcpus_op = {
 };
 #endif
 
+/* JYW: 打印中断前的堆栈信息 */
 static void sysrq_handle_showregs(int key)
 {
+    /* JYW: 获取中断前线程的pc、sp、fp等寄存器值 */
 	struct pt_regs *regs = get_irq_regs();
 	if (regs)
 		show_regs(regs);

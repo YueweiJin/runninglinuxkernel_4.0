@@ -156,6 +156,7 @@ extern struct task_group root_task_group;
 # define INIT_VTIME(tsk)
 #endif
 
+/* JYW: 内核启动初始化进程 */
 #define INIT_TASK_COMM "swapper"
 
 #ifdef CONFIG_RT_MUTEXES
@@ -186,6 +187,7 @@ extern struct task_group root_task_group;
  *  INIT_TASK is used to set up the first task table, touch at
  * your own risk!. Base=0, limit=0x1fffff (=2MB)
  */
+/* JYW: 内核启动初始化进程 */
 #define INIT_TASK(tsk)	\
 {									\
 	.state		= 0,						\
