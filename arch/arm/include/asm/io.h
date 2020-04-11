@@ -115,6 +115,10 @@ static inline u8 __raw_readb(const volatile void __iomem *addr)
 }
 
 #define __raw_readl __raw_readl
+/*
+ * '=': 被修饰的操作符只写
+ * '+': 被修饰的操作符具有可读写的属性
+ */
 static inline u32 __raw_readl(const volatile void __iomem *addr)
 {
 	u32 val;
