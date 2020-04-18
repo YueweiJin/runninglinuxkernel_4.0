@@ -35,7 +35,8 @@
 
 /*
  * Interrupt handling.
- */
+ */ 
+	/* JYW: 执行真正的中断处理 */
 	.macro	irq_handler
 #ifdef CONFIG_MULTI_IRQ_HANDLER
 	/* JYW: arm32 GIC gic_handle_irq */
@@ -148,9 +149,11 @@ ENDPROC(__und_invalid)
 #define SPFIX(code...)
 #endif
 
+	/* JYW: 将中断现场保存到内核栈中 */
 	.macro	svc_entry, stack_hole=0, trace=1
  UNWIND(.fnstart		)
  UNWIND(.save {r0 - pc}		)
+ 	/* JYW: 首先将SP指向ARM_r1处 */
 	sub	sp, sp, #(S_FRAME_SIZE + \stack_hole - 4)
 #ifdef CONFIG_THUMB2_KERNEL
  SPFIX(	str	r0, [sp]	)	@ temporarily saved
@@ -161,16 +164,21 @@ ENDPROC(__und_invalid)
  SPFIX(	tst	sp, #4		)
 #endif
  SPFIX(	subeq	sp, sp, #4	)
+ 	/* JYW: 将r1~r12寄存器保存到ARM_r1~ARM_r12中 */
 	stmia	sp, {r1 - r12}
-
+	/* JYW: r0寄存器还保存着IRQ模式的sp指针，将SPSR_irq、LR_irq及SP_irq分别拷贝到r3、r4、r5寄存器 */
 	ldmia	r0, {r3 - r5}
+	/* JYW: r7指向ARM_sp处 */
 	add	r7, sp, #S_SP - 4	@ here for interlock avoidance
+	/* JYW: r6寄存器值为-1 */
 	mov	r6, #-1			@  ""  ""      ""       ""
+	/* JYW: 把栈顶的地址赋值到r2中 */
 	add	r2, sp, #(S_FRAME_SIZE + \stack_hole - 4)
  SPFIX(	addeq	r2, r2, #4	)
 	str	r3, [sp, #-4]!		@ save the "real" r0 copied
 					@ from the exception stack
 
+ 	/* JYW: 把SVC模式的lr_svc寄存器的内容复制到r3寄存器，现在重新复制到SVC模式的ARM_r0中 */
 	mov	r3, lr
 
 	@
@@ -202,20 +210,27 @@ __dabt_svc:
 ENDPROC(__dabt_svc)
 
 	.align	5
+/* JYW: 处理断点在内核态的IRQ */
 __irq_svc:
+	/* JYW: 将中断现场保存到内核栈中 */
 	svc_entry
+	/* JYW: 执行真正的中断处理 */
 	irq_handler
 
 #ifdef CONFIG_PREEMPT
+	/* JYW: 获取当前进程的struct thread_info数据结构 */
 	get_thread_info tsk
+	/* JYW: 用于判断当前是否可以抢占，0表示可以抢占，>0不能抢占 */
 	ldr	r8, [tsk, #TI_PREEMPT]		@ get preempt count
+	/* JYW: 表示是否需要抢占 */
 	ldr	r0, [tsk, #TI_FLAGS]		@ get flags
 	teq	r8, #0				@ if preempt count != 0
 	movne	r0, #0				@ force flags to 0
 	tst	r0, #_TIF_NEED_RESCHED
+	/* JYW: 进行抢占处理 */
 	blne	svc_preempt
 #endif
-
+	/* JYW: 执行中断退出处理，还原现场 （entry-header.S） */
 	svc_exit r5, irq = 1			@ return from exception
  UNWIND(.fnend		)
 ENDPROC(__irq_svc)
@@ -443,6 +458,7 @@ __dabt_usr:
 ENDPROC(__dabt_usr)
 
 	.align	5
+/* JYW: 处理断点在用户态的IRQ */
 __irq_usr:
 	usr_entry
 	kuser_cmpxchg_check
@@ -1039,6 +1055,7 @@ __kuser_helper_end:
 
 vector_\name:
 	.if \correction
+	/* JYW: irq时参数是4， ARM处理器流水线架构，进入中断前PC值被填入LR_irq寄存器中，但是PC为断点处+8，所以减去4才是中断返回地址 */
 	sub	lr, lr, #\correction
 	.endif
 
@@ -1046,13 +1063,16 @@ vector_\name:
 	@ Save r0, lr_<exception> (parent PC) and spsr_<exception>
 	@ (parent CPSR)
 	@
+	/* JYW: 保存r0和LR_irq寄存器到sp(指向IRQ模式的栈空间)中 */
 	stmia	sp, {r0, lr}		@ save r0, lr
+	/* JYW: 将spsr也压到IRQ模式下的栈中 */
 	mrs	lr, spsr
 	str	lr, [sp, #8]		@ save spsr
 
 	@
 	@ Prepare for SVC32 mode.  IRQs remain disabled.
 	@
+	/* JYW: 修改cpsr，切换到svc模式，而不是中断模式执行（并不会立即生效，后面movs pc,lr才会正真生效） */
 	mrs	r0, cpsr
 	eor	r0, r0, #(\mode ^ SVC_MODE | PSR_ISETSTATE)
 	msr	spsr_cxsf, r0
@@ -1060,11 +1080,16 @@ vector_\name:
 	@
 	@ the branch table must immediately follow this code
 	@
+	/* JYW: LR_irq寄存器保存着发生中断时CPSR值(见上面mrs	lr, spsr)，获取spsr的低4位([3..0] SVC、IRQ、FIQ、USR)，反应了CPU进入中断前的实际运行模式 */
 	and	lr, lr, #0x0f
  THUMB(	adr	r0, 1f			)
  THUMB(	ldr	lr, [r0, lr, lsl #2]	)
+ 	/* JYW: 将IRQ模式的sp指针保存至r0 */
 	mov	r0, sp
+	/* JYW: 根据中断发生点所在模式，给lr寄存器赋值 */
  ARM(	ldr	lr, [pc, lr, lsl #2]	)
+ 	/* JYW: 跳转到 __irq_usr 或者 __irq_svc */
+	/* JYW: mov是带's'的，会生效cpsr，从而正真实现模式切换到svc模式 */
 	movs	pc, lr			@ branch to handler in SVC mode
 ENDPROC(vector_\name)
 
@@ -1216,6 +1241,7 @@ vector_addrexcptn:
 	.equ	vector_fiq_offset, vector_fiq
 
 	.section .vectors, "ax", %progbits
+/* JYW: 发生异常时，会跳到这里 */
 __vectors_start:
 	W(b)	vector_rst
 	W(b)	vector_und
@@ -1223,6 +1249,7 @@ __vectors_start:
 	W(b)	vector_pabt
 	W(b)	vector_dabt
 	W(b)	vector_addrexcptn
+	/* JYW: 发生中断时，跳到此处，对应的是(vector_stub	irq, IRQ_MODE, 4) */
 	W(b)	vector_irq
 	W(b)	vector_fiq
 

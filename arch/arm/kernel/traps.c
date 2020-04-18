@@ -851,6 +851,7 @@ static inline void __init kuser_init(void *vectors)
 }
 #endif
 
+/* JYW: 实现异常向量的复制 */
 void __init early_trap_init(void *vectors_base)
 {
 #ifndef CONFIG_CPU_V7M
@@ -867,6 +868,7 @@ void __init early_trap_init(void *vectors_base)
 	 * ISAs.  The Thumb version is an undefined instruction with a
 	 * branch back to the undefined instruction.
 	 */
+    /* JYW: 将第一个页面全部填充未定义指令，目的是在程序跑飞情况下可以捕捉到异常 */
 	for (i = 0; i < PAGE_SIZE / sizeof(u32); i++)
 		((u32 *)vectors_base)[i] = 0xe7fddef1;
 

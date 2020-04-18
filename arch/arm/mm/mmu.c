@@ -1261,8 +1261,9 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
 	/*
 	 * Allocate the vector page early.
 	 */
+    /* JYW: 分配两个页面用于映射中断向量表 */
 	vectors = early_alloc(PAGE_SIZE * 2);
-
+    /* JYW: 实现异常向量的复制 */
 	early_trap_init(vectors);
 
 	for (addr = VMALLOC_START; addr; addr += PMD_SIZE)
@@ -1303,6 +1304,7 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
 	 * location (0xffff0000).  If we aren't using high-vectors, also
 	 * create a mapping at the low-vectors virtual address.
 	 */
+    /* JYW: 将中断向量表映射到high vectors(0xffff0000)处 */
 	map.pfn = __phys_to_pfn(virt_to_phys(vectors));
 	map.virtual = 0xffff0000;
 	map.length = PAGE_SIZE;
