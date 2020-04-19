@@ -149,6 +149,7 @@ __do_kernel_fault(struct mm_struct *mm, unsigned long addr, unsigned int fsr,
 		 "paging request", addr);
 
 	show_pte(mm, addr);
+    /* JYW: die处理 */
 	die("Oops", regs, fsr);
 	bust_spinlocks(0);
 	do_exit(SIGKILL);

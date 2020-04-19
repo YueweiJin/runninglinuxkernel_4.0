@@ -235,6 +235,7 @@ void show_stack(struct task_struct *tsk, unsigned long *sp)
 #define S_ISA " ARM"
 #endif
 
+/* JYW: die处理 */
 static int __die(const char *str, int err, struct pt_regs *regs)
 {
 	struct task_struct *tsk = current;
@@ -251,10 +252,13 @@ static int __die(const char *str, int err, struct pt_regs *regs)
 
 	print_modules();
 	__show_regs(regs);
+    /* JYW: 打印die时进程名、PID号及堆栈底部的地址 */
 	pr_emerg("Process %.*s (pid: %d, stack limit = 0x%p)\n",
 		 TASK_COMM_LEN, tsk->comm, task_pid_nr(tsk), end_of_stack(tsk));
 
+    /* JYW: 如果是内核态或者中断上下文，则继续打堆栈 */
 	if (!user_mode(regs) || in_interrupt()) {
+        /* JYW: 打印整个栈空间 */
 		dump_mem(KERN_EMERG, "Stack: ", regs->ARM_sp,
 			 THREAD_SIZE + (unsigned long)task_stack_page(tsk));
 		dump_backtrace(regs, tsk);
@@ -317,6 +321,7 @@ static void oops_end(unsigned long flags, struct pt_regs *regs, int signr)
 /*
  * This function is protected against re-entrancy.
  */
+/* JYW: die处理 */
 void die(const char *str, struct pt_regs *regs, int err)
 {
 	enum bug_trap_type bug_type = BUG_TRAP_TYPE_NONE;
