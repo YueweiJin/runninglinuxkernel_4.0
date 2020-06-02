@@ -777,6 +777,7 @@ ENDPROC(__fiq_usr)
 ENTRY(__switch_to)
  UNWIND(.fnstart	)
  UNWIND(.cantunwind	)
+ 	/* JYW: 在 arch\arm\kernel\asm-offsets.c DEFINE(TI_CPU_SAVE,     offsetof(struct thread_info, cpu_context)) */
 	add	ip, r1, #TI_CPU_SAVE
  ARM(	stmia	ip!, {r4 - sl, fp, sp, lr} )	@ Store most regs on stack
  THUMB(	stmia	ip!, {r4 - sl, fp}	   )	@ Store most regs on stack
@@ -797,6 +798,7 @@ ENTRY(__switch_to)
 	mcr	p15, 0, r6, c3, c0, 0		@ Set domain register
 #endif
 	mov	r5, r0
+	/* JYW: r4 指向的要切入进程的 thread_info 中的 struct cpu_context_save    cpu_context */
 	add	r4, r2, #TI_CPU_SAVE
 	ldr	r0, =thread_notify_head
 	mov	r1, #THREAD_NOTIFY_SWITCH
@@ -805,7 +807,9 @@ ENTRY(__switch_to)
 	str	r7, [r8]
 #endif
  THUMB(	mov	ip, r4			   )
+ 	/* JYW: 此时 r0 表示 previous task_struct ，即要切出的进程的 task */
 	mov	r0, r5
+	/* JYW: 将要切入进程的 cpu_context 的值加载到寄存器，其中加载到 pc，实现跳转执行 */
  ARM(	ldmia	r4, {r4 - sl, fp, sp, pc}  )	@ Load all regs saved previously
  THUMB(	ldmia	ip!, {r4 - sl, fp}	   )	@ Load all regs saved previously
  THUMB(	ldr	sp, [ip], #4		   )

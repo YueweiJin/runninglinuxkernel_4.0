@@ -213,6 +213,7 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
 }
 #endif
 
+/* JYW: 打印进程堆栈信息 */
 void show_stack(struct task_struct *tsk, unsigned long *sp)
 {
 	dump_backtrace(NULL, tsk);

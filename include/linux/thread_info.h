@@ -56,6 +56,7 @@ extern long do_no_restart_syscall(struct restart_block *parm);
 #ifdef __KERNEL__
 
 #ifdef CONFIG_DEBUG_STACK_USAGE
+/* JYW: 若开启DEBUG_STACK_USAGE，则页面会清零 */
 # define THREADINFO_GFP		(GFP_KERNEL | __GFP_NOTRACK | __GFP_ZERO)
 #else
 # define THREADINFO_GFP		(GFP_KERNEL | __GFP_NOTRACK)

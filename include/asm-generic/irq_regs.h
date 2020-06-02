@@ -18,6 +18,7 @@
  * Per-cpu current frame pointer - the location of the last exception frame on
  * the stack
  */
+/* JYW: per-cpu结构，保存中断前的上下文 */
 DECLARE_PER_CPU(struct pt_regs *, __irq_regs);
 
 /* JYW: 获取中断前线程的pc、sp、fp等寄存器值 */
@@ -26,6 +27,7 @@ static inline struct pt_regs *get_irq_regs(void)
 	return __this_cpu_read(__irq_regs);
 }
 
+/* JYW: 保存中断前线程的pc、sp、fp等寄存器值 */
 static inline struct pt_regs *set_irq_regs(struct pt_regs *new_regs)
 {
 	struct pt_regs *old_regs;

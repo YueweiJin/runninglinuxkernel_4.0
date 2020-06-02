@@ -4520,6 +4520,7 @@ out_unlock:
 
 static const char stat_nam[] = TASK_STATE_TO_CHAR_STR;
 
+/* JYW: 显示每个进程的调度信息 */
 void sched_show_task(struct task_struct *p)
 {
 	unsigned long free = 0;
@@ -4542,6 +4543,7 @@ void sched_show_task(struct task_struct *p)
 		printk(KERN_CONT " %016lx ", thread_saved_pc(p));
 #endif
 #ifdef CONFIG_DEBUG_STACK_USAGE
+    /* JYW: 统计堆栈剩余空间 */
 	free = stack_not_used(p);
 #endif
 	ppid = 0;
@@ -4576,6 +4578,7 @@ void show_state_filter(unsigned long state_filter)
 		 */
 		touch_nmi_watchdog();
 		if (!state_filter || (p->state & state_filter))
+            /* JYW: 显示每个进程的调度信息 */
 			sched_show_task(p);
 	}
 

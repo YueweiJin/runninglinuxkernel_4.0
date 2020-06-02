@@ -140,6 +140,7 @@ void __weak arch_release_thread_info(struct thread_info *ti)
 {
 }
 
+/* JYW: Hi3536平台未开 */
 #ifndef CONFIG_ARCH_THREAD_INFO_ALLOCATOR
 
 /*
@@ -147,9 +148,11 @@ void __weak arch_release_thread_info(struct thread_info *ti)
  * kmemcache based allocator.
  */
 # if THREAD_SIZE >= PAGE_SIZE
+/* JYW: 分配线程堆栈空间，返回page所在首地址就是struct thread_info */
 static struct thread_info *alloc_thread_info_node(struct task_struct *tsk,
 						  int node)
 {
+    /* JYW: 若开启DEBUG_STACK_USAGE，则页面会清零 */
 	struct page *page = alloc_kmem_pages_node(node, THREADINFO_GFP,
 						  THREAD_SIZE_ORDER);
 

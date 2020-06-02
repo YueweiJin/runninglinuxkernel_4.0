@@ -2744,6 +2744,7 @@ static inline int object_is_on_stack(void *obj)
 extern void thread_info_cache_init(void);
 
 #ifdef CONFIG_DEBUG_STACK_USAGE
+/* JYW: 统计堆栈剩余空间 */
 static inline unsigned long stack_not_used(struct task_struct *p)
 {
 	unsigned long *n = end_of_stack(p);

@@ -370,6 +370,7 @@ EXPORT_SYMBOL_GPL(generic_handle_irq);
 int __handle_domain_irq(struct irq_domain *domain, unsigned int hwirq,
 			bool lookup, struct pt_regs *regs)
 {
+    /* JYW: 将中断前进程的regs保存到per-cpu结构 */
 	struct pt_regs *old_regs = set_irq_regs(regs);
 	unsigned int irq = hwirq;
 	int ret = 0;
