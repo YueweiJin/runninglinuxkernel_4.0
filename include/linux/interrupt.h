@@ -469,10 +469,11 @@ static inline struct task_struct *this_cpu_ksoftirqd(void)
      wrt another tasklets. If client needs some intertask synchronization,
      he makes it with spinlocks.
  */
-
+/* JYW: 代表一个tasklet实例 */
 struct tasklet_struct
 {
 	struct tasklet_struct *next;
+    /* JYW: 当前tasklet的状态，SCHED和RUN */
 	unsigned long state;
 	atomic_t count;
 	void (*func)(unsigned long);
@@ -516,6 +517,7 @@ static inline void tasklet_unlock_wait(struct tasklet_struct *t)
 
 extern void __tasklet_schedule(struct tasklet_struct *t);
 
+/* JYW: 若还在运行，则会!!丢失!!tasklet */
 static inline void tasklet_schedule(struct tasklet_struct *t)
 {
 	if (!test_and_set_bit(TASKLET_STATE_SCHED, &t->state))

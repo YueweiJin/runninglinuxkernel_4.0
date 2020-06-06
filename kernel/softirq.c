@@ -455,12 +455,15 @@ void open_softirq(int nr, void (*action)(struct softirq_action *))
 /*
  * Tasklets
  */
+/* JYW: 用于管理所有的tasklet */
 struct tasklet_head {
 	struct tasklet_struct *head;
 	struct tasklet_struct **tail;
 };
 
+/* JYW: 用于管理所有的tasklet */
 static DEFINE_PER_CPU(struct tasklet_head, tasklet_vec);
+/* JYW: 用于管理所有的hi tasklet */
 static DEFINE_PER_CPU(struct tasklet_head, tasklet_hi_vec);
 
 /* JYW: 触发tasklet软中断 */
@@ -501,6 +504,7 @@ void __tasklet_hi_schedule_first(struct tasklet_struct *t)
 }
 EXPORT_SYMBOL(__tasklet_hi_schedule_first);
 
+/* JYW: 处理tasklet软中断 */
 static void tasklet_action(struct softirq_action *a)
 {
 	struct tasklet_struct *list;
@@ -515,19 +519,21 @@ static void tasklet_action(struct softirq_action *a)
 		struct tasklet_struct *t = list;
 
 		list = list->next;
-
+        /* JYW: 保证同一个tasklet只能在一个CPU上运行 */
 		if (tasklet_trylock(t)) {
+            /* JYW: tasklet_disable()会加1，这时候就禁用了 */
 			if (!atomic_read(&t->count)) {
 				if (!test_and_clear_bit(TASKLET_STATE_SCHED,
 							&t->state))
 					BUG();
+                /* JYW: 执行tasklet处理函数 */
 				t->func(t->data);
 				tasklet_unlock(t);
 				continue;
 			}
 			tasklet_unlock(t);
 		}
-
+        /* JYW: 因拿不到锁，先放入队列 */
 		local_irq_disable();
 		t->next = NULL;
 		*__this_cpu_read(tasklet_vec.tail) = t;
