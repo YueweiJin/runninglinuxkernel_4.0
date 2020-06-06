@@ -14,8 +14,10 @@ static __always_inline void __local_bh_disable_ip(unsigned long ip, unsigned int
 }
 #endif
 
+/* JYW: 关闭本地下半部 */
 static inline void local_bh_disable(void)
 {
+    /* JYW: 在当前进程的preempt_count加上SOFTIRQ_DISABLE_OFFSET         */
 	__local_bh_disable_ip(_THIS_IP_, SOFTIRQ_DISABLE_OFFSET);
 }
 
