@@ -1409,6 +1409,7 @@ static void run_timer_softirq(struct softirq_action *h)
 void run_local_timers(void)
 {
 	hrtimer_run_queues();
+    /* JYW: 触发timer软中断 */
 	raise_softirq(TIMER_SOFTIRQ);
 }
 

@@ -2727,6 +2727,7 @@ static void invoke_rcu_callbacks(struct rcu_state *rsp, struct rcu_data *rdp)
 static void invoke_rcu_core(void)
 {
 	if (cpu_online(smp_processor_id()))
+        /* JYW: 触发RCU软中断 */
 		raise_softirq(RCU_SOFTIRQ);
 }
 

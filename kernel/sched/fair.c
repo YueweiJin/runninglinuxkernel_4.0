@@ -7682,6 +7682,7 @@ void trigger_load_balance(struct rq *rq)
 		return;
 
 	if (time_after_eq(jiffies, rq->next_balance))
+        /* JYW: 触发负载均衡软中断 */
 		raise_softirq(SCHED_SOFTIRQ);
 #ifdef CONFIG_NO_HZ_COMMON
 	if (nohz_kick_needed(rq))

@@ -124,6 +124,7 @@ void rcu_sched_qs(void)
 	local_irq_save(flags);
 	if (rcu_qsctr_help(&rcu_sched_ctrlblk) +
 	    rcu_qsctr_help(&rcu_bh_ctrlblk))
+        /* JYW: 触发RCU软中断 */
 		raise_softirq(RCU_SOFTIRQ);
 	local_irq_restore(flags);
 }
@@ -137,6 +138,7 @@ void rcu_bh_qs(void)
 
 	local_irq_save(flags);
 	if (rcu_qsctr_help(&rcu_bh_ctrlblk))
+        /* JYW: 触发RCU软中断 */
 		raise_softirq(RCU_SOFTIRQ);
 	local_irq_restore(flags);
 }

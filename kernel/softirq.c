@@ -49,10 +49,12 @@
  */
 
 #ifndef __ARCH_IRQ_STAT
+/* JYW: 每个CPU有一个软中断状态寄存器 */
 irq_cpustat_t irq_stat[NR_CPUS] ____cacheline_aligned;
 EXPORT_SYMBOL(irq_stat);
 #endif
 
+/* JYW: 软中断向量表 */
 static struct softirq_action softirq_vec[NR_SOFTIRQS] __cacheline_aligned_in_smp;
 
 DEFINE_PER_CPU(struct task_struct *, ksoftirqd);
@@ -227,6 +229,7 @@ static inline bool lockdep_softirq_start(void) { return false; }
 static inline void lockdep_softirq_end(bool in_hardirq) { }
 #endif
 
+/* JYW: 处理软中断 */
 asmlinkage __visible void __do_softirq(void)
 {
 	unsigned long end = jiffies + MAX_SOFTIRQ_TIME;
@@ -258,6 +261,7 @@ restart:
 
 	h = softirq_vec;
 
+    /* JYW: 找到优先级最高的置位的软中断所在bit */
 	while ((softirq_bit = ffs(pending))) {
 		unsigned int vec_nr;
 		int prev_count;
@@ -267,9 +271,12 @@ restart:
 		vec_nr = h - softirq_vec;
 		prev_count = preempt_count();
 
+        /* JYW: 对应软中断计数+1 */
 		kstat_incr_softirqs_this_cpu(vec_nr);
 
 		trace_softirq_entry(vec_nr);
+        /* JYW: 执行软中断处理函数 */
+        /* JYW: ！！同一类型的软中断可以在多个CPU上并行执行！！ */
 		h->action(h);
 		trace_softirq_exit(vec_nr);
 		if (unlikely(prev_count != preempt_count())) {
@@ -278,6 +285,7 @@ restart:
 			       prev_count, preempt_count());
 			preempt_count_set(prev_count);
 		}
+        /* JYW: 处理下一个pending的软中断 */
 		h++;
 		pending >>= softirq_bit;
 	}
@@ -287,10 +295,11 @@ restart:
 
 	pending = local_softirq_pending();
 	if (pending) {
+        /* JYW: 2ms、10次、未调度 */
 		if (time_before(jiffies, end) && !need_resched() &&
 		    --max_restart)
 			goto restart;
-
+        /* JYW: 否则，让出CPU，后台执行软中断 */
 		wakeup_softirqd();
 	}
 
@@ -306,11 +315,12 @@ asmlinkage __visible void do_softirq(void)
 	__u32 pending;
 	unsigned long flags;
 
+    /* JYW: 不允许在硬中断中直接调用软中断 */
 	if (in_interrupt())
 		return;
 
 	local_irq_save(flags);
-
+    /* JYW: 当前CPU是否有软中断pending */
 	pending = local_softirq_pending();
 
 	if (pending)
@@ -389,6 +399,7 @@ void irq_exit(void)
 
 	account_irq_exit_time(current);
 	preempt_count_sub(HARDIRQ_OFFSET);
+    /* JYW: 不在硬中断且在本地软中断置位情况下才会处理软中断 */
 	if (!in_interrupt() && local_softirq_pending())
 		invoke_softirq();
 
@@ -417,21 +428,25 @@ inline void raise_softirq_irqoff(unsigned int nr)
 		wakeup_softirqd();
 }
 
+/* JYW: 主动触发软中断 */
 void raise_softirq(unsigned int nr)
 {
 	unsigned long flags;
 
 	local_irq_save(flags);
+    /* JYW: 置本地CPU的软中断状态的pending标志 */
 	raise_softirq_irqoff(nr);
 	local_irq_restore(flags);
 }
 
+/* JYW: 置本地CPU的软中断状态的pending标志 */
 void __raise_softirq_irqoff(unsigned int nr)
 {
 	trace_softirq_raise(nr);
 	or_softirq_pending(1UL << nr);
 }
 
+/* JYW: 注册软中断向量 */
 void open_softirq(int nr, void (*action)(struct softirq_action *))
 {
 	softirq_vec[nr].action = action;
@@ -448,6 +463,7 @@ struct tasklet_head {
 static DEFINE_PER_CPU(struct tasklet_head, tasklet_vec);
 static DEFINE_PER_CPU(struct tasklet_head, tasklet_hi_vec);
 
+/* JYW: 触发tasklet软中断 */
 void __tasklet_schedule(struct tasklet_struct *t)
 {
 	unsigned long flags;
@@ -461,6 +477,7 @@ void __tasklet_schedule(struct tasklet_struct *t)
 }
 EXPORT_SYMBOL(__tasklet_schedule);
 
+/* JYW: 触发hi tasklet软中断 */
 void __tasklet_hi_schedule(struct tasklet_struct *t)
 {
 	unsigned long flags;
@@ -643,8 +660,9 @@ void __init softirq_init(void)
 		per_cpu(tasklet_hi_vec, cpu).tail =
 			&per_cpu(tasklet_hi_vec, cpu).head;
 	}
-
+    /* JYW: 注册TASKLET_SOFTIRQ软中断 */
 	open_softirq(TASKLET_SOFTIRQ, tasklet_action);
+    /* JYW: 注册HI_SOFTIRQ软中断 */
 	open_softirq(HI_SOFTIRQ, tasklet_hi_action);
 }
 
