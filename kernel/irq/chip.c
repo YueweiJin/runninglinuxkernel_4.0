@@ -533,12 +533,14 @@ handle_fasteoi_irq(unsigned int irq, struct irq_desc *desc)
 		goto out;
 	}
 
+    /* JYW: 如果是oneshot，不支持中断嵌套，则屏蔽该中断源 */
 	if (desc->istate & IRQS_ONESHOT)
 		mask_irq(desc);
 
 	preflow_handler(desc);
+    /* JYW: 核心函数 */
 	handle_irq_event(desc);
-
+    /* JYW: 发送EOI信号，通知中断控制器中断已经处理    完毕并判断是否解除屏蔽 */
 	cond_unmask_eoi_irq(desc, chip);
 
 	raw_spin_unlock(&desc->lock);

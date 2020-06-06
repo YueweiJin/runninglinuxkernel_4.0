@@ -380,6 +380,7 @@ int __handle_domain_irq(struct irq_domain *domain, unsigned int hwirq,
 
 #ifdef CONFIG_IRQ_DOMAIN
 	if (lookup)
+        /* JYW: 根据硬中断查找软中断 */
 		irq = irq_find_mapping(domain, hwirq);
 #endif
 

@@ -39,7 +39,7 @@
 	/* JYW: 执行真正的中断处理 */
 	.macro	irq_handler
 #ifdef CONFIG_MULTI_IRQ_HANDLER
-	/* JYW: arm32 GIC gic_handle_irq */
+	/* JYW: arm32 GIC gic_handle_irq(struct pt_regs * regs) */
 	ldr	r1, =handle_arch_irq
 	mov	r0, sp
 	adr	lr, BSYM(9997f)

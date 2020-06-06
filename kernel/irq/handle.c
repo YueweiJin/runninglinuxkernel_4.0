@@ -184,8 +184,9 @@ irqreturn_t handle_irq_event(struct irq_desc *desc)
 {
 	struct irqaction *action = desc->action;
 	irqreturn_t ret;
-
+    /* JYW: 清除pending标志位 */
 	desc->istate &= ~IRQS_PENDING;
+    /* JYW: 表示正在处理硬件中断 */
 	irqd_set(&desc->irq_data, IRQD_IRQ_INPROGRESS);
 	raw_spin_unlock(&desc->lock);
 
