@@ -25,23 +25,28 @@ struct worker {
 		struct list_head	entry;	/* L: while idle */
 		struct hlist_node	hentry;	/* L: while busy */
 	};
-
+    /* JYW: 当前正在处理的任务 */
 	struct work_struct	*current_work;	/* L: work being processed */
+    /* JYW: 当前正在执行的work回调函数 */
 	work_func_t		current_func;	/* L: current_work's fn */
+    /* JYW: 当前work所属的pool_workqueue */
 	struct pool_workqueue	*current_pwq; /* L: current_work's pwq */
 	bool			desc_valid;	/* ->desc is valid */
 	struct list_head	scheduled;	/* L: scheduled works */
 
 	/* 64 bytes boundary on 64bit, 32 on 32bit */
-
+    /* JYW: 所有被调度并正准备执行的work都挂入该链表中 */
 	struct task_struct	*task;		/* I: worker task */
+    /* JYW: 该工作线程所属的worker_pool */
 	struct worker_pool	*pool;		/* I: the associated pool */
 						/* L: for rescuers */
+    /* JYW: 用于挂入到worker_pool->workers链表中 */
 	struct list_head	node;		/* A: anchored at pool->workers */
 						/* A: runs through worker->node */
 
 	unsigned long		last_active;	/* L: last active timestamp */
 	unsigned int		flags;		/* X: flags */
+    /* JYW: 工作线程的ID号 */
 	int			id;		/* I: worker id */
 
 	/*

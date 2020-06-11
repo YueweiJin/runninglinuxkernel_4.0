@@ -97,9 +97,12 @@ enum {
 	WORKER_DESC_LEN		= 24,
 };
 
+/* JYW: 描述一个工作任务 */
 struct work_struct {
 	atomic_long_t data;
+    /* JYW: 用于挂接到队列上 */
 	struct list_head entry;
+    /* JYW: 具体的处理函数 */
 	work_func_t func;
 #ifdef CONFIG_LOCKDEP
 	struct lockdep_map lockdep_map;
@@ -211,6 +214,7 @@ static inline unsigned int work_static(struct work_struct *work) { return 0; }
 		(_work)->func = (_func);				\
 	} while (0)
 #else
+/* JYW: 申明一个WORK及回调函数 */
 #define __INIT_WORK(_work, _func, _onstack)				\
 	do {								\
 		__init_work((_work), _onstack);				\
@@ -349,6 +353,7 @@ enum {
  * system_power_efficient_wq is identical to system_wq if
  * 'wq_power_efficient' is disabled.  See WQ_POWER_EFFICIENT for more info.
  */
+/* JYW: 系统默认的工作队列 */
 extern struct workqueue_struct *system_wq;
 extern struct workqueue_struct *system_highpri_wq;
 extern struct workqueue_struct *system_long_wq;
@@ -524,6 +529,7 @@ static inline bool schedule_work_on(int cpu, struct work_struct *work)
  * queued and leaves it in the same position on the kernel-global
  * workqueue otherwise.
  */
+/* JYW: 将work放到全局的工作队列 */
 static inline bool schedule_work(struct work_struct *work)
 {
 	return queue_work(system_wq, work);

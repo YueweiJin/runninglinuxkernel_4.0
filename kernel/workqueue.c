@@ -135,20 +135,27 @@ enum {
  */
 
 /* struct worker is defined in workqueue_internal.h */
-
+/* JYW: 工作线程池
+ *  每个CPU上都有一个（准确有两个，一个用于普通先级工作线程，另一个用于高优先级的工作）
+ */
 struct worker_pool {
 	spinlock_t		lock;		/* the pool lock */
+    /* JYW: 绑定的CPU ID，UNBOUND类型: -1 */
 	int			cpu;		/* I: the associated cpu */
+    /* JYW: 内存节点的ID编号 */
 	int			node;		/* I: the associated node ID */
+    /* JYW: 该worker-pool的ID号 */
 	int			id;		/* I: pool ID */
 	unsigned int		flags;		/* X: flags */
-
+    /* JYW: pending状态的work会挂入该链表中 */
 	struct list_head	worklist;	/* L: list of pending works */
+    /* JYW: 工作线程数量 */
 	int			nr_workers;	/* L: total number of workers */
 
 	/* nr_idle includes the ones off idle_list for rebinding */
+    /* JYW: 处于idle状态的工作线程的数量 */
 	int			nr_idle;	/* L: currently idle ones */
-
+    /* JYW:  挂入idle状态的工作线程 */
 	struct list_head	idle_list;	/* X: list of idle workers */
 	struct timer_list	idle_timer;	/* L: worker idle timeout */
 	struct timer_list	mayday_timer;	/* L: SOS timer for workers */
@@ -160,11 +167,12 @@ struct worker_pool {
 	/* see manage_workers() for details on the two manager mutexes */
 	struct mutex		manager_arb;	/* manager arbitration */
 	struct mutex		attach_mutex;	/* attach/detach exclusion */
+    /* JYW: 管理所有的工作线程 */
 	struct list_head	workers;	/* A: attached workers */
 	struct completion	*detach_completion; /* all workers detached */
 
 	struct ida		worker_ida;	/* worker IDs for task name */
-
+    /* JYW: 工作线程属性 */
 	struct workqueue_attrs	*attrs;		/* I: worker attributes */
 	struct hlist_node	hash_node;	/* PL: unbound_pool_hash node */
 	int			refcnt;		/* PL: refcnt for unbound pools */
@@ -174,6 +182,7 @@ struct worker_pool {
 	 * from other CPUs during try_to_wake_up(), put it in a separate
 	 * cacheline.
 	 */
+    /* JYW: 统计计数，表示正在运行中的worker数量    */
 	atomic_t		nr_running ____cacheline_aligned_in_smp;
 
 	/*
@@ -189,6 +198,7 @@ struct worker_pool {
  * point to the pwq; thus, pwqs need to be aligned at two's power of the
  * number of flag bits.
  */
+/* JYW: 连接workqueue_struct和worker_pool的枢纽 */
 struct pool_workqueue {
 	struct worker_pool	*pool;		/* I: the associated pool */
 	struct workqueue_struct *wq;		/* I: the owning workqueue */
@@ -197,8 +207,11 @@ struct pool_workqueue {
 	int			refcnt;		/* L: reference count */
 	int			nr_in_flight[WORK_NR_COLORS];
 						/* L: nr of in_flight works */
+    /* JYW: 活跃的work数量 */
 	int			nr_active;	/* L: nr of active works */
+    /* JYW: 活跃的work最大数量 */
 	int			max_active;	/* L: max active works */
+    /* JYW: 链表头，被延迟执行的works可以挂入该链表   */
 	struct list_head	delayed_works;	/* L: delayed works */
 	struct list_head	pwqs_node;	/* WR: node on wq->pwqs */
 	struct list_head	mayday_node;	/* MD: node on wq->maydays */
@@ -211,6 +224,7 @@ struct pool_workqueue {
 	 */
 	struct work_struct	unbound_release_work;
 	struct rcu_head		rcu;
+    /* JYW: 结构体256字节对齐 */
 } __aligned(1 << WORK_STRUCT_FLAG_BITS);
 
 /*
@@ -228,8 +242,11 @@ struct wq_device;
  * The externally visible workqueue.  It relays the issued work items to
  * the appropriate worker_pool through its pool_workqueues.
  */
+/* JYW: 工作队列 */
 struct workqueue_struct {
+    /* JYW: 管理所有的pool-workqueue */
 	struct list_head	pwqs;		/* WR: all pwqs of this wq */
+    /* JYW: 被挂入全局的workqueues链表 */
 	struct list_head	list;		/* PL: list of all workqueues */
 
 	struct mutex		mutex;		/* protects this wq */
@@ -239,8 +256,9 @@ struct workqueue_struct {
 	struct wq_flusher	*first_flusher;	/* WQ: first flusher */
 	struct list_head	flusher_queue;	/* WQ: flush waiters */
 	struct list_head	flusher_overflow; /* WQ: flush overflow list */
-
+    /* JYW: 管理所有rescue状态下的pool-workqueue数据结构 */
 	struct list_head	maydays;	/* MD: pwqs requesting rescue */
+    /* JYW: rescure内核线程，内存紧张时创建失败，若置位了WQ_MEM_RECLAIM，则rescuer会接管这种情况 */
 	struct worker		*rescuer;	/* I: rescue worker */
 
 	int			nr_drainers;	/* WQ: drain in progress */
@@ -292,6 +310,9 @@ static LIST_HEAD(workqueues);		/* PL: list of all workqueues */
 static bool workqueue_freezing;		/* PL: have wqs started freezing? */
 
 /* the per-cpu worker pools */
+/* JYW: 工作线程池cpu_worker_pools
+ *  每个CPU上都有一个（准确有两个，一个用于普通先级工作线程，另一个用于高优先级的工作）
+ */
 static DEFINE_PER_CPU_SHARED_ALIGNED(struct worker_pool [NR_STD_WORKER_POOLS],
 				     cpu_worker_pools);
 
@@ -337,7 +358,7 @@ static void copy_workqueue_attrs(struct workqueue_attrs *to,
 	rcu_lockdep_assert(rcu_read_lock_sched_held() ||		\
 			   lockdep_is_held(&wq->mutex),			\
 			   "sched RCU or wq->mutex should be held")
-
+/* JYW: 遍历每个CPU上的worker_pool */
 #define for_each_cpu_worker_pool(pool, cpu)				\
 	for ((pool) = &per_cpu(cpu_worker_pools, cpu)[0];		\
 	     (pool) < &per_cpu(cpu_worker_pools, cpu)[NR_STD_WORKER_POOLS]; \
@@ -726,6 +747,7 @@ static bool __need_more_worker(struct worker_pool *pool)
  * function will always return %true for unbound pools as long as the
  * worklist isn't empty.
  */
+/* JYW: 是否有活要干 */
 static bool need_more_worker(struct worker_pool *pool)
 {
 	return !list_empty(&pool->worklist) && __need_more_worker(pool);
@@ -1570,6 +1592,7 @@ static void worker_enter_idle(struct worker *worker)
  * LOCKING:
  * spin_lock_irq(pool->lock).
  */
+/* JYW: 退出idle状态 */
 static void worker_leave_idle(struct worker *worker)
 {
 	struct worker_pool *pool = worker->pool;
@@ -1668,6 +1691,7 @@ static void worker_detach_from_pool(struct worker *worker,
  * Return:
  * Pointer to the newly created worker.
  */
+/* JYW: 创建一个工作线程 */
 static struct worker *create_worker(struct worker_pool *pool)
 {
 	struct worker *worker = NULL;
@@ -1692,6 +1716,7 @@ static struct worker *create_worker(struct worker_pool *pool)
 	else
 		snprintf(id_buf, sizeof(id_buf), "u%d:%d", pool->id, id);
 
+    /* JYW: 创建一个worker pool */
 	worker->task = kthread_create_on_node(worker_thread, worker, pool->node,
 					      "kworker/%s", id_buf);
 	if (IS_ERR(worker->task))
@@ -1932,6 +1957,7 @@ static bool manage_workers(struct worker *worker)
  * CONTEXT:
  * spin_lock_irq(pool->lock) which is released and regrabbed.
  */
+/* JYW: 处理一个pending的work */
 static void process_one_work(struct worker *worker, struct work_struct *work)
 __releases(&pool->lock)
 __acquires(&pool->lock)
@@ -2011,6 +2037,7 @@ __acquires(&pool->lock)
 	lock_map_acquire_read(&pwq->wq->lockdep_map);
 	lock_map_acquire(&lockdep_map);
 	trace_workqueue_execute_start(work);
+    /* JYW: 处理工作 */
 	worker->current_func(work);
 	/*
 	 * While we must be careful to not use "work" after this, the trace
@@ -2066,6 +2093,7 @@ __acquires(&pool->lock)
  * spin_lock_irq(pool->lock) which may be released and regrabbed
  * multiple times.
  */
+/* JYW：处理调度类的工作 */
 static void process_scheduled_works(struct worker *worker)
 {
 	while (!list_empty(&worker->scheduled)) {
@@ -2093,6 +2121,7 @@ static int worker_thread(void *__worker)
 	struct worker_pool *pool = worker->pool;
 
 	/* tell the scheduler that this is a workqueue worker */
+    /* JYW: 告诉调度器这是一个worker类型的进程 */
 	worker->task->flags |= PF_WQ_WORKER;
 woke_up:
 	spin_lock_irq(&pool->lock);
@@ -2109,10 +2138,11 @@ woke_up:
 		kfree(worker);
 		return 0;
 	}
-
+    /* JYW: 执行时退出idle状态 */
 	worker_leave_idle(worker);
 recheck:
 	/* no more worker necessary? */
+    /* JYW: 是否有活要干，若没有则休眠 */
 	if (!need_more_worker(pool))
 		goto sleep;
 
@@ -2818,6 +2848,7 @@ static bool __cancel_work_timer(struct work_struct *work, bool is_dwork)
  * Return:
  * %true if @work was pending, %false otherwise.
  */
+/* JYW: 取消并等待work结束 */
 bool cancel_work_sync(struct work_struct *work)
 {
 	return __cancel_work_timer(work, false);
@@ -4876,6 +4907,7 @@ static void __init wq_numa_init(void)
 	wq_numa_enabled = true;
 }
 
+/* JYW: 初始化工作队列 */
 static int __init init_workqueues(void)
 {
 	int std_nice[NR_STD_WORKER_POOLS] = { 0, HIGHPRI_NICE_LEVEL };
@@ -4895,6 +4927,7 @@ static int __init init_workqueues(void)
 		struct worker_pool *pool;
 
 		i = 0;
+        /* JYW: 遍历每个CPU上的worker_pool，并初始化 */
 		for_each_cpu_worker_pool(pool, cpu) {
 			BUG_ON(init_worker_pool(pool));
 			pool->cpu = cpu;
@@ -4910,6 +4943,7 @@ static int __init init_workqueues(void)
 	}
 
 	/* create the initial worker */
+    /* JYW: 为每个CPU上的每个worker_pool分别创建一个工作线程 */
 	for_each_online_cpu(cpu) {
 		struct worker_pool *pool;
 
@@ -4937,7 +4971,7 @@ static int __init init_workqueues(void)
 		attrs->no_numa = true;
 		ordered_wq_attrs[i] = attrs;
 	}
-
+    /* JYW: 创建系统默认的work queue */
 	system_wq = alloc_workqueue("events", 0, 0);
 	system_highpri_wq = alloc_workqueue("events_highpri", WQ_HIGHPRI, 0);
 	system_long_wq = alloc_workqueue("events_long", 0, 0);
