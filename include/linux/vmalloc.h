@@ -35,6 +35,7 @@ struct vm_struct {
 	unsigned long		flags;
     /* JYW: 指向page地址的指针数组，用于获取每个页面的物理地址 */
 	struct page		**pages;
+    /* JYW: 管理的页面数量 */
 	unsigned int		nr_pages;
 	phys_addr_t		phys_addr;
 	const void		*caller;

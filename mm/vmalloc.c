@@ -341,6 +341,7 @@ static void purge_vmap_area_lazy(void);
  * Allocate a region of KVA of the specified size and alignment, within the
  * vstart and vend.
  */
+/* JYW: 查找一块大小合适的并且没有人使用的空间 */
 static struct vmap_area *alloc_vmap_area(unsigned long size,
 				unsigned long align,
 				unsigned long vstart, unsigned long vend,
@@ -807,6 +808,7 @@ static struct vmap_block *new_vmap_block(gfp_t gfp_mask)
 	if (unlikely(!vb))
 		return ERR_PTR(-ENOMEM);
 
+    /* JYW: 查找一块大小合适的并且没有人使用的空间 */
 	va = alloc_vmap_area(VMAP_BLOCK_SIZE, VMAP_BLOCK_SIZE,
 					VMALLOC_START, VMALLOC_END,
 					node, gfp_mask);
@@ -1270,6 +1272,7 @@ void unmap_kernel_range(unsigned long addr, unsigned long size)
 }
 EXPORT_SYMBOL_GPL(unmap_kernel_range);
 
+/* JYW: 建立映射 */
 int map_vm_area(struct vm_struct *area, pgprot_t prot, struct page **pages)
 {
 	unsigned long addr = (unsigned long)area->addr;
@@ -1282,6 +1285,7 @@ int map_vm_area(struct vm_struct *area, pgprot_t prot, struct page **pages)
 }
 EXPORT_SYMBOL_GPL(map_vm_area);
 
+/* JYW: 建立vm_struct和vmap_area的关系 */
 static void setup_vmalloc_vm(struct vm_struct *vm, struct vmap_area *va,
 			      unsigned long flags, const void *caller)
 {
@@ -1306,6 +1310,7 @@ static void clear_vm_uninitialized_flag(struct vm_struct *vm)
 	vm->flags &= ~VM_UNINITIALIZED;
 }
 
+/* JYW: 获得一个vm_struct */
 static struct vm_struct *__get_vm_area_node(unsigned long size,
 		unsigned long align, unsigned long flags, unsigned long start,
 		unsigned long end, int node, gfp_t gfp_mask, const void *caller)
@@ -1330,12 +1335,14 @@ static struct vm_struct *__get_vm_area_node(unsigned long size,
 	if (!(flags & VM_NO_GUARD))
 		size += PAGE_SIZE;
 
+    /* JYW: 查找一块大小合适的并且没有人使用的空间 */
 	va = alloc_vmap_area(size, align, start, end, node, gfp_mask);
 	if (IS_ERR(va)) {
 		kfree(area);
 		return NULL;
 	}
 
+    /* JYW: 建立vm_struct和vmap_area的关系 */
 	setup_vmalloc_vm(area, va, flags, caller);
 
 	return area;
@@ -1591,6 +1598,7 @@ static void *__vmalloc_area_node(struct vm_struct *area, gfp_t gfp_mask,
 		struct page *page;
 
 		if (node == NUMA_NO_NODE)
+            /* JYW: 从高端内存分配物理页面 */
 			page = alloc_page(alloc_mask);
 		else
 			page = alloc_pages_node(node, alloc_mask, order);
@@ -1604,7 +1612,7 @@ static void *__vmalloc_area_node(struct vm_struct *area, gfp_t gfp_mask,
 		if (gfp_mask & __GFP_WAIT)
 			cond_resched();
 	}
-
+    /* JYW: 建立映射 */
 	if (map_vm_area(area, prot, pages))
 		goto fail;
 	return area->addr;
@@ -1642,11 +1650,12 @@ void *__vmalloc_node_range(unsigned long size, unsigned long align,
 	void *addr;
 	unsigned long real_size = size;
 
-    /* JYW: 必须是页面对齐 */
+    /* JYW: 必须是页面对齐 => 适用于分配大块内存 */
 	size = PAGE_ALIGN(size);
 	if (!size || (size >> PAGE_SHIFT) > totalram_pages)
 		goto fail;
 
+    /* JYW: 获得一个vm_struct */
 	area = __get_vm_area_node(size, align, VM_ALLOC | VM_UNINITIALIZED |
 				vm_flags, start, end, node, gfp_mask, caller);
 	if (!area)
@@ -1725,6 +1734,7 @@ static inline void *__vmalloc_node_flags(unsigned long size,
  */
 void *vmalloc(unsigned long size)
 {
+    /* JYW: 优先使用高端内存分配 */
 	return __vmalloc_node_flags(size, NUMA_NO_NODE,
 				    GFP_KERNEL | __GFP_HIGHMEM);
 }
