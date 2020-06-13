@@ -2045,7 +2045,7 @@ get_unmapped_area(struct file *file, unsigned long addr, unsigned long len,
 EXPORT_SYMBOL(get_unmapped_area);
 
 /* Look up the first VMA which satisfies  addr < vm_end,  NULL if none. */
-/* JYW: 查找一个VMA */
+/* JYW: 查找一个VMA，只需要满足addr < vam end */
 struct vm_area_struct *find_vma(struct mm_struct *mm, unsigned long addr)
 {
 	struct rb_node *rb_node;
@@ -2356,6 +2356,7 @@ int expand_stack(struct vm_area_struct *vma, unsigned long address)
 	return expand_downwards(vma, address);
 }
 
+/* JYW: 若addr比vma start小，则扩展vma start为addr */
 struct vm_area_struct *
 find_extend_vma(struct mm_struct *mm, unsigned long addr)
 {
@@ -2363,9 +2364,11 @@ find_extend_vma(struct mm_struct *mm, unsigned long addr)
 	unsigned long start;
 
 	addr &= PAGE_MASK;
+    /* JYW: 查找一个VMA，只需要满足addr < vam end */
 	vma = find_vma(mm, addr);
 	if (!vma)
 		return NULL;
+    /* JYW: 如果刚好合适，则返回 */
 	if (vma->vm_start <= addr)
 		return vma;
 	if (!(vma->vm_flags & VM_GROWSDOWN))

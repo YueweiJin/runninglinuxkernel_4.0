@@ -331,10 +331,12 @@ static int faultin_page(struct task_struct *tsk, struct vm_area_struct *vma,
 	return 0;
 }
 
+/* JYW: 检查vma的标志位 */
 static int check_vma_flags(struct vm_area_struct *vma, unsigned long gup_flags)
 {
 	vm_flags_t vm_flags = vma->vm_flags;
 
+    /* JYW: 如果是IO映射的vma，则返回错误 */
 	if (vm_flags & (VM_IO | VM_PFNMAP))
 		return -EFAULT;
 
@@ -455,6 +457,7 @@ long __get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 
 		/* first iteration or cross vma bound */
 		if (!vma || start >= vma->vm_end) {
+            /* JYW: 若addr比vma start小，则扩展vma start为addr */
 			vma = find_extend_vma(mm, start);
 			if (!vma && in_gate_area(mm, start)) {
 				int ret;
@@ -467,6 +470,7 @@ long __get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 				goto next_page;
 			}
 
+            /* JYW: 检查vma的标志位 */
 			if (!vma || check_vma_flags(vma, gup_flags))
 				return i ? : -EFAULT;
 			if (is_vm_hugetlb_page(vma)) {
@@ -481,8 +485,10 @@ retry:
 		 * If we have a pending SIGKILL, don't keep faulting pages and
 		 * potentially allocating memory.
 		 */
+        /* JYW: 若有信号错误，则直接退出 */
 		if (unlikely(fatal_signal_pending(current)))
 			return i ? i : -ERESTARTSYS;
+        /* JYW: 有条件调度，降低系统延迟 */
 		cond_resched();
         /* JYW: 查看VMA中的虚拟页面是否已经分配了物理内存  */
 		page = follow_page_mask(vma, start, foll_flags, &page_mask);

@@ -224,6 +224,7 @@ out:
  * If @nonblocking is non-NULL, it must held for read only and may be
  * released.  If it's released, *@nonblocking will be set to 0.
  */
+/* JYW: mlock一段vma */
 long __mlock_vma_pages_range(struct vm_area_struct *vma,
 		unsigned long start, unsigned long end, int *nonblocking)
 {
@@ -610,6 +611,7 @@ out:
 	return ret;
 }
 
+/* JYW: 处理vma标记及合并 */
 static int do_mlock(unsigned long start, size_t len, int on)
 {
 	unsigned long nstart, end, tmp;
@@ -637,6 +639,7 @@ static int do_mlock(unsigned long start, size_t len, int on)
 		/* Here we know that  vma->vm_start <= nstart < vma->vm_end. */
 
 		newflags = vma->vm_flags & ~VM_LOCKED;
+        /* JYW: 标记VM_LOCKED属性 */
 		if (on)
 			newflags |= VM_LOCKED;
 
@@ -691,17 +694,23 @@ int __mm_populate(unsigned long start, unsigned long len, int ignore_errors)
 			down_read(&mm->mmap_sem);
             /* JYW: 先找到对应的vma结构 */
 			vma = find_vma(mm, nstart);
+        /* JYW: 搜索的VMA已经大于当前vma的结束地址，则遍历下一个vma */
 		} else if (nstart >= vma->vm_end)
 			vma = vma->vm_next;
+        /* JYW: vma不存在或超过了搜索的范围，则跳出 */
 		if (!vma || vma->vm_start >= end)
 			break;
 		/*
 		 * Set [nstart; nend) to intersection of desired address
 		 * range with the first VMA. Also, skip undesirable VMA types.
 		 */
+        /* JYW: 取最小值，因为find_vma找到的是满足addr < vma end的vma */
 		nend = min(end, vma->vm_end);
+        /* JYW: 不会为VM_IO或VM_PFNMAP的vma映射物理页面 */
+        /* JYW: VM_IO | VM_PFNMAP  are set by remap_pfn_range() */
 		if (vma->vm_flags & (VM_IO | VM_PFNMAP))
 			continue;
+        /* JYW: 从实际vma管理的vm start开始 */
 		if (nstart < vma->vm_start)
 			nstart = vma->vm_start;
 		/*
@@ -709,8 +718,10 @@ int __mm_populate(unsigned long start, unsigned long len, int ignore_errors)
 		 * double checks the vma flags, so that it won't mlock pages
 		 * if the vma was already munlocked.
 		 */
+        /* JYW: mlock一段vma */
 		ret = __mlock_vma_pages_range(vma, nstart, nend, &locked);
 		if (ret < 0) {
+            /* JYW: 为1表示忽略错误 */
 			if (ignore_errors) {
 				ret = 0;
 				continue;	/* continue at next VMA */
@@ -732,11 +743,13 @@ SYSCALL_DEFINE2(mlock, unsigned long, start, size_t, len)
 	unsigned long lock_limit;
 	int error = -ENOMEM;
 
+    /* JYW: 权限检查 */
 	if (!can_do_mlock())
 		return -EPERM;
 
 	lru_add_drain_all();	/* flush pagevec */
 
+    /* JYW: 页面对齐 */
 	len = PAGE_ALIGN(len + (start & ~PAGE_MASK));
 	start &= PAGE_MASK;
 
@@ -749,7 +762,9 @@ SYSCALL_DEFINE2(mlock, unsigned long, start, size_t, len)
 	locked += current->mm->locked_vm;
 
 	/* check against resource limits */
+    /* JYW: 若没有超过资源限制 或 支持CAP_IPC_LOCK能力 */
 	if ((locked <= lock_limit) || capable(CAP_IPC_LOCK))
+        /* JYW: 处理vma标记及合并 */
 		error = do_mlock(start, len, 1);
 
 	up_write(&current->mm->mmap_sem);
