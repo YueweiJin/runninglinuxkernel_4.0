@@ -16,6 +16,7 @@ static inline int fsr_fs(unsigned int fsr)
 	return fsr & FSR_FS5_0;
 }
 #else
+/* JYW: 获取错误状态编号 */
 static inline int fsr_fs(unsigned int fsr)
 {
 	return (fsr & FSR_FS3_0) | (fsr & FSR_FS4) >> 6;

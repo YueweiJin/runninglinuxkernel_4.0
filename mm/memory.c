@@ -1751,7 +1751,7 @@ int remap_pfn_range(struct vm_area_struct *vma, unsigned long addr,
 	do {
         /* JYW: 计算下一个将要被映射的虚拟地址 */
 		next = pgd_addr_end(addr, end);
-        /* JYW: 填充页表 */
+        /* JYW: 填充pud */
 		err = remap_pud_range(mm, pgd, addr, next,
 				pfn + (addr >> PAGE_SHIFT), prot);
 		if (err)
@@ -2684,7 +2684,7 @@ static int __do_fault(struct vm_area_struct *vma, unsigned long address,
 	vmf.flags = flags;
 	vmf.page = NULL;
 	vmf.cow_page = cow_page;
-
+    /* JYW: 调用fault函数 */
 	ret = vma->vm_ops->fault(vma, &vmf);
 	if (unlikely(ret & (VM_FAULT_ERROR | VM_FAULT_NOPAGE | VM_FAULT_RETRY)))
 		return ret;
@@ -2868,12 +2868,13 @@ static int do_read_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 	 */
 	if (vma->vm_ops->map_pages && fault_around_bytes >> PAGE_SHIFT > 1) {
 		pte = pte_offset_map_lock(mm, pmd, address, &ptl);
+        /* JYW: 和page cache建立映射关系 */
 		do_fault_around(vma, address, pte, pgoff, flags);
 		if (!pte_same(*pte, orig_pte))
 			goto unlock_out;
 		pte_unmap_unlock(pte, ptl);
 	}
-
+    /* JYW: 创建新的page cache页面是在这里完成的 */
 	ret = __do_fault(vma, address, pgoff, flags, NULL, &fault_page);
 	if (unlikely(ret & (VM_FAULT_ERROR | VM_FAULT_NOPAGE | VM_FAULT_RETRY)))
 		return ret;
@@ -2913,11 +2914,11 @@ static int do_cow_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 		page_cache_release(new_page);
 		return VM_FAULT_OOM;
 	}
-
+    /* JYW: 读取文件内容到fault_page页面里 */
 	ret = __do_fault(vma, address, pgoff, flags, new_page, &fault_page);
 	if (unlikely(ret & (VM_FAULT_ERROR | VM_FAULT_NOPAGE | VM_FAULT_RETRY)))
 		goto uncharge_out;
-
+    /* JYW: 将内容拷贝到新的页面 */
 	if (fault_page)
 		copy_user_highpage(new_page, fault_page, address, vma);
 	__SetPageUptodate(new_page);
@@ -2937,6 +2938,7 @@ static int do_cow_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 		}
 		goto uncharge_out;
 	}
+    /* JYW: 为新页面设置页表项 */
 	do_set_pte(vma, address, new_page, pte, true, true);
 	mem_cgroup_commit_charge(new_page, memcg, false);
 	lru_cache_add_active_or_unevictable(new_page, vma);
@@ -3164,6 +3166,7 @@ out:
  * The mmap_sem may have been released depending on flags and our
  * return value.  See filemap_fault() and __lock_page_or_retry().
  */
+/* JYW: 缺页异常处理核心接口 */
 static int handle_pte_fault(struct mm_struct *mm,
 		     struct vm_area_struct *vma, unsigned long address,
 		     pte_t *pte, pmd_t *pmd, unsigned int flags)
@@ -3185,9 +3188,7 @@ static int handle_pte_fault(struct mm_struct *mm,
 	if (!pte_present(entry)) {
 		/* JYW: 如果PTE内容为空 */
 		if (pte_none(entry)) {
-			/* JYW:
-			 * 对于文件映射,通常vma的vm_ops操作函数定义了fault方法
-			 */
+			/* JYW: 对于文件映射,通常vma的vm_ops操作函数定义了fault方法 */
 			if (vma->vm_ops) {
 				if (likely(vma->vm_ops->fault))
 					return do_fault(mm, vma, address, pte,
@@ -3206,25 +3207,23 @@ static int handle_pte_fault(struct mm_struct *mm,
 		return do_numa_page(mm, vma, address, entry, pte, pmd);
 
 	/* JYW: PTE有映射内容，但是之前是只读,需要写时，发生写时复制缺页中断
-	 * 例如父子进程之间共享的内存，当其中一方需要写入新内容时，就会触发写时复制
+     * 例如父子进程之间共享的内存，当其中一方需要写入新内容时，就会触发写时复制
 	 */
 
 	ptl = pte_lockptr(mm, pmd);
 	spin_lock(ptl);
 	if (unlikely(!pte_same(*pte, entry)))
 		goto unlock;
-	/* JYW: 如果传进来的flags设置了可写的属性 */
+	/* JYW: 如果传进来的flags设置了可写的属性，但是页面是只读的 */
 	if (flags & FAULT_FLAG_WRITE) {
-		/* JYW: 当前pte是只读的 */
 		if (!pte_write(entry))
 			return do_wp_page(mm, vma, address,
 					pte, pmd, ptl, entry);
-		/* JYW: 当前PTE属性是可写的，为什么要继续处理呢？ */
-	        entry = pte_mkdirty(entry);
-        } 
+		/* JYW: 当前PTE属性是可写的，则标记脏页 */
+	    entry = pte_mkdirty(entry);
+    }
 	entry = pte_mkyoung(entry);
-	/* JYW:
-	 * 如果PTE内容发生变化，则需要把新的内容写入到PTE表项中，并且要刷到对应的TLB和cache */
+	/* JYW: 如果PTE内容发生变化，则需要把新的内容写入到PTE表项中，并且要刷到对应的TLB和cache */
 	if (ptep_set_access_flags(vma, address, pte, entry, flags & FAULT_FLAG_WRITE)) {
 		update_mmu_cache(vma, address, pte);
 	} else {
@@ -3331,7 +3330,7 @@ static int __handle_mm_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 	/* JYW: 获取pte表项 */
 	pte = pte_offset_map(pmd, address);
 
-	/* JYW: 核心接口 */
+	/* JYW: 缺页异常处理核心接口 */
 	return handle_pte_fault(mm, vma, address, pte, pmd, flags);
 }
 
@@ -3342,6 +3341,12 @@ static int __handle_mm_fault(struct mm_struct *mm, struct vm_area_struct *vma,
  * return value.  See filemap_fault() and __lock_page_or_retry().
  */
 /* JYW: 缺页异常的核心处理函数 */
+/*
+ * JYW: 函数返回值：
+ *  VM_FAULT_OOM
+ *  VM_FAULT_SIGBUS
+ *  ......
+ */
 int handle_mm_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 		    unsigned long address, unsigned int flags)
 {

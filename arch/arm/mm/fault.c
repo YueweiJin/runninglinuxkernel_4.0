@@ -56,6 +56,7 @@ static inline int notify_page_fault(struct pt_regs *regs, unsigned int fsr)
  * This is useful to dump out the page tables associated with
  * 'addr' in mm 'mm'.
  */
+/* JYW: 打印进程的页表信息 */
 void show_pte(struct mm_struct *mm, unsigned long addr)
 {
 	pgd_t *pgd;
@@ -202,7 +203,9 @@ void do_bad_area(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 }
 
 #ifdef CONFIG_MMU
+/* JYW: 失效地址在进程虚拟地址空间还未被分配 */
 #define VM_FAULT_BADMAP		0x010000
+/* JYW: 访问权限出错 */
 #define VM_FAULT_BADACCESS	0x020000
 
 /*
@@ -231,15 +234,13 @@ __do_page_fault(struct mm_struct *mm, unsigned long addr, unsigned int fsr,
 	struct vm_area_struct *vma;
 	int fault;
 
-	/* JYW: 首先通过addr来找到所在的vma结构 */
+	/* JYW: 首先通过失效addr来找到所在的vma结构 */
 	vma = find_vma(mm, addr);
 	fault = VM_FAULT_BADMAP;
-	/* JYW:
-	 * 如果找不到，索命addr地址还没有在进程地址空间中，返回VM_FAULT_BADMAP
-	 * 错误 
-	 */
+	/* JYW: 如果找不到，说明失效addr地址还没有在进程地址空间中，返回VM_FAULT_BADMAP错误 */
 	if (unlikely(!vma))
 		goto out;
+    /* JYW: 如果地址小于vm_start，则跳到check_stack */
 	if (unlikely(vma->vm_start > addr))
 		goto check_stack;
 
@@ -256,6 +257,12 @@ good_area:
 	}
 
 	/* JYW: 缺页异常的核心处理函数 */
+    /*
+     * JYW: 函数返回值：
+     *  VM_FAULT_OOM
+     *  VM_FAULT_SIGBUS
+     *  ......
+     */
 	return handle_mm_fault(mm, vma, addr & PAGE_MASK, flags);
 
 check_stack:
@@ -267,6 +274,7 @@ out:
 	return fault;
 }
 
+/* JYW: 缺页中断处理的核心函数 */
 static int __kprobes
 do_page_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 {
@@ -285,14 +293,14 @@ do_page_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 	if (interrupts_enabled(regs))
 		local_irq_enable();
 	/* If we're in an interrupt or have no user * context, we must not take the fault..  */
-       	/* JYW:
-	 * 如果在中断上下文或禁止抢占状态，或者在内核线程上下文，则跳到__do_kernel_fault */
+    /* JYW: * 如果在中断上下文或禁止抢占状态，或者在内核线程上下文，则跳到__do_kernel_fault */
 	if (in_atomic() || !mm)
 		goto no_context;
 
-	/* JYW: 如果是用户模式 */
+	/* JYW: 如果是用户模式，则置位FAULT_FLAG_USER */
 	if (user_mode(regs))
 		flags |= FAULT_FLAG_USER;
+    /* JYW: 如果是写模式，则置位FAULT_FLAG_WRITE */
 	if (fsr & FSR_WRITE)
 		flags |= FAULT_FLAG_WRITE;
 
@@ -408,8 +416,7 @@ retry:
 	return 0;
 
 no_context:
-	/* JYW:
-	 * 错误发生在内核模式，如果内核无法处理，只能调用__do_kernel_fault()来发送OOPS错误 */
+	/* JYW: 错误发生在内核模式，如果内核无法处理，只能调用__do_kernel_fault()来发送OOPS错误 */
 	__do_kernel_fault(mm, addr, fsr, regs);
 	return 0;
 }
@@ -566,13 +573,16 @@ hook_fault_code(int nr, int (*fn)(unsigned long, unsigned int, struct pt_regs *)
 /*
  * Dispatch a data abort to the relevant handler.
  */
+/* JYW: 数据异常处理函数 */
 asmlinkage void __exception
 do_DataAbort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 {
+    /* JYW: 获取错误状态编号对应的地址失效处理向量 */
 	const struct fsr_info *inf = fsr_info + fsr_fs(fsr);
 	struct siginfo info;
 
 	/* JYW: 跳转到对应状态的处理方案 */
+    /* JYW: 缺页异常： do_page_fault() */
 	if (!inf->fn(addr, fsr & ~FSR_LNX_PF, regs))
 		return;
 
@@ -580,6 +590,7 @@ do_DataAbort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 
 	pr_alert("Unhandled fault: %s (0x%03x) at 0x%08lx\n",
 		inf->name, fsr, addr);
+    /* JYW: 打印进程的页表信息 */
 	show_pte(current->mm, addr);
 
 	info.si_signo = inf->sig;

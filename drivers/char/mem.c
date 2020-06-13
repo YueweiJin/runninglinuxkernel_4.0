@@ -234,6 +234,7 @@ int __weak phys_mem_access_prot_allowed(struct file *file,
  *
  */
 #ifdef pgprot_noncached
+/* JYW: 是否允许非cache访问 */
 static int uncached_access(struct file *file, phys_addr_t addr)
 {
 #if defined(CONFIG_IA64)
@@ -255,19 +256,23 @@ static int uncached_access(struct file *file, phys_addr_t addr)
 	 * file pointer
 	 * that was marked O_DSYNC will be done non-cached.
 	 */
+    /* JYW: 如果置位O_DSYNC，则页面属性为非cache */
 	if (file->f_flags & O_DSYNC)
 		return 1;
+    /* JYW: 高端地址区域默认是非cache */
 	return addr >= __pa(high_memory);
 #endif
 }
 #endif
 
+/* JYW: 根据是否允许非cache访问，设置非cache属性 */
 static pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
 				     unsigned long size, pgprot_t vma_prot)
 {
 #ifdef pgprot_noncached
 	phys_addr_t offset = pfn << PAGE_SHIFT;
 
+    /* JYW: 是否允许非cache访问 */
 	if (uncached_access(file, offset))
 		return pgprot_noncached(vma_prot);
 #endif
@@ -326,6 +331,7 @@ static int mmap_mem(struct file *file, struct vm_area_struct *vma)
 	if (!valid_mmap_phys_addr_range(vma->vm_pgoff, size))
 		return -EINVAL;
 
+    /* JYW: 未开启MMU，不允许私有映射 */
 	if (!private_mapping_ok(vma))
 		return -ENOSYS;
 
@@ -336,6 +342,7 @@ static int mmap_mem(struct file *file, struct vm_area_struct *vma)
 						&vma->vm_page_prot))
 		return -EINVAL;
 
+    /* JYW: 根据是否允许非cache访问，设置非cache属性 */
 	vma->vm_page_prot = phys_mem_access_prot(file, vma->vm_pgoff,
 						 size,
 						 vma->vm_page_prot);

@@ -13,14 +13,14 @@
  */
 	.align	5
 ENTRY(v7_early_abort)
-	/* JYW: »ñÈ¡Data Fault Status Register,
-	 * ·´Ó³´æ´¢·ÃÎÊËùÊôÓòºÍ´æ´¢·ÃÎÊÀàĞÍµÈ
-	 * Í¨¹ıĞ­´¦Àí¼Ä´æÆ÷c5¶ÁÈ¡
+	/* JYW: è·å–Data Fault Status Register,
+	 * åæ˜ å­˜å‚¨è®¿é—®æ‰€å±åŸŸå’Œå­˜å‚¨è®¿é—®ç±»å‹ç­‰
+	 * é€šè¿‡åå¤„ç†å¯„å­˜å™¨c5è¯»å–
 	 */
 	mrc	p15, 0, r1, c5, c0, 0		@ get FSR
-	/* JYW: »ñÈ¡Data Fault Address Register 
-	 * ¼ÇÂ¼·ÃÎÊÊ§Ğ§µÄĞéÄâµØÖ·
-	 * Í¨¹ıĞ­´¦Àí¼Ä´æÆ÷c6¶ÁÈ¡
+	/* JYW: è·å–Data Fault Address Register 
+	 * è®°å½•è®¿é—®å¤±æ•ˆçš„è™šæ‹Ÿåœ°å€
+	 * é€šè¿‡åå¤„ç†å¯„å­˜å™¨c6è¯»å–
 	 */
 	mrc	p15, 0, r0, c6, c0, 0		@ get FAR
 
@@ -36,7 +36,6 @@ ENTRY(v7_early_abort)
 	ldr	r3, =0x40d			@ On permission fault
 	and	r3, r1, r3
 	cmp	r3, #0x0d
-	/* JYW: µ÷ÓÃ´Ë½Ó¿Ú */
 	bne	do_DataAbort
 
 	mcr	p15, 0, r0, c7, c8, 0   	@ Retranslate FAR
@@ -50,5 +49,6 @@ ENTRY(v7_early_abort)
 	orr	r1, r1, ip, LSR #1
 #endif
 
+	/* JYW: è°ƒç”¨æ­¤æ¥å£ */
 	b	do_DataAbort
 ENDPROC(v7_early_abort)

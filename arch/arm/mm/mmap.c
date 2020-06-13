@@ -191,6 +191,7 @@ void arch_pick_mmap_layout(struct mm_struct *mm)
  * You really shouldn't be using read() or write() on /dev/mem.  This
  * might go away in the future.
  */
+/* JYW: 判断是否超过了低端内存 */
 int valid_phys_addr_range(phys_addr_t addr, size_t size)
 {
 	if (addr < PHYS_OFFSET)
