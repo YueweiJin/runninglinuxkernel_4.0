@@ -781,6 +781,7 @@ typedef struct pglist_data {
 					     range, including holes */
 	/* JYW: 表示一个内存节点的编号 */
 	int node_id;
+    /* JYW: 等待队列 */
 	wait_queue_head_t kswapd_wait;
 	wait_queue_head_t pfmemalloc_wait;
 	struct task_struct *kswapd;	/* Protected by
@@ -840,6 +841,7 @@ extern int init_currently_empty_zone(struct zone *zone, unsigned long start_pfn,
 
 extern void lruvec_init(struct lruvec *lruvec);
 
+/* JYW: 获取lru向量所归属的zone */
 static inline struct zone *lruvec_zone(struct lruvec *lruvec)
 {
 #ifdef CONFIG_MEMCG

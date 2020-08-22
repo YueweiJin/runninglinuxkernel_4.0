@@ -17,20 +17,24 @@
  * needs to survive until the page is last deleted from the LRU, which
  * could be as far down as __page_cache_release.
  */
+/* JYW: 判断该页面是否属于文件cache */
 static inline int page_is_file_cache(struct page *page)
 {
 	return !PageSwapBacked(page);
 }
 
+/* JYW: 将page添加到lru链表中，并更新统计计数 */
 static __always_inline void add_page_to_lru_list(struct page *page,
 				struct lruvec *lruvec, enum lru_list lru)
 {
 	int nr_pages = hpage_nr_pages(page);
 	mem_cgroup_update_lru_size(lruvec, lru, nr_pages);
 	list_add(&page->lru, &lruvec->lists[lru]);
+    /* JYW: 统计增加zone上的page状态和全局的vm_stat */
 	__mod_zone_page_state(lruvec_zone(lruvec), NR_LRU_BASE + lru, nr_pages);
 }
 
+/* JYW: 将page从lru链表删除，并更新统计计数 */
 static __always_inline void del_page_from_lru_list(struct page *page,
 				struct lruvec *lruvec, enum lru_list lru)
 {
@@ -48,6 +52,7 @@ static __always_inline void del_page_from_lru_list(struct page *page,
  *
  * Returns the base LRU type - file or anon - @page should be on.
  */
+/* JYW: 统计该page所属lru类型 */
 static inline enum lru_list page_lru_base_type(struct page *page)
 {
 	if (page_is_file_cache(page))

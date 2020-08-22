@@ -58,6 +58,7 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/vmscan.h>
 
+/* JYW: 扫描的结果和参数都放在sc中 */
 struct scan_control {
 	/* How many pages shrink_list() should reclaim */
 	unsigned long nr_to_reclaim;
@@ -103,6 +104,7 @@ struct scan_control {
 	unsigned long nr_scanned;
 
 	/* Number of pages freed so far during a call to shrink_zones() */
+    /* JYW: 表示已经成功回收页面的数量 */
 	unsigned long nr_reclaimed;
 };
 
@@ -753,12 +755,17 @@ redo:
 }
 
 enum page_references {
+    /* JYW: 尝试回收该页面 */
 	PAGEREF_RECLAIM,
+    /* JYW: 尝试回收该页面 */
 	PAGEREF_RECLAIM_CLEAN,
+    /* JYW: 继续保留在不活跃链表中 */
 	PAGEREF_KEEP,
+    /* JYW: 会迁移到活跃链表中 */
 	PAGEREF_ACTIVATE,
 };
 
+/* JYW: 扫描不活跃LRU链表时被调用 */
 static enum page_references page_check_references(struct page *page,
 						  struct scan_control *sc)
 {
@@ -2134,7 +2141,7 @@ out:
 /*
  * This is a basic per-zone page freer.  Used by both kswapd and direct reclaim.
  */
-/* JYW: 基于zone的页面回收接口 */
+/* JYW: 扫描lru链表的核心函数 */
 static void shrink_lruvec(struct lruvec *lruvec, int swappiness,
 			  struct scan_control *sc, unsigned long *lru_pages)
 {
@@ -2328,7 +2335,7 @@ static inline bool should_continue_reclaim(struct zone *zone,
 	}
 }
 
-/* JYW: 回收page */
+/* JYW: 扫描zone中所有可回收页面 */
 static bool shrink_zone(struct zone *zone, struct scan_control *sc,
 			bool is_classzone)
 {
@@ -2365,7 +2372,7 @@ static bool shrink_zone(struct zone *zone, struct scan_control *sc,
 			swappiness = mem_cgroup_swappiness(memcg);
 			scanned = sc->nr_scanned;
 
-			/* JYW: 基于zone的页面回收接口 */
+			/* JYW: 扫描lru链表的核心函数 */
 			shrink_lruvec(lruvec, swappiness, sc, &lru_pages);
 			zone_lru_pages += lru_pages;
 
@@ -2914,6 +2921,7 @@ static void age_active_anon(struct zone *zone, struct scan_control *sc)
 	} while (memcg);
 }
 
+/* JYW: 用于判断zone的空闲页面是否处于WMARK_HIGH水位上 */
 static bool zone_balanced(struct zone *zone, int order,
 			  unsigned long balance_gap, int classzone_idx)
 {
@@ -2948,6 +2956,7 @@ static bool zone_balanced(struct zone *zone, int order,
  *     Similarly, on x86-64 the Normal zone would need to be at least 1G
  *     to balance a node on its own. These seemed like reasonable ratios.
  */
+/* JYW: 如果所有平衡状态的zone的页面数量大于这个节点所有管理的页面的25%，则认为该页面处于平衡状态 */
 static bool pgdat_balanced(pg_data_t *pgdat, int order, int classzone_idx)
 {
 	unsigned long managed_pages = 0;
@@ -2982,6 +2991,7 @@ static bool pgdat_balanced(pg_data_t *pgdat, int order, int classzone_idx)
 	}
 
 	if (order)
+        /* JYW: 如果所有平衡状态的zone的页面数量大于这个节点所有管理的页面的25%，则认为该页面处于平衡状态 */
 		return balanced_pages >= (managed_pages >> 2);
 	else
 		return true;
@@ -3027,6 +3037,8 @@ static bool prepare_kswapd_sleep(pg_data_t *pgdat, int order, long remaining,
  * reclaim or if the lack of progress was due to pages under writeback.
  * This is used to determine if the scanning priority needs to be raised.
  */
+/* JYW: 真正的页面扫描和回收函数，扫描的结果和参数都放在sc中 */
+/* JYW: 返回true，表示已经回收了所需要的页面，且不需要再提高扫描优先级 */
 static bool kswapd_shrink_zone(struct zone *zone,
 			       int classzone_idx,
 			       struct scan_control *sc,
@@ -3037,6 +3049,7 @@ static bool kswapd_shrink_zone(struct zone *zone,
 	bool lowmem_pressure;
 
 	/* Reclaim above the high watermark. */
+    /* JYW: 计算一轮扫描最多回收的页面个数 */
 	sc->nr_to_reclaim = max(SWAP_CLUSTER_MAX, high_wmark_pages(zone));
 
 	/*
@@ -3067,7 +3080,7 @@ static bool kswapd_shrink_zone(struct zone *zone,
 	if (!lowmem_pressure && zone_balanced(zone, testorder,
 						balance_gap, classzone_idx))
 		return true;
-
+    /* JYW: 扫描zone中所有可回收页面 */
 	shrink_zone(zone, sc, zone_idx(zone) == classzone_idx);
 
 	/* Account for the number of pages attempted to reclaim */
@@ -3086,7 +3099,7 @@ static bool kswapd_shrink_zone(struct zone *zone,
 		clear_bit(ZONE_CONGESTED, &zone->flags);
 		clear_bit(ZONE_DIRTY, &zone->flags);
 	}
-
+    /* JYW: 扫描的页面数量大于等于扫描目标 */
 	return sc->nr_scanned >= sc->nr_to_reclaim;
 }
 
@@ -3139,6 +3152,7 @@ static unsigned long balance_pgdat(pg_data_t *pgdat, int order,
 		 * Scan in the highmem->dma direction for the highest
 		 * zone which needs scanning
 		 */
+        /* JYW: 从高端zone往低端zone方向查找第一个处于不平衡状态的end_zone */
 		for (i = pgdat->nr_zones - 1; i >= 0; i--) {
 			struct zone *zone = pgdat->node_zones + i;
 
@@ -3165,7 +3179,7 @@ static unsigned long balance_pgdat(pg_data_t *pgdat, int order,
 				end_zone = i;
 				break;
 			}
-
+            /* JYW: 查找第一个处于不平衡状态的end_zone（水位小于WMARK_HIGH） */
 			if (!zone_balanced(zone, order, 0, 0)) {
 				end_zone = i;
 				break;
@@ -3181,7 +3195,7 @@ static unsigned long balance_pgdat(pg_data_t *pgdat, int order,
 
 		if (i < 0)
 			goto out;
-
+        /* JYW: 从低端zone开始页面回收，一直到end_zone */
 		for (i = 0; i <= end_zone; i++) {
 			struct zone *zone = pgdat->node_zones + i;
 
@@ -3193,6 +3207,7 @@ static unsigned long balance_pgdat(pg_data_t *pgdat, int order,
 			 * not call compaction as it is expected that the
 			 * necessary pages are already available.
 			 */
+            /* JYW: 当order大于0且zone处于WMARK_LOW水位之上时，则不需要内存规整 */
 			if (pgdat_needs_compaction &&
 					zone_watermark_ok(zone, order,
 						low_wmark_pages(zone),
@@ -3216,6 +3231,7 @@ static unsigned long balance_pgdat(pg_data_t *pgdat, int order,
 		 * pages behind kswapd's direction of progress, which would
 		 * cause too much scanning of the lower zones.
 		 */
+        /* JYW: 方向从ZONE_NORMAL到end_zone，伙伴系统是从高到低，目的是为了减少锁的争用 */
 		for (i = 0; i <= end_zone; i++) {
 			struct zone *zone = pgdat->node_zones + i;
 
@@ -3243,6 +3259,7 @@ static unsigned long balance_pgdat(pg_data_t *pgdat, int order,
 			 * that that high watermark would be met at 100%
 			 * efficiency.
 			 */
+            /* JYW: 真正的页面扫描和回收函数 */
 			if (kswapd_shrink_zone(zone, end_zone,
 					       &sc, &nr_attempted))
 				raise_priority = false;
@@ -3276,6 +3293,7 @@ static unsigned long balance_pgdat(pg_data_t *pgdat, int order,
 		 * Compact if necessary and kswapd is reclaiming at least the
 		 * high watermark number of pages as requsted
 		 */
+        /* JYW: 判断是否要对这个内存节点进行内存规整，优化内存碎片 */
 		if (pgdat_needs_compaction && sc.nr_reclaimed > nr_attempted)
 			compact_pgdat(pgdat, order);
 
@@ -3283,8 +3301,10 @@ static unsigned long balance_pgdat(pg_data_t *pgdat, int order,
 		 * Raise priority if scanning rate is too low or there was no
 		 * progress in reclaiming pages
 		 */
+        /* JYW: 判断是否需要提高扫描的优先级和扫描粒度 */
 		if (raise_priority || !sc.nr_reclaimed)
 			sc.priority--;
+    /* JYW: 不断增加扫描粒度，检查从最低端zone到classzone_idx的zone是否处于平衡状态 */
 	} while (sc.priority >= 1 &&
 		 !pgdat_balanced(pgdat, order, *classzone_idx));
 
@@ -3367,6 +3387,7 @@ static void kswapd_try_to_sleep(pg_data_t *pgdat, int order, int classzone_idx)
  * If there are applications that are active memory-allocators
  * (most normal use), this basically shouldn't matter.
  */
+/* JYW: 负责内存不足下的页面回收 */
 static int kswapd(void *p)
 {
 	unsigned long order, new_order;
@@ -3451,6 +3472,7 @@ static int kswapd(void *p)
 		if (!ret) {
 			trace_mm_vmscan_kswapd_wake(pgdat->node_id, order);
 			balanced_classzone_idx = classzone_idx;
+            /* JYW: 被唤醒后主要调用这里：*/
 			balanced_order = balance_pgdat(pgdat, order,
 						&balanced_classzone_idx);
 		}
@@ -3466,6 +3488,7 @@ static int kswapd(void *p)
 /*
  * A zone is low on free memory, so wake its kswapd task to service it.
  */
+/* JYW: 如果在低水位（ALLOC_WMARK_LOW）的情况下无法成功分配内存，则会调用 */
 void wakeup_kswapd(struct zone *zone, int order, enum zone_type classzone_idx)
 {
 	pg_data_t *pgdat;
@@ -3565,6 +3588,7 @@ int kswapd_run(int nid)
 	if (pgdat->kswapd)
 		return 0;
 
+    /* JYW: 创建kswapd页面回收进程 */
 	pgdat->kswapd = kthread_run(kswapd, pgdat, "kswapd%d", nid);
 	if (IS_ERR(pgdat->kswapd)) {
 		/* failure at boot is fatal */
@@ -3590,11 +3614,13 @@ void kswapd_stop(int nid)
 	}
 }
 
+/* JYW: 创建kswapd页面回收进程 */
 static int __init kswapd_init(void)
 {
 	int nid;
 
 	swap_setup();
+    /* JYW: 创建kswapd页面回收进程 */
 	for_each_node_state(nid, N_MEMORY)
  		kswapd_run(nid);
 	hotcpu_notifier(cpu_callback, 0);

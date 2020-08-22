@@ -110,6 +110,7 @@ static inline void vm_events_fold_cpu(int cpu)
  */
 extern atomic_long_t vm_stat[NR_VM_ZONE_STAT_ITEMS];
 
+/* JYW: 统计增加zone上的page状态和全局的vm_stat */
 static inline void zone_page_state_add(long x, struct zone *zone,
 				 enum zone_stat_item item)
 {

@@ -416,7 +416,7 @@ static void pagevec_lru_move_fn(struct pagevec *pvec,
 	struct zone *zone = NULL;
 	struct lruvec *lruvec;
 	unsigned long flags = 0;
-
+    /* JYW: 遍历整个向量的所有页面 */
 	for (i = 0; i < pagevec_count(pvec); i++) {
 		struct page *page = pvec->pages[i];
 		struct zone *pagezone = page_zone(page);
@@ -429,6 +429,7 @@ static void pagevec_lru_move_fn(struct pagevec *pvec,
 		}
 
 		lruvec = mem_cgroup_page_lruvec(page, zone);
+        /* JYW: 将每个页面添加或删除 */
 		(*move_fn)(page, lruvec, arg);
 	}
 	if (zone)
@@ -595,6 +596,7 @@ static void __lru_cache_activate_page(struct page *page)
  * When a newly allocated page is not yet visible, so safe for non-atomic ops,
  * __SetPageReferenced(page) may be substituted for mark_page_accessed(page).
  */
+/* JYW: 标记页面被访问过了，逻辑见注释 */
 void mark_page_accessed(struct page *page)
 {
 	if (!PageActive(page) && !PageUnevictable(page) &&
@@ -626,8 +628,7 @@ static void __lru_cache_add(struct page *page)
 	struct pagevec *pvec = &get_cpu_var(lru_add_pvec);
 
 	page_cache_get(page);
-	/* JYW:
-	 * 判断page向量是否有空间，若没有空间，则将向量中的所有页面添加到lru链表中 */
+	/* JYW: 判断page向量是否有空间，若没有空间，则将向量中的所有页面添加到lru链表中 */
 	if (!pagevec_space(pvec))
 		/* JYW: 将页面向量中的所有页面添加到lru链表中 */
 		__pagevec_lru_add(pvec);
@@ -1041,6 +1042,7 @@ static void __pagevec_lru_add_fn(struct page *page, struct lruvec *lruvec,
 	VM_BUG_ON_PAGE(PageLRU(page), page);
 
 	SetPageLRU(page);
+    /* JYW: 将page添加到lru链表中，并更新统计计数 */
 	add_page_to_lru_list(page, lruvec, lru);
 	update_page_reclaim_stat(lruvec, file, active);
 	trace_mm_lru_insertion(page, lru);
