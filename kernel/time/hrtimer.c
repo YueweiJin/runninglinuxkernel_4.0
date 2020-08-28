@@ -939,9 +939,11 @@ int __hrtimer_start_range_ns(struct hrtimer *timer, ktime_t tim,
 	unsigned long flags;
 	int ret, leftmost;
 
+    /* 取得hrtimer_clock_base指针 */
 	base = lock_hrtimer_base(timer, &flags);
 
 	/* Remove an active timer from the queue: */
+    /* 如果已经在红黑树中，先移除它 */
 	ret = remove_hrtimer(timer, base);
 
 	if (mode & HRTIMER_MODE_REL) {
@@ -957,14 +959,15 @@ int __hrtimer_start_range_ns(struct hrtimer *timer, ktime_t tim,
 		tim = ktime_add_safe(tim, base->resolution);
 #endif
 	}
-
+    /* 设置到期的时间范围 */
 	hrtimer_set_expires_range_ns(timer, tim, delta_ns);
 
 	/* Switch the timer base, if necessary: */
 	new_base = switch_hrtimer_base(timer, base, mode & HRTIMER_MODE_PINNED);
 
 	timer_stats_hrtimer_set_start_info(timer);
-
+    /* 把hrtime按到期时间排序，加入到对应时间基准系统的红黑树中 */
+    /* 如果该定时器是最早到期的，将会返回true */
 	leftmost = enqueue_hrtimer(timer, new_base);
 
 	if (!leftmost) {
@@ -1036,6 +1039,7 @@ EXPORT_SYMBOL_GPL(hrtimer_start_range_ns);
  *  0 on success
  *  1 when the timer was active
  */
+/* JYW: 开启一个高精度定时器 */
 int
 hrtimer_start(struct hrtimer *timer, ktime_t tim, const enum hrtimer_mode mode)
 {
@@ -1166,6 +1170,7 @@ static void __hrtimer_init(struct hrtimer *timer, clockid_t clock_id,
  * @clock_id:	the clock to be used
  * @mode:	timer mode abs/rel
  */
+/* JYW: 初始化一个高精度定时器 */
 void hrtimer_init(struct hrtimer *timer, clockid_t clock_id,
 		  enum hrtimer_mode mode)
 {
@@ -1194,6 +1199,7 @@ int hrtimer_get_res(const clockid_t which_clock, struct timespec *tp)
 }
 EXPORT_SYMBOL_GPL(hrtimer_get_res);
 
+/* JYW: 对到期定时器进行处理 */
 static void __run_hrtimer(struct hrtimer *timer, ktime_t *now)
 {
 	struct hrtimer_clock_base *base = timer->base;
@@ -1204,6 +1210,7 @@ static void __run_hrtimer(struct hrtimer *timer, ktime_t *now)
 	WARN_ON(!irqs_disabled());
 
 	debug_deactivate(timer);
+    /* JYW: 从红黑树中移除该定时器 */
 	__remove_hrtimer(timer, base, HRTIMER_STATE_CALLBACK, 0);
 	timer_stats_account_hrtimer(timer);
 	fn = timer->function;
@@ -1215,6 +1222,7 @@ static void __run_hrtimer(struct hrtimer *timer, ktime_t *now)
 	 */
 	raw_spin_unlock(&cpu_base->lock);
 	trace_hrtimer_expire_entry(timer, now);
+    /* JYW: 调用定时器的回调函数 */
 	restart = fn(timer);
 	trace_hrtimer_expire_exit(timer);
 	raw_spin_lock(&cpu_base->lock);
@@ -1224,6 +1232,7 @@ static void __run_hrtimer(struct hrtimer *timer, ktime_t *now)
 	 * we do not reprogramm the event hardware. Happens either in
 	 * hrtimer_start_range_ns() or in hrtimer_interrupt()
 	 */
+    /* JYW: 根据回调函数的返回值决定是否重新启动该定时器 */
 	if (restart != HRTIMER_NORESTART) {
 		BUG_ON(timer->state != HRTIMER_STATE_CALLBACK);
 		enqueue_hrtimer(timer, base);
@@ -1239,6 +1248,10 @@ static void __run_hrtimer(struct hrtimer *timer, ktime_t *now)
 /*
  * High resolution timer interrupt
  * Called with interrupts disabled
+ */
+/*
+ * JYW: 切换到高精度模式后，原来给cpu提供tick事件的tick_device（clock_event_device）会被高精度定时器系统接管，
+ *          它的中断事件回调函数被设置为hrtimer_interrupt
  */
 void hrtimer_interrupt(struct clock_event_device *dev)
 {
@@ -1273,7 +1286,7 @@ retry:
 
 		base = cpu_base->clock_base + i;
 		basenow = ktime_add(now, base->offset);
-
+        /* JYW: 遍历红黑树左下角的定时器 */
 		while ((node = timerqueue_getnext(&base->active))) {
 			struct hrtimer *timer;
 
@@ -1409,6 +1422,7 @@ static inline void __hrtimer_peek_ahead_timers(void) { }
  * softirq context in case the hrtimer initialization failed or has
  * not been done yet.
  */
+/* JYW: 如果没有激活，则检查是否需要切换到高精度模式 */
 void hrtimer_run_pending(void)
 {
 	if (hrtimer_hres_active())
@@ -1429,6 +1443,10 @@ void hrtimer_run_pending(void)
 /*
  * Called from hardirq context every jiffy
  */
+/* JYW: 尽管内核配置成支持高精度定时器，但并不是一开始就工作于高精度模式，系统在启动的开始阶段，
+ *      还是按照传统的模式在运行：tick_device按HZ频率定期地产生tick事件，这时的hrtimer工作在低分辨率模式，
+ *      到期事件在每个tick事件中断中由hrtimer_run_queues函数处理 
+ */
 void hrtimer_run_queues(void)
 {
 	struct timerqueue_node *node;
@@ -1436,9 +1454,11 @@ void hrtimer_run_queues(void)
 	struct hrtimer_clock_base *base;
 	int index, gettime = 1;
 
+    /* JYW: 如果已经切换到了高精度模式，什么也不做，直接返回 */
 	if (hrtimer_hres_active())
 		return;
 
+    /* JYW: 遍历各个时间基准系统 */
 	for (index = 0; index < HRTIMER_MAX_CLOCK_BASES; index++) {
 		base = &cpu_base->clock_base[index];
 		if (!timerqueue_getnext(&base->active))
@@ -1450,7 +1470,7 @@ void hrtimer_run_queues(void)
 		}
 
 		raw_spin_lock(&cpu_base->lock);
-
+        /* JYW: 查询对应红黑树的左下节点 */
 		while ((node = timerqueue_getnext(&base->active))) {
 			struct hrtimer *timer;
 
@@ -1458,7 +1478,7 @@ void hrtimer_run_queues(void)
 			if (base->softirq_time.tv64 <=
 					hrtimer_get_expires_tv64(timer))
 				break;
-
+            /* JYW: 对到期定时器进行处理 */
 			__run_hrtimer(timer, &base->softirq_time);
 		}
 		raw_spin_unlock(&cpu_base->lock);

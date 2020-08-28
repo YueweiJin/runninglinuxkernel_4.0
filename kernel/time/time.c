@@ -60,6 +60,7 @@ EXPORT_SYMBOL(sys_tz);
  * why not move it into the appropriate arch directory (for those
  * architectures that need it).
  */
+/* JYW: 获取秒数 */
 SYSCALL_DEFINE1(time, time_t __user *, tloc)
 {
 	time_t i = get_seconds();
@@ -78,7 +79,7 @@ SYSCALL_DEFINE1(time, time_t __user *, tloc)
  * why not move it into the appropriate arch directory (for those
  * architectures that need it).
  */
-
+/* JYW: 设置时间 */
 SYSCALL_DEFINE1(stime, time_t __user *, tptr)
 {
 	struct timespec tv;
@@ -99,6 +100,7 @@ SYSCALL_DEFINE1(stime, time_t __user *, tptr)
 
 #endif /* __ARCH_WANT_SYS_TIME */
 
+/* JYW: 获取时间 */
 SYSCALL_DEFINE2(gettimeofday, struct timeval __user *, tv,
 		struct timezone __user *, tz)
 {
@@ -186,6 +188,7 @@ int do_sys_settimeofday(const struct timespec *tv, const struct timezone *tz)
 	return 0;
 }
 
+/* JYW: 设置时间 */
 SYSCALL_DEFINE2(settimeofday, struct timeval __user *, tv,
 		struct timezone __user *, tz)
 {
@@ -321,6 +324,7 @@ EXPORT_SYMBOL(timespec_trunc);
  *
  * This algorithm was first published by Gauss (I think).
  */
+/* JYW: 将年月日转换为秒值，参考点为：linux epoch 1970-01-01 00:00:00 */
 time64_t mktime64(const unsigned int year0, const unsigned int mon0,
 		const unsigned int day, const unsigned int hour,
 		const unsigned int min, const unsigned int sec)

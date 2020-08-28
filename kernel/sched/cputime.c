@@ -475,9 +475,10 @@ void account_process_tick(struct task_struct *p, int user_tick)
 
 	if (steal_account_process_tick())
 		return;
-
+    /* JYW: 中断前处于用户态 */
 	if (user_tick)
 		account_user_time(p, cputime_one_jiffy, one_jiffy_scaled);
+    /* JYW: 中断前处于内核态，且不是idle进程 */
 	else if ((p != rq->idle) || (irq_count() != HARDIRQ_OFFSET))
 		account_system_time(p, HARDIRQ_OFFSET, cputime_one_jiffy,
 				    one_jiffy_scaled);

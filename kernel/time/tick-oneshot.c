@@ -80,6 +80,7 @@ int tick_switch_to_oneshot(void (*handler)(struct clock_event_device *))
 	}
 
 	td->mode = TICKDEV_MODE_ONESHOT;
+    /* JYW：hrtimer_interrupt */
 	dev->event_handler = handler;
 	clockevents_set_mode(dev, CLOCK_EVT_MODE_ONESHOT);
 	tick_broadcast_switch_to_oneshot();
@@ -109,6 +110,7 @@ int tick_oneshot_mode_active(void)
  *
  * Called with interrupts disabled.
  */
+/* JYW: 被设置在clock_event_device的回调函数 */
 int tick_init_highres(void)
 {
 	return tick_switch_to_oneshot(hrtimer_interrupt);

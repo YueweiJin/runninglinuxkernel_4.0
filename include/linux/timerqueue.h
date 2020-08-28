@@ -6,12 +6,16 @@
 
 
 struct timerqueue_node {
+    /* JYW: 红黑树的节点 */
 	struct rb_node node;
+    /* JYW: 该节点代表队hrtimer的到期时间，与hrtimer结构中的_softexpires稍有不同 */
 	ktime_t expires;
 };
 
 struct timerqueue_head {
+    /* JYW: 红黑树的根 */
 	struct rb_root head;
+    /* JYW: 增加了一个next字段，用于保存树中最先到期的定时器节点 */
 	struct timerqueue_node *next;
 };
 

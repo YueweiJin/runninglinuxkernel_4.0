@@ -77,16 +77,24 @@ struct tvec_root {
 
 struct tvec_base {
 	spinlock_t lock;
+    /* JYW: 当前正在运行的定时器 */
 	struct timer_list *running_timer;
+    /* JYW: 需要检查的最早到期时间 */
 	unsigned long timer_jiffies;
 	unsigned long next_timer;
 	unsigned long active_timers;
+    /* JYW: 添加的动态定时器数量 */
 	unsigned long all_timers;
 	int cpu;
+    /* JYW: 包含TVR_SIZE个动态定时器链表 */
 	struct tvec_root tv1;
+    /* JYW: 包含TVN_SIZE个动态定时器链表（2^14-1个节拍内将要到期） */
 	struct tvec tv2;
+    /* JYW: 包含TVN_SIZE个动态定时器链表（2^20-1个节拍内将要到期） */
 	struct tvec tv3;
+    /* JYW: 包含TVN_SIZE个动态定时器链表（2^26-1个节拍内将要到期） */
 	struct tvec tv4;
+    /* JYW: 包含TVN_SIZE个动态定时器链表（2^32-1个节拍内将要到期） */
 	struct tvec tv5;
 } ____cacheline_aligned;
 
@@ -940,6 +948,7 @@ EXPORT_SYMBOL(mod_timer_pinned);
  * Timers with an ->expires field in the past will be executed in the next
  * timer tick.
  */
+/* JYW: 启动一个定时器 */
 void add_timer(struct timer_list *timer)
 {
 	BUG_ON(timer_pending(timer));
@@ -1113,6 +1122,7 @@ static int cascade(struct tvec_base *base, struct tvec *tv, int index)
 	return index;
 }
 
+/* JYW: 调用动态定时器函数 */
 static void call_timer_fn(struct timer_list *timer, void (*fn)(unsigned long),
 			  unsigned long data)
 {
@@ -1138,6 +1148,7 @@ static void call_timer_fn(struct timer_list *timer, void (*fn)(unsigned long),
 	lock_map_acquire(&lockdep_map);
 
 	trace_timer_expire_entry(timer);
+    /* JYW: 执行函数 */
 	fn(data);
 	trace_timer_expire_exit(timer);
 
@@ -1165,6 +1176,7 @@ static void call_timer_fn(struct timer_list *timer, void (*fn)(unsigned long),
  * This function cascades all vectors and executes all expired timer
  * vectors.
  */
+/* JYW: 运行所有当前CPU上到期的动态定时器 */
 static inline void __run_timers(struct tvec_base *base)
 {
 	struct timer_list *timer;
@@ -1193,7 +1205,7 @@ static inline void __run_timers(struct tvec_base *base)
 			void (*fn)(unsigned long);
 			unsigned long data;
 			bool irqsafe;
-
+            /* JYW: 从链表中取出 */
 			timer = list_first_entry(head, struct timer_list,entry);
 			fn = timer->function;
 			data = timer->data;
@@ -1201,15 +1213,18 @@ static inline void __run_timers(struct tvec_base *base)
 
 			timer_stats_account_timer(timer);
 
+            /* JYW: 当前正在运行的定时器 */
 			base->running_timer = timer;
 			detach_expired_timer(timer, base);
 
 			if (irqsafe) {
 				spin_unlock(&base->lock);
+                /* JYW: 调用动态定时器函数 */
 				call_timer_fn(timer, fn, data);
 				spin_lock(&base->lock);
 			} else {
 				spin_unlock_irq(&base->lock);
+                /* JYW: 调用动态定时器函数 */
 				call_timer_fn(timer, fn, data);
 				spin_lock_irq(&base->lock);
 			}
@@ -1374,6 +1389,7 @@ unsigned long get_next_timer_interrupt(unsigned long now)
  * Called from the timer interrupt handler to charge one tick to the current
  * process.  user_tick is 1 if the tick is user time, 0 for system.
  */
+/* JYW: 更新进程时间 */
 void update_process_times(int user_tick)
 {
 	struct task_struct *p = current;
@@ -1393,12 +1409,14 @@ void update_process_times(int user_tick)
 /*
  * This function runs timers and the timer-tq in bottom half context.
  */
+/* JYW: 运行定时器软中断 */
 static void run_timer_softirq(struct softirq_action *h)
 {
 	struct tvec_base *base = __this_cpu_read(tvec_bases);
 
 	hrtimer_run_pending();
 
+    /* JYW: 需要检查的最早到期时间到达后 */
 	if (time_after_eq(jiffies, base->timer_jiffies))
 		__run_timers(base);
 }
@@ -1681,6 +1699,7 @@ void __init init_timers(void)
 
 	init_timer_stats();
 	register_cpu_notifier(&timers_nb);
+    /* JYW: 初始化定时器软中断处理函数 */
 	open_softirq(TIMER_SOFTIRQ, run_timer_softirq);
 }
 
@@ -1688,7 +1707,7 @@ void __init init_timers(void)
  * msleep - sleep safely even with waitqueue interruptions
  * @msecs: Time in milliseconds to sleep for
  */
-/* JYW: 使用定时器 */
+/* JYW: 使用定时器，超时后自动唤醒 */
 void msleep(unsigned int msecs)
 {
 	unsigned long timeout = msecs_to_jiffies(msecs) + 1;
@@ -1696,7 +1715,6 @@ void msleep(unsigned int msecs)
 	while (timeout)
 		timeout = schedule_timeout_uninterruptible(timeout);
 }
-
 EXPORT_SYMBOL(msleep);
 
 /**
@@ -1711,7 +1729,6 @@ unsigned long msleep_interruptible(unsigned int msecs)
 		timeout = schedule_timeout_interruptible(timeout);
 	return jiffies_to_msecs(timeout);
 }
-
 EXPORT_SYMBOL(msleep_interruptible);
 
 static int __sched do_usleep_range(unsigned long min, unsigned long max)

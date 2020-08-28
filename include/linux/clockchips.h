@@ -101,6 +101,8 @@ struct clock_event_device {
      * 而在这个中断handler中再调用event_handler,
      * 参考实例：sp804_timer_interrupt
      */
+    /* JYW: tick_handle_periodic */
+    /* JYW：hrtimer_interrupt */
 	void			(*event_handler)(struct clock_event_device *);
 	int			(*set_next_event)(unsigned long evt,
 						  struct clock_event_device *);

@@ -691,6 +691,7 @@ static void __init arch_timer_common_init(void)
 	arch_timer_arch_init();
 }
 
+/* JYW: arm自带定时器初始化 */
 static void __init arch_timer_init(struct device_node *np)
 {
 	int i;

@@ -28,6 +28,7 @@
  * for a fast NMI safe accessor to clock monotonic.
  */
 struct tk_read_base {
+    /* JYW: 选择的时钟源，这个clock应该系统中最优的那个 */
 	struct clocksource	*clock;
 	cycle_t			(*read)(struct clocksource *cs);
 	cycle_t			mask;
@@ -75,10 +76,13 @@ struct tk_read_base {
  * wall_to_monotonic is no longer the boot time, getboottime must be
  * used instead.
  */
+/* JYW: 时间管家结构体 */
 struct timekeeper {
 	struct tk_read_base	tkr;
+    /* JYW: CLOCK_REALTIME类型的系统时钟（其实就是墙上时钟）*/
 	u64			xtime_sec;
 	unsigned long		ktime_sec;
+    /* JYW: 定义了monotonic clock到real time clock的偏移 */
 	struct timespec64	wall_to_monotonic;
 	ktime_t			offs_real;
 	ktime_t			offs_boot;

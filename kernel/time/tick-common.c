@@ -48,6 +48,7 @@ ktime_t tick_period;
  *    at it will take over and keep the time keeping alive.  The handover
  *    procedure also covers cpu hotplug.
  */
+/* JYW: 指明哪一个cpu上的local tick作为global tick */
 int tick_do_timer_cpu __read_mostly = TICK_DO_TIMER_BOOT;
 
 /*
@@ -77,17 +78,20 @@ int tick_is_oneshot_available(void)
  */
 static void tick_periodic(int cpu)
 {
+    /* JYW: 如果是global tick选定的CPU */
 	if (tick_do_timer_cpu == cpu) {
 		write_seqlock(&jiffies_lock);
 
 		/* Keep track of the next tick event */
 		tick_next_period = ktime_add(tick_next_period, tick_period);
-
+        /* JYW: 更新jiffies，计算平均负载 */
 		do_timer(1);
 		write_sequnlock(&jiffies_lock);
+        /* JYW: 从clocksource读取更新墙上时间 */
 		update_wall_time();
 	}
 
+    /* JYW: 更新进程时间 */
 	update_process_times(user_mode(get_irq_regs()));
 	profile_tick(CPU_PROFILING);
 }
@@ -109,8 +113,9 @@ void tick_handle_periodic(struct clock_event_device *dev)
 		 * Setup the next period for devices, which do not have
 		 * periodic mode:
 		 */
+        /* JYW: 计算下一个周期性tick触发的时间 */
 		next = ktime_add(next, tick_period);
-
+        /* JYW: 设定下一个clock event触发的时间 */
 		if (!clockevents_program_event(dev, next, false))
 			return;
 		/*

@@ -78,8 +78,11 @@ enum hrtimer_restart {
  * All state transitions are protected by cpu_base->lock.
  */
 #define HRTIMER_STATE_INACTIVE	0x00
+/* JYW: 定时器已经被排入红黑树中 */
 #define HRTIMER_STATE_ENQUEUED	0x01
+/* JYW: 定时器的回调函数正在被调用 */
 #define HRTIMER_STATE_CALLBACK	0x02
+/* JYW: 定时器正在CPU之间做迁移 */
 #define HRTIMER_STATE_MIGRATE	0x04
 
 /**
@@ -105,6 +108,7 @@ enum hrtimer_restart {
  *
  * The hrtimer structure must be initialized by hrtimer_init()
  */
+/* JYW: 高精度定时器 */
 struct hrtimer {
 	struct timerqueue_node		node;
 	ktime_t				_softexpires;
@@ -146,6 +150,7 @@ struct hrtimer_clock_base {
 	struct hrtimer_cpu_base	*cpu_base;
 	int			index;
 	clockid_t		clockid;
+    /* JYW: 红黑树的封装 */
 	struct timerqueue_head	active;
 	ktime_t			resolution;
 	ktime_t			(*get_time)(void);
@@ -179,6 +184,7 @@ enum  hrtimer_base_type {
  * @max_hang_time:	Maximum time spent in hrtimer_interrupt
  * @clock_base:		array of clock bases for this cpu
  */
+/* JYW: 每个CPU一个 */
 struct hrtimer_cpu_base {
 	raw_spinlock_t			lock;
 	unsigned int			cpu;
@@ -328,6 +334,7 @@ static inline void timerfd_clock_was_set(void) { }
 #endif
 extern void hrtimers_resume(void);
 
+/* JYW: 系统为每一个cpu建立了一个tick device */
 DECLARE_PER_CPU(struct tick_device, tick_cpu_device);
 
 

@@ -1149,6 +1149,7 @@ void tick_setup_sched_timer(void)
 	 * Emulate tick processing via per-CPU hrtimers:
 	 */
 	hrtimer_init(&ts->sched_timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
+    /* JYW: 将tick调度时钟挂接到hrtimer->function，模拟调度时钟 */
 	ts->sched_timer.function = tick_sched_timer;
 
 	/* Get the next period (per cpu) */
@@ -1227,13 +1228,18 @@ void tick_oneshot_notify(void)
 int tick_check_oneshot_change(int allow_nohz)
 {
 	struct tick_sched *ts = this_cpu_ptr(&tick_cpu_sched);
-
+    /* JYW: check_clock标志由clocksource和clock_event_device系统的notify系统置位，
+            当系统中有更高精度的clocksource被注册和选择后，
+            或者有更精确的支持CLOCK_EVT_MODE_ONESHOT模式的clock_event_device被注册时，
+            通过它们的notify函数，check_clock标志的第0为会置位
+     */
 	if (!test_and_clear_bit(0, &ts->check_clocks))
 		return 0;
 
 	if (ts->nohz_mode != NOHZ_MODE_INACTIVE)
 		return 0;
 
+    /* JYW: 判断timekeeper系统是否支持高精度模式 || 判断tick_device是否支持CLOCK_EVT_MODE_ONESHOT模式 */
 	if (!timekeeping_valid_for_hres() || !tick_is_oneshot_available())
 		return 0;
 

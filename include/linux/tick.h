@@ -21,6 +21,7 @@ enum tick_device_mode {
 	TICKDEV_MODE_ONESHOT,
 };
 
+/* JYW: 工作在某种模式下的clock event设备 */
 struct tick_device {
 	struct clock_event_device *evtdev;
 	enum tick_device_mode mode;

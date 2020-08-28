@@ -44,10 +44,15 @@ struct itimerval {
 /*
  * The IDs of the various system clocks (for POSIX.1b interval timers):
  */
+/* JYW: 真实世界的时钟，允许修改，也可通过NTP校时 */
 #define CLOCK_REALTIME			0
+/* JYW: 禁止人为设定的时钟，单调递增，一般会把系统启动的时间点设定为其基准点 */
+/* JYW: 除了可以通过NTP对该时钟进行调整之外，其他任何程序不允许设定该时钟 */
 #define CLOCK_MONOTONIC			1
+/* JYW: 基于进程或者线程的系统时钟 */
 #define CLOCK_PROCESS_CPUTIME_ID	2
 #define CLOCK_THREAD_CPUTIME_ID		3
+/* JYW: 具备CLOCK_MONOTONIC的特性，完全基于本地晶振的时钟 */
 #define CLOCK_MONOTONIC_RAW		4
 #define CLOCK_REALTIME_COARSE		5
 #define CLOCK_MONOTONIC_COARSE		6

@@ -9,12 +9,14 @@
 
 struct tvec_base;
 
+/* JYW: 描述一个定时器 */
 struct timer_list {
 	/*
 	 * All fields that change during normal runtime grouped to the
 	 * same cacheline
 	 */
 	struct list_head entry;
+    /* JYW: 期望定时器执行的jiffies值，到达jiffies值时，将调用function函数 */
 	unsigned long expires;
 	struct tvec_base *base;
 

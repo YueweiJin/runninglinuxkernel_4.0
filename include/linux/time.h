@@ -157,6 +157,7 @@ extern void do_sys_times(struct tms *);
  * Similar to the struct tm in userspace <time.h>, but it needs to be here so
  * that the kernel source is self contained.
  */
+/* JYW: break-down时间，将秒分解为年月日时分秒 */
 struct tm {
 	/*
 	 * the number of seconds after the minute, normally in the range
@@ -172,6 +173,7 @@ struct tm {
 	/* the number of months since January, in the range 0 to 11 */
 	int tm_mon;
 	/* the number of years since 1900 */
+    /* JYW: 以NTP epoch为基准点 */
 	long tm_year;
 	/* the number of days since Sunday, in the range 0 to 6 */
 	int tm_wday;
@@ -188,6 +190,7 @@ void time_to_tm(time_t totalsecs, int offset, struct tm *result);
  * Returns the scalar nanosecond representation of the timespec
  * parameter.
  */
+/* JYW: 将timespec转换成ns */
 static inline s64 timespec_to_ns(const struct timespec *ts)
 {
 	return ((s64) ts->tv_sec * NSEC_PER_SEC) + ts->tv_nsec;
@@ -200,6 +203,7 @@ static inline s64 timespec_to_ns(const struct timespec *ts)
  * Returns the scalar nanosecond representation of the timeval
  * parameter.
  */
+/* JYW: 将timeval转换成ns */
 static inline s64 timeval_to_ns(const struct timeval *tv)
 {
 	return ((s64) tv->tv_sec * NSEC_PER_SEC) +

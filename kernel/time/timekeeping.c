@@ -36,12 +36,18 @@
  * The most important data for readout fits into a single 64 byte
  * cache line.
  */
+/* JYW: 定义tk_core全局变量 */
 static struct {
 	seqcount_t		seq;
 	struct timekeeper	timekeeper;
 } tk_core ____cacheline_aligned;
 
 static DEFINE_RAW_SPINLOCK(timekeeper_lock);
+/* JYW: shadow_timekeeper主要用在更新系统时间的过程中。
+        在update_wall_time中，首先将时间调整值设定到shadow_timekeeper中，
+        然后一次性的copy到真正的那个timekeeper中。
+        这样的设计主要是可以减少持有timekeeper_seq锁的时间（在更新系统时间的过程中）
+ */
 static struct timekeeper shadow_timekeeper;
 
 /**
@@ -1604,6 +1610,7 @@ static cycle_t logarithmic_accumulation(struct timekeeper *tk, cycle_t offset,
  * update_wall_time - Uses the current clocksource to increment the wall time
  *
  */
+/* JYW: 从clocksource读取更新墙上时间 */
 void update_wall_time(void)
 {
 	struct timekeeper *real_tk = &tk_core.timekeeper;
@@ -1760,6 +1767,7 @@ struct timespec64 get_monotonic_coarse64(void)
 /*
  * Must hold jiffies_lock
  */
+/* JYW: 更新jiffies，计算平均负载 */
 void do_timer(unsigned long ticks)
 {
 	jiffies_64 += ticks;

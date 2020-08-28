@@ -67,6 +67,7 @@ typedef __kernel_ptrdiff_t	ptrdiff_t;
 
 #ifndef _TIME_T
 #define _TIME_T
+/* JYW: 32位系统上，到2038年就溢出了 */
 typedef __kernel_time_t		time_t;
 #endif
 
