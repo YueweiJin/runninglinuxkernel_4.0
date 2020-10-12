@@ -310,7 +310,9 @@ static int shmem_add_to_page_cache(struct page *page,
 								 page);
 	if (!error) {
 		mapping->nrpages++;
+        /* JYW: 增加统计NR_FILE_PAGES页面数量 */
 		__inc_zone_page_state(page, NR_FILE_PAGES);
+        /* JYW: 增加统计NR_SHMEM页面数量 */
 		__inc_zone_page_state(page, NR_SHMEM);
 		spin_unlock_irq(&mapping->tree_lock);
 	} else {

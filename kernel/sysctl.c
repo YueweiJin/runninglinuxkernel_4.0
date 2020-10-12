@@ -1196,6 +1196,8 @@ static struct ctl_table vm_table[] = {
 		.proc_handler	= dirty_background_bytes_handler,
 		.extra1		= &one_ul,
 	},
+    /* JYW: 指定了当文件系统缓存脏页数量达到系统内存百分之多少时，系统不得不开始处理缓存脏页 */
+    /* JYW: 大华设置了5%，前端设置了1%，默认是20% */
 	{
 		.procname	= "dirty_ratio",
 		.data		= &vm_dirty_ratio,

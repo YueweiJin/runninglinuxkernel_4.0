@@ -204,6 +204,7 @@ EXPORT_SYMBOL(generic_error_remove_page);
  *
  * Returns 1 if the page is successfully invalidated, otherwise 0.
  */
+/* JYW: 无效page，成功返回1，失败返回0（比如是脏页） */
 int invalidate_inode_page(struct page *page)
 {
 	struct address_space *mapping = page_mapping(page);
@@ -476,6 +477,7 @@ EXPORT_SYMBOL(truncate_inode_pages_final);
  * invalidate pages which are dirty, locked, under writeback or mapped into
  * pagetables.
  */
+/* JYW: 无效所有的page buffer，但是脏页、锁住的页、回写的页或者正在使用的页是无法回收的 */
 unsigned long invalidate_mapping_pages(struct address_space *mapping,
 		pgoff_t start, pgoff_t end)
 {
@@ -506,6 +508,7 @@ unsigned long invalidate_mapping_pages(struct address_space *mapping,
 			if (!trylock_page(page))
 				continue;
 			WARN_ON(page->index != index);
+            /* JYW: 无效page，成功返回1，失败返回0（比如是脏页） */
 			ret = invalidate_inode_page(page);
 			unlock_page(page);
 			/*
@@ -513,6 +516,7 @@ unsigned long invalidate_mapping_pages(struct address_space *mapping,
 			 * of interest and try to speed up its reclaim.
 			 */
 			if (!ret)
+                /* JYW: 如果page无法回收，则放到inactive链表来加速回收 */
 				deactivate_page(page);
 			count += ret;
 		}

@@ -713,6 +713,7 @@ const char * const vmstat_text[] = {
 	"nr_slab_reclaimable",
 	"nr_slab_unreclaimable",
 	"nr_page_table_pages",
+    /* JYW: 内核堆栈页面数量 */
 	"nr_kernel_stack",
 	"nr_unstable",
 	"nr_bounce",
@@ -746,6 +747,7 @@ const char * const vmstat_text[] = {
 
 #ifdef CONFIG_VM_EVENT_COUNTERS
 	/* enum vm_event_item counters */
+    /* JYW: 关联的是 enum vm_event_item */
 	"pgpgin",
 	"pgpgout",
 	"pswpin",
@@ -761,9 +763,13 @@ const char * const vmstat_text[] = {
 	"pgmajfault",
 
 	TEXTS_FOR_ZONES("pgrefill")
+    /* JYW: 由kswapd回收的页面数量 */
 	TEXTS_FOR_ZONES("pgsteal_kswapd")
+    /* JYW: 直接回收的页面数量 */
 	TEXTS_FOR_ZONES("pgsteal_direct")
+    /* JYW: 由kswapd扫描的页面数量 */
 	TEXTS_FOR_ZONES("pgscan_kswapd")
+    /* JYW: 直接回收的页面数量 */
 	TEXTS_FOR_ZONES("pgscan_direct")
 	"pgscan_direct_throttle",
 
@@ -1274,7 +1280,9 @@ static const struct file_operations proc_zoneinfo_file_operations = {
 };
 
 enum writeback_stat_item {
+    /* JYW: 脏页回写阈值 */
 	NR_DIRTY_THRESHOLD,
+    /* JYW: 脏页触发回写现场阈值 */
 	NR_DIRTY_BG_THRESHOLD,
 	NR_VM_WRITEBACK_STAT_ITEMS,
 };
@@ -1301,6 +1309,7 @@ static void *vmstat_start(struct seq_file *m, loff_t *pos)
 		v[i] = global_page_state(i);
 	v += NR_VM_ZONE_STAT_ITEMS;
 
+    /* JYW: 脏页回写阈值计算 */
 	global_dirty_limits(v + NR_DIRTY_BG_THRESHOLD,
 			    v + NR_DIRTY_THRESHOLD);
 	v += NR_VM_WRITEBACK_STAT_ITEMS;
@@ -1531,6 +1540,7 @@ static int __init setup_vmstat(void)
 	proc_create("buddyinfo", S_IRUGO, NULL, &fragmentation_file_operations);
 	/* JYW: 注册/proc/pagetypeinfo节点 */
 	proc_create("pagetypeinfo", S_IRUGO, NULL, &pagetypeinfo_file_ops);
+    /* JYW: 注册/proc/vmstat节点 */
 	proc_create("vmstat", S_IRUGO, NULL, &proc_vmstat_file_operations);
 	proc_create("zoneinfo", S_IRUGO, NULL, &proc_zoneinfo_file_operations);
 #endif

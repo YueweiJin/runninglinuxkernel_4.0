@@ -830,6 +830,7 @@ static long writeback_inodes_wb(struct bdi_writeback *wb, long nr_pages,
 	return nr_pages - work.nr_pages;
 }
 
+/* JYW: 脏页数量是否超过了background_thresh */
 static bool over_bground_thresh(struct backing_dev_info *bdi)
 {
 	unsigned long background_thresh, dirty_thresh;
@@ -906,6 +907,7 @@ static long wb_writeback(struct bdi_writeback *wb,
 		 * For background writeout, stop when we are below the
 		 * background dirty threshold
 		 */
+        /* JYW: 脏页数量没有超过background_thresh */
 		if (work->for_background && !over_bground_thresh(wb->bdi))
 			break;
 

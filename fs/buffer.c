@@ -54,9 +54,11 @@ void init_buffer(struct buffer_head *bh, bh_end_io_t *handler, void *private)
 }
 EXPORT_SYMBOL(init_buffer);
 
+/* JYW: 访问buffer所在页面 */
 inline void touch_buffer(struct buffer_head *bh)
 {
 	trace_block_touch_buffer(bh);
+    /* JYW: 标记页面被访问过了，逻辑见注释 */
 	mark_page_accessed(bh->b_page);
 }
 EXPORT_SYMBOL(touch_buffer);
@@ -209,7 +211,7 @@ __find_get_block_slow(struct block_device *bdev, sector_t block)
 
 	/* JYW: 根据块号和块大小得到与块设备相关的页的索引 */
 	index = block >> (PAGE_CACHE_SHIFT - bd_inode->i_blkbits);
-	/* JYW: 根据page index查找对应的page, 如果没有这一项，则返回NULL  */
+    /* JYW: 根据page index查找对应的page，如果没有会申请添加 */
 	page = find_get_page_flags(bd_mapping, index, FGP_ACCESSED);
 	if (!page)
 		goto out;
@@ -221,7 +223,7 @@ __find_get_block_slow(struct block_device *bdev, sector_t block)
 	/* JYW: 获取page关联的块缓冲区首部 */
 	head = page_buffers(page);
 	bh = head;
-	/* JYW: 遍历链表找到匹配的block缓冲 */
+	/* JYW: 遍历链表(一个page对应多个buffer head)找到匹配的block缓冲 */
 	do {
 		if (!buffer_mapped(bh))
 			all_mapped = 0;
@@ -805,6 +807,7 @@ static int fsync_buffers_list(spinlock_t *lock, struct list_head *list)
  * assumes that all the buffers are against the blockdev.  Not true
  * for reiserfs.
  */
+/* JYW: 无效块设备的buffer */
 void invalidate_inode_buffers(struct inode *inode)
 {
 	if (inode_has_buffers(inode)) {
@@ -1161,6 +1164,7 @@ EXPORT_SYMBOL(__getblk_slow);
  * mark_buffer_dirty() is atomic.  It takes bh->b_page->mapping->private_lock,
  * mapping->tree_lock and mapping->host->i_lock.
  */
+/* JYW: 标记buffer为脏 */
 void mark_buffer_dirty(struct buffer_head *bh)
 {
 	WARN_ON_ONCE(!buffer_uptodate(bh));
@@ -1368,7 +1372,7 @@ lookup_bh_lru(struct block_device *bdev, sector_t block, unsigned size)
  * it in the LRU and mark it as accessed.  If it is not present then return
  * NULL
  */
-/* JYW: 搜索一个缓存块,若不存在，则返回NULL  */
+/* JYW: 搜索一个缓存块,若不存在，若不存在会分配page并加入页高速缓存，返回对应buffer_head */
 struct buffer_head *
 __find_get_block(struct block_device *bdev, sector_t block, unsigned size)
 {
@@ -1402,7 +1406,7 @@ struct buffer_head *
 __getblk_gfp(struct block_device *bdev, sector_t block,
 	     unsigned size, gfp_t gfp)
 {
-	/* JYW: 搜索一个缓存块,若不存在，则返回NULL  */
+    /* JYW: 搜索一个缓存块,若不存在，若不存在会分配page并加入页高速缓存，返回对应buffer_head */
 	struct buffer_head *bh = __find_get_block(bdev, block, size);
 
 	might_sleep();
@@ -1551,6 +1555,7 @@ static void discard_buffer(struct buffer_head * bh)
  * point.  Because the caller is about to free (and possibly reuse) those
  * blocks on-disk.
  */
+/* JYW: 无效部分buffer page */
 void block_invalidatepage(struct page *page, unsigned int offset,
 			  unsigned int length)
 {
@@ -1606,6 +1611,7 @@ EXPORT_SYMBOL(block_invalidatepage);
  * __set_page_dirty_buffers() via private_lock.  try_to_free_buffers
  * is already excluded via the page lock.
  */
+/* JYW: 设置为page创建buffers */
 void create_empty_buffers(struct page *page,
 			unsigned long blocksize, unsigned long b_state)
 {
@@ -1652,6 +1658,7 @@ EXPORT_SYMBOL(create_empty_buffers);
  * wait on that I/O in bforget() - it's more efficient to wait on the I/O
  * only if we really need to.  That happens here.
  */
+/* JYW: 等待回写后释放buffer head */
 void unmap_underlying_metadata(struct block_device *bdev, sector_t block)
 {
 	struct buffer_head *old_bh;
@@ -2979,6 +2986,7 @@ sector_t generic_block_bmap(struct address_space *mapping, sector_t block,
 }
 EXPORT_SYMBOL(generic_block_bmap);
 
+/* JYW: 底层BIO完成后，向上通知buffer page已完成I/O */
 static void end_bio_bh_io_sync(struct bio *bio, int err)
 {
 	struct buffer_head *bh = bio->bi_private;
@@ -3173,6 +3181,7 @@ void write_dirty_buffer(struct buffer_head *bh, int rw)
 	}
 	bh->b_end_io = end_buffer_write_sync;
 	get_bh(bh);
+    /* JYW: 把缓冲区首部提交到通用块层 */
 	submit_bh(rw, bh);
 }
 EXPORT_SYMBOL(write_dirty_buffer);
@@ -3192,6 +3201,7 @@ int __sync_dirty_buffer(struct buffer_head *bh, int rw)
 	if (test_clear_buffer_dirty(bh)) {
 		get_bh(bh);
 		bh->b_end_io = end_buffer_write_sync;
+        /* JYW: 把缓冲区首部提交到通用块层 */
 		ret = submit_bh(rw, bh);
 		wait_on_buffer(bh);
 		if (!ret && !buffer_uptodate(bh))

@@ -28,6 +28,7 @@ static void drop_pagecache_sb(struct super_block *sb, void *unused)
 		__iget(inode);
 		spin_unlock(&inode->i_lock);
 		spin_unlock(&inode_sb_list_lock);
+        /* JYW: 无效所有的page buffer，但是脏页、锁住的页、回写的页或者正在使用的页是无法回收的 */
 		invalidate_mapping_pages(inode->i_mapping, 0, -1);
 		iput(toput_inode);
 		toput_inode = inode;

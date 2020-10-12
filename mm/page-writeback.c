@@ -236,6 +236,7 @@ static unsigned long highmem_dirtyable_memory(unsigned long total)
  * Returns the global number of pages potentially available for dirty
  * page cache.  This is the base value for the global dirty limits.
  */
+/* JYW: 估算最大可能的脏页数量 */
 static unsigned long global_dirtyable_memory(void)
 {
 	unsigned long x;
@@ -261,8 +262,10 @@ static unsigned long global_dirtyable_memory(void)
  * The dirty limits will be lifted by 1/4 for PF_LESS_THROTTLE (ie. nfsd) and
  * real-time tasks.
  */
+/* JYW: 脏页回写阈值计算 */
 void global_dirty_limits(unsigned long *pbackground, unsigned long *pdirty)
 {
+    /* JYW: 估算最大可能的脏页数量 */
 	const unsigned long available_memory = global_dirtyable_memory();
 	unsigned long background;
 	unsigned long dirty;
@@ -297,6 +300,7 @@ void global_dirty_limits(unsigned long *pbackground, unsigned long *pdirty)
  * Returns the maximum number of dirty pages allowed in a zone, based
  * on the zone's dirtyable memory.
  */
+/* JYW: 计算zone最大可能脏页 */
 static unsigned long zone_dirty_limit(struct zone *zone)
 {
 	unsigned long zone_memory = zone_dirtyable_memory(zone);

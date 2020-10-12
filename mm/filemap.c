@@ -606,6 +606,7 @@ err_insert:
  * This function is used to add a page to the pagecache. It must be locked.
  * This function does not add the page to the LRU.  The caller must do that.
  */
+/* JYW: 将page添加到基数树 */
 int add_to_page_cache_locked(struct page *page, struct address_space *mapping,
 		pgoff_t offset, gfp_t gfp_mask)
 {
@@ -614,6 +615,7 @@ int add_to_page_cache_locked(struct page *page, struct address_space *mapping,
 }
 EXPORT_SYMBOL(add_to_page_cache_locked);
 
+/* JYW: 将page加入到lru及mapping表 */
 int add_to_page_cache_lru(struct page *page, struct address_space *mapping,
 				pgoff_t offset, gfp_t gfp_mask)
 {
@@ -621,6 +623,7 @@ int add_to_page_cache_lru(struct page *page, struct address_space *mapping,
 	int ret;
 
 	__set_page_locked(page);
+    /* JYW: 将page添加到基数树 */
 	ret = __add_to_page_cache_locked(page, mapping, offset,
 					 gfp_mask, &shadow);
 	if (unlikely(ret))
@@ -636,6 +639,7 @@ int add_to_page_cache_lru(struct page *page, struct address_space *mapping,
 			workingset_activation(page);
 		} else
 			ClearPageActive(page);
+        /* JYW: 将页面添加到lru链表 */
 		lru_cache_add(page);
 	}
 	return ret;
@@ -1067,6 +1071,7 @@ EXPORT_SYMBOL(find_lock_entry);
  *
  * If there is a page cache page, it is returned with an increased refcount.
  */
+/* JYW: 获取基数树中的page结构，如果没有会申请添加 */
 struct page *pagecache_get_page(struct address_space *mapping, pgoff_t offset,
 	int fgp_flags, gfp_t gfp_mask)
 {
@@ -1108,18 +1113,18 @@ no_page:
 			gfp_mask |= __GFP_WRITE;
 		if (fgp_flags & FGP_NOFS)
 			gfp_mask &= ~__GFP_FS;
-
+        /* JYW: 如果找不到对应的page，则申请一个page */
 		page = __page_cache_alloc(gfp_mask);
 		if (!page)
 			return NULL;
 
 		if (WARN_ON_ONCE(!(fgp_flags & FGP_LOCK)))
 			fgp_flags |= FGP_LOCK;
-
 		/* Init accessed so avoid atomic mark_page_accessed later */
+        /* JYW: 先初始化为accessed */
 		if (fgp_flags & FGP_ACCESSED)
 			__SetPageReferenced(page);
-
+        /* JYW: 将page加入到lru及mapping表 */
 		err = add_to_page_cache_lru(page, mapping, offset,
 				gfp_mask & GFP_RECLAIM_MASK);
 		if (unlikely(err)) {

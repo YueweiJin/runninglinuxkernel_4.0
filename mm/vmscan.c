@@ -1567,9 +1567,12 @@ shrink_inactive_list(unsigned long nr_to_scan, struct lruvec *lruvec,
 	__mod_zone_page_state(zone, NR_ISOLATED_ANON + file, nr_taken);
 
 	if (global_reclaim(sc)) {
+        /* JYW: 更新NR_PAGES_SCANNED计数 */
 		__mod_zone_page_state(zone, NR_PAGES_SCANNED, nr_scanned);
+        /* JYW: 如果是由kswapd扫描，则统计PGSCAN_KSWAPD数量 */
 		if (current_is_kswapd())
 			__count_zone_vm_events(PGSCAN_KSWAPD, zone, nr_scanned);
+        /* JYW: 如果是直接扫描，则统计PGSCAN_DIRECT数量 */
 		else
 			__count_zone_vm_events(PGSCAN_DIRECT, zone, nr_scanned);
 	}
@@ -3420,6 +3423,7 @@ static int kswapd(void *p)
 	 * us from recursively trying to free more memory as we're
 	 * trying to free the first piece of memory in the first place).
 	 */
+    /* JYW: 进程标记，自己是kswapd */
 	tsk->flags |= PF_MEMALLOC | PF_SWAPWRITE | PF_KSWAPD;
 	set_freezable();
 

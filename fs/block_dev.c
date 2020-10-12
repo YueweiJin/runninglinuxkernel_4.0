@@ -74,6 +74,7 @@ void kill_bdev(struct block_device *bdev)
 EXPORT_SYMBOL(kill_bdev);
 
 /* Invalidate clean unused buffers and pagecache. */
+/* JYW: 无效块设备的buffer page */
 void invalidate_bdev(struct block_device *bdev)
 {
 	struct address_space *mapping = bdev->bd_inode->i_mapping;

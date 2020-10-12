@@ -5788,7 +5788,7 @@ static void setup_per_zone_lowmem_reserve(void)
 static void __setup_per_zone_wmarks(void)
 {
 	/* JYW:
-	 * 用到min_free_kbytes这个全局变量，在系统启动时通过init_per_zone_wmark_min()计算来的 */
+	 * 用到min_free_kbytes这个全局变量，在系统启动时通过 init_per_zone_wmark_min() 计算来的 */
 	unsigned long pages_min = min_free_kbytes >> (PAGE_SHIFT - 10);
 	unsigned long lowmem_pages = 0;
 	struct zone *zone;

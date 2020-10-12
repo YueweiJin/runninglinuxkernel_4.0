@@ -157,8 +157,10 @@ void buffer_check_dirty_writeback(struct page *page,
  * Declarations
  */
 
+/* JYW: 标记buffer为脏 */
 void mark_buffer_dirty(struct buffer_head *bh);
 void init_buffer(struct buffer_head *, bh_end_io_t *, void *);
+/* JYW: 访问buffer所在页面 */
 void touch_buffer(struct buffer_head *bh);
 void set_bh_page(struct buffer_head *bh,
 		struct page *page, unsigned long offset);

@@ -753,6 +753,7 @@ void lru_cache_add_active_or_unevictable(struct page *page,
  * be write it out by flusher threads as this is much more effective
  * than the single-page writeout from reclaim.
  */
+/* JYW: 如果page无法回收，则放到inactive链表来加速回收 */
 static void lru_deactivate_fn(struct page *page, struct lruvec *lruvec,
 			      void *arg)
 {
@@ -836,6 +837,7 @@ void lru_add_drain_cpu(int cpu)
  * for example if its invalidation fails due to the page being dirty
  * or under writeback.
  */
+/* JYW: 如果page无法回收，则放到inactive链表来加速回收 */
 void deactivate_page(struct page *page)
 {
 	/*
@@ -849,6 +851,7 @@ void deactivate_page(struct page *page)
 		struct pagevec *pvec = &get_cpu_var(lru_deactivate_pvecs);
 
 		if (!pagevec_add(pvec, page))
+            /* JYW: 如果page无法回收，则放到inactive链表来加速回收 */
 			pagevec_lru_move_fn(pvec, lru_deactivate_fn, NULL);
 		put_cpu_var(lru_deactivate_pvecs);
 	}

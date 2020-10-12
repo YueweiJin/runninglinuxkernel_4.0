@@ -28,6 +28,7 @@ struct bio;
 				 SWAP_FLAG_DISCARD | SWAP_FLAG_DISCARD_ONCE | \
 				 SWAP_FLAG_DISCARD_PAGES)
 
+/* JYW: 判断当前进程是否是kswapd */
 static inline int current_is_kswapd(void)
 {
 	return current->flags & PF_KSWAPD;
