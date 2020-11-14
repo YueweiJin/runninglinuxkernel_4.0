@@ -359,7 +359,7 @@ static int __event__synthesize_thread(union perf_event *comm_event,
 		return 0;
 	}
 
-	while (!readdir_r(tasks, &dirent, &next) && next) {
+	while (!readdir(tasks, &dirent, &next) && next) {
 		char *end;
 		int rc = 0;
 		pid_t _pid;
@@ -490,7 +490,7 @@ int perf_event__synthesize_threads(struct perf_tool *tool,
 	if (proc == NULL)
 		goto out_free_fork;
 
-	while (!readdir_r(proc, &dirent, &next) && next) {
+	while (!readdir(proc, &dirent, &next) && next) {
 		char *end;
 		pid_t pid = strtol(dirent.d_name, &end, 10);
 

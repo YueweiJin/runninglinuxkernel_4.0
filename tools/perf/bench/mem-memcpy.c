@@ -130,7 +130,9 @@ static double timeval2double(struct timeval *ts)
 
 struct bench_mem_info {
 	const struct routine *routines;
+    /* JYW: 通过cycle方式计算的拷贝指定长度所用时间 */
 	u64 (*do_cycle)(const struct routine *r, size_t len, bool prefault);
+    /* JYW: 通过gettimeofday方式计算的拷贝指定长度所用时间 */
 	double (*do_gettimeofday)(const struct routine *r, size_t len, bool prefault);
 	const char *const *usage;
 };
@@ -193,16 +195,19 @@ static int bench_mem_common(int argc, const char **argv,
 		if (use_cycle) {
 			result_cycle[0] =
 				info->do_cycle(&info->routines[i], len, false);
+            /* JYW: 则在memcpy前进行pre page fault */
 			result_cycle[1] =
 				info->do_cycle(&info->routines[i], len, true);
 		} else {
 			result_bps[0] =
 				info->do_gettimeofday(&info->routines[i],
 						len, false);
+            /* JYW: 则在memcpy前进行pre page fault */
 			result_bps[1] =
 				info->do_gettimeofday(&info->routines[i],
 						len, true);
 		}
+    /* JYW: 传入-o选项，则在memcpy前进行pre page fault */
 	} else {
 		if (use_cycle) {
 			result_cycle[pf] =
@@ -216,6 +221,7 @@ static int bench_mem_common(int argc, const char **argv,
 	}
 
 	switch (bench_format) {
+    /* JYW: 以默认的方式打印perf bench mem的结果 */
 	case BENCH_FORMAT_DEFAULT:
 		if (!only_prefault && !no_prefault) {
 			if (use_cycle) {
@@ -269,6 +275,7 @@ static int bench_mem_common(int argc, const char **argv,
 	return 0;
 }
 
+/* JYW: 分配内存 */
 static void memcpy_alloc_mem(void **dst, void **src, size_t length)
 {
 	*dst = zalloc(length);
@@ -282,6 +289,7 @@ static void memcpy_alloc_mem(void **dst, void **src, size_t length)
 	memset(*src, 0, length);
 }
 
+/* JYW: 计算memcpy经过的cycle数量 */
 static u64 do_memcpy_cycle(const struct routine *r, size_t len, bool prefault)
 {
 	u64 cycle_start = 0ULL, cycle_end = 0ULL;
@@ -289,8 +297,10 @@ static u64 do_memcpy_cycle(const struct routine *r, size_t len, bool prefault)
 	memcpy_t fn = r->fn.memcpy;
 	int i;
 
+    /* JYW: 分配内存 */
 	memcpy_alloc_mem(&dst, &src, len);
 
+    /* JYW: 若置位了prefault，提前进行page fault操作 */
 	if (prefault)
 		fn(dst, src, len);
 
@@ -304,6 +314,7 @@ static u64 do_memcpy_cycle(const struct routine *r, size_t len, bool prefault)
 	return cycle_end - cycle_start;
 }
 
+/* JYW: 计算memcpy经过的时间，重复iterations次，返回bytes/s */
 static double do_memcpy_gettimeofday(const struct routine *r, size_t len,
 				     bool prefault)
 {
@@ -314,6 +325,7 @@ static double do_memcpy_gettimeofday(const struct routine *r, size_t len,
 
 	memcpy_alloc_mem(&dst, &src, len);
 
+    /* JYW: 若置位了prefault，提前进行page fault操作 */
 	if (prefault)
 		fn(dst, src, len);
 
@@ -342,6 +354,7 @@ int bench_mem_memcpy(int argc, const char **argv,
 	return bench_mem_common(argc, argv, prefix, &info);
 }
 
+/* JYW: memcpy方式分配内存 */
 static void memset_alloc_mem(void **dst, size_t length)
 {
 	*dst = zalloc(length);
@@ -349,6 +362,7 @@ static void memset_alloc_mem(void **dst, size_t length)
 		die("memory allocation failed - maybe length is too large?\n");
 }
 
+/* JYW: cycle方式计算拷贝指定长度所用时间 */
 static u64 do_memset_cycle(const struct routine *r, size_t len, bool prefault)
 {
 	u64 cycle_start = 0ULL, cycle_end = 0ULL;
@@ -370,6 +384,7 @@ static u64 do_memset_cycle(const struct routine *r, size_t len, bool prefault)
 	return cycle_end - cycle_start;
 }
 
+/* JYW: gettimeofday方式计算拷贝指定长度所用时间 */
 static double do_memset_gettimeofday(const struct routine *r, size_t len,
 				     bool prefault)
 {
