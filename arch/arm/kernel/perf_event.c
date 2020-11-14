@@ -134,6 +134,7 @@ int armpmu_event_set_period(struct perf_event *event)
 	return ret;
 }
 
+/* JYW: 更新count计数，一般是在event事件溢出时在中断中进行 */
 u64 armpmu_event_update(struct perf_event *event)
 {
 	struct arm_pmu *armpmu = to_arm_pmu(event->pmu);
@@ -142,14 +143,15 @@ u64 armpmu_event_update(struct perf_event *event)
 
 again:
 	prev_raw_count = local64_read(&hwc->prev_count);
+    /* JYW: 读取计数器 */
 	new_raw_count = armpmu->read_counter(event);
 
 	if (local64_cmpxchg(&hwc->prev_count, prev_raw_count,
 			     new_raw_count) != prev_raw_count)
 		goto again;
-
+    /* JYW: 获取差值 */
 	delta = (new_raw_count - prev_raw_count) & armpmu->max_period;
-
+    /* JYW: 累加到count变量中 */
 	local64_add(delta, &event->count);
 	local64_sub(delta, &hwc->period_left);
 
@@ -516,6 +518,7 @@ const struct dev_pm_ops armpmu_dev_pm_ops = {
 	SET_RUNTIME_PM_OPS(armpmu_runtime_suspend, armpmu_runtime_resume, NULL)
 };
 
+/* JYW: 初始化struct arm_pmu成员 */
 static void armpmu_init(struct arm_pmu *armpmu)
 {
 	atomic_set(&armpmu->active_events, 0);
@@ -533,12 +536,15 @@ static void armpmu_init(struct arm_pmu *armpmu)
 	};
 }
 
+/* JYW: 注册PMU */
 int armpmu_register(struct arm_pmu *armpmu, int type)
 {
 	armpmu_init(armpmu);
 	pm_runtime_enable(&armpmu->plat_device->dev);
+    /* JYW: 启动打印注册的驱动及事件个数 */
 	pr_info("enabled with %s PMU driver, %d counters available\n",
 			armpmu->name, armpmu->num_events);
+    /* JYW: 向perf核心层注册底层的pmu对象 */
 	return perf_pmu_register(&armpmu->pmu, armpmu->name, type);
 }
 

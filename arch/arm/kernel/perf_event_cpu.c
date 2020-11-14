@@ -182,6 +182,7 @@ static int cpu_pmu_notify(struct notifier_block *b, unsigned long action,
 	return NOTIFY_OK;
 }
 
+/* JYW: 初始化cpu_pmu，主要是分配cpu_hw_events并关联到cpu_pmu以及初始化request_irq和free_irq成员 */
 static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
 {
 	int err;
@@ -289,6 +290,7 @@ static int probe_current_pmu(struct arm_pmu *pmu)
 	return ret;
 }
 
+/* JYW: PMU驱动probe入口 */
 static int cpu_pmu_device_probe(struct platform_device *pdev)
 {
 	const struct of_device_id *of_id;
@@ -313,6 +315,7 @@ static int cpu_pmu_device_probe(struct platform_device *pdev)
 
 	if (node && (of_id = of_match_node(cpu_pmu_of_device_ids, pdev->dev.of_node))) {
 		init_fn = of_id->data;
+        /* JYW: 初始化具体Cortex核的cpu_pmu成员 */
 		ret = init_fn(pmu);
 	} else {
 		ret = probe_current_pmu(pmu);
@@ -323,6 +326,7 @@ static int cpu_pmu_device_probe(struct platform_device *pdev)
 		goto out_free;
 	}
 
+    /* JYW: 初始化cpu_pmu，主要是分配cpu_hw_events并关联到cpu_pmu以及初始化request_irq和free_irq成员 */
 	ret = cpu_pmu_init(cpu_pmu);
 	if (ret)
 		goto out_free;
@@ -341,6 +345,7 @@ out_free:
 	return ret;
 }
 
+/* JYW: cpu_pmu驱动 */
 static struct platform_driver cpu_pmu_driver = {
 	.driver		= {
 		.name	= "arm-pmu",

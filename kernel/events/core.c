@@ -6912,6 +6912,7 @@ free_dev:
 static struct lock_class_key cpuctx_mutex;
 static struct lock_class_key cpuctx_lock;
 
+/* JYW: 向perf核心层注册底层的pmu对象 */
 int perf_pmu_register(struct pmu *pmu, const char *name, int type)
 {
 	int cpu, ret;
@@ -6920,7 +6921,7 @@ int perf_pmu_register(struct pmu *pmu, const char *name, int type)
 	ret = -ENOMEM;
 	pmu->pmu_disable_count = alloc_percpu(int);
 	if (!pmu->pmu_disable_count)
-		goto unlock;
+		gotso unlock;
 
 	pmu->type = -1;
 	if (!name)
@@ -6936,6 +6937,7 @@ int perf_pmu_register(struct pmu *pmu, const char *name, int type)
 	}
 	pmu->type = type;
 
+    /* JYW: 创建/sys/device/xxx */
 	if (pmu_bus_running) {
 		ret = pmu_dev_alloc(pmu);
 		if (ret)

@@ -29,15 +29,19 @@
  * but the encodings are considered to be `reserved' in the case that
  * they are not available.
  */
+/* JYW: 详见ARMv7参考手册C12.8.2 Common event numbers */
 enum armv7_perf_types {
 	ARMV7_PERFCTR_PMNC_SW_INCR			= 0x00,
 	ARMV7_PERFCTR_L1_ICACHE_REFILL			= 0x01,
 	ARMV7_PERFCTR_ITLB_REFILL			= 0x02,
+    /* JYW: Level 1 data cache refill */
 	ARMV7_PERFCTR_L1_DCACHE_REFILL			= 0x03,
+    /* JYW: Instruction architecturally executed */
 	ARMV7_PERFCTR_L1_DCACHE_ACCESS			= 0x04,
 	ARMV7_PERFCTR_DTLB_REFILL			= 0x05,
 	ARMV7_PERFCTR_MEM_READ				= 0x06,
 	ARMV7_PERFCTR_MEM_WRITE				= 0x07,
+    /* JYW: Instruction architecturally executed */
 	ARMV7_PERFCTR_INSTR_EXECUTED			= 0x08,
 	ARMV7_PERFCTR_EXC_TAKEN				= 0x09,
 	ARMV7_PERFCTR_EXC_EXECUTED			= 0x0A,
@@ -54,6 +58,7 @@ enum armv7_perf_types {
 	ARMV7_PERFCTR_PC_IMM_BRANCH			= 0x0D,
 	ARMV7_PERFCTR_PC_PROC_RETURN			= 0x0E,
 	ARMV7_PERFCTR_MEM_UNALIGNED_ACCESS		= 0x0F,
+    /* JYW: Mispredicted or not predicted branch speculatively executed */
 	ARMV7_PERFCTR_PC_BRANCH_MIS_PRED		= 0x10,
 	ARMV7_PERFCTR_CLOCK_CYCLES			= 0x11,
 	ARMV7_PERFCTR_PC_BRANCH_PRED			= 0x12,
@@ -69,6 +74,7 @@ enum armv7_perf_types {
 	ARMV7_PERFCTR_MEM_ERROR				= 0x1A,
 	ARMV7_PERFCTR_INSTR_SPEC			= 0x1B,
 	ARMV7_PERFCTR_TTBR_WRITE			= 0x1C,
+    /* JYW: Bus cycle */
 	ARMV7_PERFCTR_BUS_CYCLES			= 0x1D,
 
 	ARMV7_PERFCTR_CPU_CYCLES			= 0xFF
@@ -114,15 +120,16 @@ enum armv7_a15_perf_types {
 };
 
 /* ARMv7 Cortex-A12 specific event types */
+/* JYW: 详见Armv7手册D3-2364页 */
 enum armv7_a12_perf_types {
 	ARMV7_A12_PERFCTR_L1_DCACHE_ACCESS_READ		= 0x40,
 	ARMV7_A12_PERFCTR_L1_DCACHE_ACCESS_WRITE	= 0x41,
 
 	ARMV7_A12_PERFCTR_L2_CACHE_ACCESS_READ		= 0x50,
 	ARMV7_A12_PERFCTR_L2_CACHE_ACCESS_WRITE		= 0x51,
-
+    /* JYW: 有别于event 0x0C，仅仅统计software changes of the PC */
 	ARMV7_A12_PERFCTR_PC_WRITE_SPEC			= 0x76,
-
+    /* JYW: 手册没找到！！ */
 	ARMV7_A12_PERFCTR_PF_TLB_REFILL			= 0xe7,
 };
 
@@ -386,12 +393,15 @@ static const unsigned armv7_a7_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
  */
 static const unsigned armv7_a12_perf_map[PERF_COUNT_HW_MAX] = {
 	PERF_MAP_ALL_UNSUPPORTED,
+    /* JYW: 为什么是0xFF？ */
 	[PERF_COUNT_HW_CPU_CYCLES]		= ARMV7_PERFCTR_CPU_CYCLES,
 	[PERF_COUNT_HW_INSTRUCTIONS]		= ARMV7_PERFCTR_INSTR_EXECUTED,
 	[PERF_COUNT_HW_CACHE_REFERENCES]	= ARMV7_PERFCTR_L1_DCACHE_ACCESS,
 	[PERF_COUNT_HW_CACHE_MISSES]		= ARMV7_PERFCTR_L1_DCACHE_REFILL,
+    /* JYW: 在Armv7手册中有找到？ */
 	[PERF_COUNT_HW_BRANCH_INSTRUCTIONS]	= ARMV7_A12_PERFCTR_PC_WRITE_SPEC,
 	[PERF_COUNT_HW_BRANCH_MISSES]		= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
+    /* JYW: 在Armv7手册中C12-2311有说明 */
 	[PERF_COUNT_HW_BUS_CYCLES]		= ARMV7_PERFCTR_BUS_CYCLES,
 };
 
@@ -400,7 +410,17 @@ static const unsigned armv7_a12_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
 					[PERF_COUNT_HW_CACHE_RESULT_MAX] = {
 	PERF_CACHE_MAP_ALL_UNSUPPORTED,
 
+    /* JYW: #define C(_x) PERF_COUNT_HW_CACHE_##_x
+     *          ==>     PERF_COUNT_HW_CACHE_L1D
+     *          ==>     PERF_COUNT_HW_CACHE_OP_READ
+     *          ==>     PERF_COUNT_HW_CACHE_RESULT_ACCESS
+     */
 	[C(L1D)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV7_A12_PERFCTR_L1_DCACHE_ACCESS_READ,
+    /* JYW: #define C(_x) PERF_COUNT_HW_CACHE_##_x
+     *          ==>     PERF_COUNT_HW_CACHE_L1D
+     *          ==>     PERF_COUNT_HW_CACHE_OP_READ
+     *          ==>     PERF_COUNT_HW_CACHE_RESULT_MISS
+     */
 	[C(L1D)][C(OP_READ)][C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_DCACHE_REFILL,
 	[C(L1D)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV7_A12_PERFCTR_L1_DCACHE_ACCESS_WRITE,
 	[C(L1D)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_DCACHE_REFILL,
@@ -410,7 +430,17 @@ static const unsigned armv7_a12_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
 	 * accesses/misses so we're not always strictly correct, but it's the
 	 * best we can do. Writes and reads get combined in these cases.
 	 */
+    /* JYW: #define C(_x) PERF_COUNT_HW_CACHE_##_x
+     *          ==>     PERF_COUNT_HW_CACHE_L1I
+     *          ==>     PERF_COUNT_HW_CACHE_OP_READ
+     *          ==>     PERF_COUNT_HW_CACHE_RESULT_ACCESS
+     */
 	[C(L1I)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV7_PERFCTR_L1_ICACHE_ACCESS,
+    /* JYW: #define C(_x) PERF_COUNT_HW_CACHE_##_x
+     *          ==>     PERF_COUNT_HW_CACHE_L1I
+     *          ==>     PERF_COUNT_HW_CACHE_OP_READ
+     *          ==>     PERF_COUNT_HW_CACHE_RESULT_MISS
+     */
 	[C(L1I)][C(OP_READ)][C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_ICACHE_REFILL,
 
 	[C(LL)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV7_A12_PERFCTR_L2_CACHE_ACCESS_READ,
@@ -534,6 +564,7 @@ static const unsigned krait_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
 #define	ARMV7_EXCLUDE_USER	(1 << 30)
 #define	ARMV7_INCLUDE_HYP	(1 << 27)
 
+/* JYW: 读PMCR（Peformence Monitors Control Register）寄存器 */
 static inline u32 armv7_pmnc_read(void)
 {
 	u32 val;
@@ -541,6 +572,7 @@ static inline u32 armv7_pmnc_read(void)
 	return val;
 }
 
+/* JYW: 写PMCR（Peformence Monitors Control Register）寄存器 */
 static inline void armv7_pmnc_write(u32 val)
 {
 	val &= ARMV7_PMNC_MASK;
@@ -553,6 +585,7 @@ static inline int armv7_pmnc_has_overflowed(u32 pmnc)
 	return pmnc & ARMV7_OVERFLOWED_MASK;
 }
 
+/* JYW: 判断是否在有效范围内 */
 static inline int armv7_pmnc_counter_valid(struct arm_pmu *cpu_pmu, int idx)
 {
 	return idx >= ARMV7_IDX_CYCLE_COUNTER &&
@@ -564,6 +597,7 @@ static inline int armv7_pmnc_counter_has_overflowed(u32 pmnc, int idx)
 	return pmnc & BIT(ARMV7_IDX_TO_COUNTER(idx));
 }
 
+/* JYW: 选择计数器 */
 static inline void armv7_pmnc_select_counter(int idx)
 {
 	u32 counter = ARMV7_IDX_TO_COUNTER(idx);
@@ -571,6 +605,7 @@ static inline void armv7_pmnc_select_counter(int idx)
 	isb();
 }
 
+/* JYW: 读取性能计数 */
 static inline u32 armv7pmu_read_counter(struct perf_event *event)
 {
 	struct arm_pmu *cpu_pmu = to_arm_pmu(event->pmu);
@@ -584,6 +619,7 @@ static inline u32 armv7pmu_read_counter(struct perf_event *event)
 	} else if (idx == ARMV7_IDX_CYCLE_COUNTER) {
 		asm volatile("mrc p15, 0, %0, c9, c13, 0" : "=r" (value));
 	} else {
+        /* JYW: 选择计数器 */
 		armv7_pmnc_select_counter(idx);
 		asm volatile("mrc p15, 0, %0, c9, c13, 2" : "=r" (value));
 	}
@@ -591,6 +627,7 @@ static inline u32 armv7pmu_read_counter(struct perf_event *event)
 	return value;
 }
 
+/* JYW: 选择计数器 */
 static inline void armv7pmu_write_counter(struct perf_event *event, u32 value)
 {
 	struct arm_pmu *cpu_pmu = to_arm_pmu(event->pmu);
@@ -615,12 +652,14 @@ static inline void armv7_pmnc_write_evtsel(int idx, u32 val)
 	asm volatile("mcr p15, 0, %0, c9, c13, 1" : : "r" (val));
 }
 
+/* JYW: 使能计数器 */
 static inline void armv7_pmnc_enable_counter(int idx)
 {
 	u32 counter = ARMV7_IDX_TO_COUNTER(idx);
 	asm volatile("mcr p15, 0, %0, c9, c12, 1" : : "r" (BIT(counter)));
 }
 
+/* JYW: 禁能计数器 */
 static inline void armv7_pmnc_disable_counter(int idx)
 {
 	u32 counter = ARMV7_IDX_TO_COUNTER(idx);
@@ -696,6 +735,7 @@ static void armv7_pmnc_dump_regs(struct arm_pmu *cpu_pmu)
 }
 #endif
 
+/* JYW: 开启性能事件 */
 static void armv7pmu_enable_event(struct perf_event *event)
 {
 	unsigned long flags;
@@ -742,6 +782,7 @@ static void armv7pmu_enable_event(struct perf_event *event)
 	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
 }
 
+/* JYW: 关闭性能事件 */
 static void armv7pmu_disable_event(struct perf_event *event)
 {
 	unsigned long flags;
@@ -811,6 +852,7 @@ static irqreturn_t armv7pmu_handle_irq(int irq_num, void *dev)
 		 * We have a single interrupt for all counters. Check that
 		 * each counter has overflowed before we process it.
 		 */
+        /* JYW: 只处理有溢出的事件类型 */
 		if (!armv7_pmnc_counter_has_overflowed(pmnc, idx))
 			continue;
 
@@ -976,12 +1018,17 @@ static int krait_map_event_no_branch(struct perf_event *event)
 				&krait_perf_cache_map, 0xFFFFF);
 }
 
+/* JYW: 初始化struct arm_pmu成员 */
 static void armv7pmu_init(struct arm_pmu *cpu_pmu)
 {
 	cpu_pmu->handle_irq	= armv7pmu_handle_irq;
+    /* JYW: 开启性能事件 */
 	cpu_pmu->enable		= armv7pmu_enable_event;
+    /* JYW: 关闭性能事件 */
 	cpu_pmu->disable	= armv7pmu_disable_event;
+    /* JYW: 读取性能计数 */
 	cpu_pmu->read_counter	= armv7pmu_read_counter;
+    /* JYW: 选择性能计数器 */
 	cpu_pmu->write_counter	= armv7pmu_write_counter;
 	cpu_pmu->get_event_idx	= armv7pmu_get_event_idx;
 	cpu_pmu->start		= armv7pmu_start;
@@ -1058,6 +1105,7 @@ static int armv7_a12_pmu_init(struct arm_pmu *cpu_pmu)
 	return 0;
 }
 
+/* JYW: 初始化A17的struct arm_pmu */
 static int armv7_a17_pmu_init(struct arm_pmu *cpu_pmu)
 {
 	armv7_a12_pmu_init(cpu_pmu);
