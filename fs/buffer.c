@@ -211,7 +211,7 @@ __find_get_block_slow(struct block_device *bdev, sector_t block)
 
 	/* JYW: 根据块号和块大小得到与块设备相关的页的索引 */
 	index = block >> (PAGE_CACHE_SHIFT - bd_inode->i_blkbits);
-    /* JYW: 根据page index查找对应的page，如果没有会申请添加 */
+    /* JYW: 根据page index查找对应的page */
 	page = find_get_page_flags(bd_mapping, index, FGP_ACCESSED);
 	if (!page)
 		goto out;
@@ -632,6 +632,7 @@ EXPORT_SYMBOL(mark_buffer_dirty_inode);
  * If warn is true, then emit a warning if the page is not uptodate and has
  * not been truncated.
  */
+/* JYW: 标记脏页 */
 static void __set_page_dirty(struct page *page,
 		struct address_space *mapping, int warn)
 {
@@ -640,6 +641,7 @@ static void __set_page_dirty(struct page *page,
 	spin_lock_irqsave(&mapping->tree_lock, flags);
 	if (page->mapping) {	/* Race with truncate? */
 		WARN_ON_ONCE(warn && !PageUptodate(page));
+        /* JYW: 更新脏页计数 */
 		account_page_dirtied(page, mapping);
 		radix_tree_tag_set(&mapping->page_tree,
 				page_index(page), PAGECACHE_TAG_DIRTY);
@@ -695,6 +697,7 @@ int __set_page_dirty_buffers(struct page *page)
 	spin_unlock(&mapping->private_lock);
 
 	if (newly_dirty)
+        /* JYW: 标记脏页 */
 		__set_page_dirty(page, mapping, 1);
 	return newly_dirty;
 }
@@ -1372,7 +1375,7 @@ lookup_bh_lru(struct block_device *bdev, sector_t block, unsigned size)
  * it in the LRU and mark it as accessed.  If it is not present then return
  * NULL
  */
-/* JYW: 搜索一个缓存块,若不存在，若不存在会分配page并加入页高速缓存，返回对应buffer_head */
+/* JYW: 搜索一个缓存块,若不存在，若不存在返回NULL */
 struct buffer_head *
 __find_get_block(struct block_device *bdev, sector_t block, unsigned size)
 {
@@ -1445,7 +1448,7 @@ EXPORT_SYMBOL(__breadahead);
  *  not to prevent page migration if you set gfp to zero.
  *  It returns NULL if the block was unreadable.
  */
-/* JYW: 确保读取到buffer_head有效数据 */
+/* JYW: 根据block号，返回对应的buffer_head，确保读取到buffer_head有效数据 */
 struct buffer_head *
 __bread_gfp(struct block_device *bdev, sector_t block,
 		   unsigned size, gfp_t gfp)
@@ -3075,7 +3078,7 @@ int _submit_bh(int rw, struct buffer_head *bh, unsigned long bio_flags)
 	/* JYW: 分配一个新的bio */
 	bio = bio_alloc(GFP_NOIO, 1);
 
-	/* JYW: 根据缓冲区首部的内容初始化bio描述符的字段 */
+	/* JYW: 根据缓冲区首部的内容初始化bio描述符的字段，硬盘扇区大小512字节 */
 	bio->bi_iter.bi_sector = bh->b_blocknr * (bh->b_size >> 9);
 	bio->bi_bdev = bh->b_bdev;
 	bio->bi_io_vec[0].bv_page = bh->b_page;
@@ -3203,6 +3206,7 @@ int __sync_dirty_buffer(struct buffer_head *bh, int rw)
 		bh->b_end_io = end_buffer_write_sync;
         /* JYW: 把缓冲区首部提交到通用块层 */
 		ret = submit_bh(rw, bh);
+        /* JYW: 把当前进程插入等待队列，直到I/O完成，即缓冲区首部的BH_Lock标志被清0 */
 		wait_on_buffer(bh);
 		if (!ret && !buffer_uptodate(bh))
 			ret = -EIO;

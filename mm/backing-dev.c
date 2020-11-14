@@ -65,6 +65,7 @@ static int bdi_debug_stats_show(struct seq_file *m, void *v)
 			nr_dirty_time++;
 	spin_unlock(&wb->list_lock);
 
+    /* JYW: 计算全局脏页阈值 */
 	global_dirty_limits(&background_thresh, &dirty_thresh);
 	bdi_thresh = bdi_dirty_limit(bdi, dirty_thresh);
 

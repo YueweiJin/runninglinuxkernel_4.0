@@ -698,6 +698,7 @@ int fragmentation_index(struct zone *zone, unsigned int order)
 const char * const vmstat_text[] = {
 	/* enum zone_stat_item countes */
 	"nr_free_pages",
+    /* JYW: order>=1的申请页面总量 */
 	"nr_alloc_batch",
 	"nr_inactive_anon",
 	"nr_active_anon",
@@ -710,6 +711,7 @@ const char * const vmstat_text[] = {
 	"nr_file_pages",
 	"nr_dirty",
 	"nr_writeback",
+    /* JYW: 根据创建的slab是否是SLAB_RECLAIM_ACCOUNT来决定 */
 	"nr_slab_reclaimable",
 	"nr_slab_unreclaimable",
 	"nr_page_table_pages",
@@ -756,7 +758,9 @@ const char * const vmstat_text[] = {
 	TEXTS_FOR_ZONES("pgalloc")
 
 	"pgfree",
+    /* JYW: 激活成为active的页面数量 */
 	"pgactivate",
+    /* JYW: 从active链表摘除的页面数量 */
 	"pgdeactivate",
 
 	"pgfault",
@@ -774,19 +778,28 @@ const char * const vmstat_text[] = {
 	"pgscan_direct_throttle",
 
 #ifdef CONFIG_NUMA
+    /* JYW: 统计回收失败（实际回收页面数小于期望回收页面数）次数 */
 	"zone_reclaim_failed",
 #endif
 	"pginodesteal",
 	"slabs_scanned",
 	"kswapd_inodesteal",
+    /* JYW: ========== 可以看出kswapd的回收效率         =========== */
+    /* JYW: kwapd休眠100ms后，水位降到了LOW以下次数 */
 	"kswapd_low_wmark_hit_quickly",
+    /* JYW: kwapd休眠100ms后，水位降到了HIGH以下次数 */
 	"kswapd_high_wmark_hit_quickly",
+
+    /* JYW: 代表kswapd的运行次数 */
 	"pageoutrun",
+    /* JYW: 因为分配内存不足遇到阻塞需要回收的命中次数 */
 	"allocstall",
 
 	"pgrotated",
 
+    /* JYW: 通过sysctl_drop_caches 1 触发drop cache的次数 */
 	"drop_pagecache",
+    /* JYW: 通过sysctl_drop_caches 2 触发drop slab的次数 */
 	"drop_slab",
 
 #ifdef CONFIG_NUMA_BALANCING

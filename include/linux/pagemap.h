@@ -263,19 +263,19 @@ struct page *pagecache_get_page(struct address_space *mapping, pgoff_t offset,
  *
  * Otherwise, %NULL is returned.
  */
-/* JYW: 根据page index查找对应的page，如果没有会申请添加 */
+/* JYW: 根据page index查找对应的page */
 static inline struct page *find_get_page(struct address_space *mapping,
 					pgoff_t offset)
 {
-    /* JYW: 获取基数树中的page结构，如果没有会申请添加 */
+    /* JYW: 获取基数树中的page结构 */
 	return pagecache_get_page(mapping, offset, 0, 0);
 }
 
-/* JYW: 根据page index查找对应的page，如果没有会申请添加 */
+/* JYW: 根据page index查找对应的page，如果没有会申请添加（fgp_flags必须要置位FGP_CREAT） */
 static inline struct page *find_get_page_flags(struct address_space *mapping,
 					pgoff_t offset, int fgp_flags)
 {
-    /* JYW: 获取基数树中的page结构，如果没有会申请添加 */
+    /* JYW: 获取基数树中的page结构，如果没有会申请添加（fgp_flags必须要置位FGP_CREAT） */
 	return pagecache_get_page(mapping, offset, fgp_flags, 0);
 }
 

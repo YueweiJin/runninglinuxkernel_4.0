@@ -70,12 +70,14 @@ static long ratelimit_pages = 32;
 /*
  * Start background writeback (via writeback threads) at this percentage
  */
+/* JYW: 开启后台回写时的脏页比例 */
 int dirty_background_ratio = 10;
 
 /*
  * dirty_background_bytes starts at 0 (disabled) so that it is a function of
  * dirty_background_ratio * the amount of dirtyable memory
  */
+/* JYW: 开启后台回写时的脏页大小 */
 unsigned long dirty_background_bytes;
 
 /*
@@ -87,12 +89,14 @@ int vm_highmem_is_dirtyable;
 /*
  * The generator of dirty data starts writeback at this percentage
  */
+/* JYW: 开启脏页回写时的比例 */
 int vm_dirty_ratio = 20;
 
 /*
  * vm_dirty_bytes starts at 0 (disabled) so that it is a function of
  * vm_dirty_ratio * the amount of dirtyable memory
  */
+/* JYW: 开启脏页回写时的大小 */
 unsigned long vm_dirty_bytes;
 
 /*
@@ -262,7 +266,7 @@ static unsigned long global_dirtyable_memory(void)
  * The dirty limits will be lifted by 1/4 for PF_LESS_THROTTLE (ie. nfsd) and
  * real-time tasks.
  */
-/* JYW: 脏页回写阈值计算 */
+/* JYW: 计算全局脏页阈值 */
 void global_dirty_limits(unsigned long *pbackground, unsigned long *pdirty)
 {
     /* JYW: 估算最大可能的脏页数量 */
@@ -300,7 +304,7 @@ void global_dirty_limits(unsigned long *pbackground, unsigned long *pdirty)
  * Returns the maximum number of dirty pages allowed in a zone, based
  * on the zone's dirtyable memory.
  */
-/* JYW: 计算zone最大可能脏页 */
+/* JYW: 计算zone最大允许的脏页数量 */
 static unsigned long zone_dirty_limit(struct zone *zone)
 {
 	unsigned long zone_memory = zone_dirtyable_memory(zone);
@@ -326,8 +330,10 @@ static unsigned long zone_dirty_limit(struct zone *zone)
  * Returns %true when the dirty pages in @zone are within the zone's
  * dirty limit, %false if the limit is exceeded.
  */
+/* JYW: 判断实际脏页数量是否超出了限制 */
 bool zone_dirty_ok(struct zone *zone)
 {
+    /* JYW: 计算zone最大允许的脏页数量 */
 	unsigned long limit = zone_dirty_limit(zone);
 
 	return zone_page_state(zone, NR_FILE_DIRTY) +
@@ -1382,6 +1388,7 @@ static void balance_dirty_pages(struct address_space *mapping,
 					global_page_state(NR_UNSTABLE_NFS);
 		nr_dirty = nr_reclaimable + global_page_state(NR_WRITEBACK);
 
+        /* JYW: 计算全局脏页阈值 */
 		global_dirty_limits(&background_thresh, &dirty_thresh);
 
 		if (unlikely(strictlimit)) {
@@ -1633,6 +1640,7 @@ void throttle_vm_writeout(gfp_t gfp_mask)
 	unsigned long dirty_thresh;
 
         for ( ; ; ) {
+        /* JYW: 计算全局脏页阈值 */
 		global_dirty_limits(&background_thresh, &dirty_thresh);
 		dirty_thresh = hard_dirty_limit(dirty_thresh);
 
@@ -2098,6 +2106,7 @@ int __set_page_dirty_no_writeback(struct page *page)
  * Helper function for set_page_dirty family.
  * NOTE: This relies on being atomic wrt interrupts.
  */
+/* JYW: 更新脏页计数 */
 void account_page_dirtied(struct page *page, struct address_space *mapping)
 {
 	trace_writeback_dirty_page(page, mapping);
@@ -2140,6 +2149,7 @@ int __set_page_dirty_nobuffers(struct page *page)
 		spin_lock_irqsave(&mapping->tree_lock, flags);
 		BUG_ON(page_mapping(page) != mapping);
 		WARN_ON_ONCE(!PagePrivate(page) && !PageUptodate(page));
+        /* JYW: 标记脏页 */
 		account_page_dirtied(page, mapping);
 		radix_tree_tag_set(&mapping->page_tree, page_index(page),
 				   PAGECACHE_TAG_DIRTY);

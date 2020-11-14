@@ -1600,6 +1600,7 @@ static struct page *kmem_getpages(struct kmem_cache *cachep, gfp_t flags,
 		pfmemalloc_active = true;
 
 	nr_pages = (1 << cachep->gfporder);
+    /* JYW: 根据创建slab时传入是否有SLAB_RECLAIM_ACCOUNT标志，来确定是否是可回收的 */
 	if (cachep->flags & SLAB_RECLAIM_ACCOUNT)
 		add_zone_page_state(page_zone(page),
 			NR_SLAB_RECLAIMABLE, nr_pages);

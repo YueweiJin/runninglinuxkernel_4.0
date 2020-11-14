@@ -580,6 +580,7 @@ static int __add_to_page_cache_locked(struct page *page,
 	radix_tree_preload_end();
 	if (unlikely(error))
 		goto err_insert;
+    /* JYW: 增加文件页数量 */
 	__inc_zone_page_state(page, NR_FILE_PAGES);
 	spin_unlock_irq(&mapping->tree_lock);
 	if (!huge)
@@ -1071,7 +1072,7 @@ EXPORT_SYMBOL(find_lock_entry);
  *
  * If there is a page cache page, it is returned with an increased refcount.
  */
-/* JYW: 获取基数树中的page结构，如果没有会申请添加 */
+/* JYW: 获取基数树中的page结构，如果没有会申请添加（fgp_flags必须要置位FGP_CREAT） */
 struct page *pagecache_get_page(struct address_space *mapping, pgoff_t offset,
 	int fgp_flags, gfp_t gfp_mask)
 {
@@ -1107,6 +1108,7 @@ repeat:
 		mark_page_accessed(page);
 
 no_page:
+    /* JYW: fgp_flags必须带FGP_CREAT */
 	if (!page && (fgp_flags & FGP_CREAT)) {
 		int err;
 		if ((fgp_flags & FGP_WRITE) && mapping_cap_account_dirty(mapping))
@@ -1497,11 +1499,13 @@ static ssize_t do_generic_file_read(struct file *filp, loff_t *ppos,
 
 		cond_resched();
 find_page:
+        /* JYW: 根据page index查找对应的page */
 		page = find_get_page(mapping, index);
 		if (!page) {
 			page_cache_sync_readahead(mapping,
 					ra, filp,
 					index, last_index - index);
+            /* JYW: 根据page index查找对应的page */
 			page = find_get_page(mapping, index);
 			if (unlikely(page == NULL))
 				goto no_cached_page;
@@ -2699,6 +2703,7 @@ EXPORT_SYMBOL(generic_file_write_iter);
  * this page (__GFP_IO), and whether the call may block (__GFP_WAIT & __GFP_FS).
  *
  */
+/* JYW: 特定文件元数据页面 */
 int try_to_release_page(struct page *page, gfp_t gfp_mask)
 {
 	struct address_space * const mapping = page->mapping;

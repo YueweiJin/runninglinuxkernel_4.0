@@ -1179,6 +1179,7 @@ static struct ctl_table vm_table[] = {
 		.proc_handler	= proc_dointvec_minmax,
 		.extra1		= &zero,
 	},
+    /* JYW: 当脏页达到该比例时，开启后台回写 */
 	{
 		.procname	= "dirty_background_ratio",
 		.data		= &dirty_background_ratio,
@@ -1188,6 +1189,7 @@ static struct ctl_table vm_table[] = {
 		.extra1		= &zero,
 		.extra2		= &one_hundred,
 	},
+    /* JYW: 当脏页达到该大小时，开启后台回写 */
 	{
 		.procname	= "dirty_background_bytes",
 		.data		= &dirty_background_bytes,

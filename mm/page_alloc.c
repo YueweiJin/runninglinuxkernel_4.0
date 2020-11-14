@@ -2163,6 +2163,7 @@ zonelist_scan:
 		 * will require awareness of zones in the
 		 * dirty-throttling and the flusher threads.
 		 */
+        /* JYW: 若超过了脏页的限制，且__GFP_WRITE行为，则不让分配内存 */
 		if (consider_zone_dirty && !zone_dirty_ok(zone))
 			continue;
 
@@ -2200,8 +2201,7 @@ zonelist_scan:
 				!zlc_zone_worth_trying(zonelist, z, allowednodes))
 				continue;
 
-			/* JYW:
-			 * 若当前zone的空闲页面低于WMARK_LOW水位，则调用下面的接口来回收页面 */
+			/* JYW: 若当前zone的空闲页面低于 WMARK_LOW 水位，则调用下面的接口来回收页面 */
 			ret = zone_reclaim(zone, gfp_mask, order);
 			switch (ret) {
 			case ZONE_RECLAIM_NOSCAN:
@@ -2479,6 +2479,7 @@ __alloc_pages_direct_compact(gfp_t gfp_mask, unsigned int order,
 	 * At least in one zone compaction wasn't deferred or skipped, so let's
 	 * count a compaction stall
 	 */
+    /* JYW: 完成一次COMPACT，但不一定成功 */
 	count_vm_event(COMPACTSTALL);
 
 	page = get_page_from_freelist(gfp_mask, order,
@@ -2489,6 +2490,7 @@ __alloc_pages_direct_compact(gfp_t gfp_mask, unsigned int order,
 
 		zone->compact_blockskip_flush = false;
 		compaction_defer_reset(zone, order, true);
+        /* JYW: 完成一次COMPACT，且成功分配出内存 */
 		count_vm_event(COMPACTSUCCESS);
 		return page;
 	}
@@ -2497,6 +2499,7 @@ __alloc_pages_direct_compact(gfp_t gfp_mask, unsigned int order,
 	 * It's bad if compaction run occurs and fails. The most likely reason
 	 * is that pages exist, but not enough to satisfy watermarks.
 	 */
+    /* JYW: 完成一次COMPACT，且扔无法分配出内存 */
 	count_vm_event(COMPACTFAIL);
 
 	cond_resched();
@@ -2599,6 +2602,7 @@ __alloc_pages_high_priority(gfp_t gfp_mask, unsigned int order,
 	return page;
 }
 
+/* JYW: 唤醒每个NUMA内存节点上的kswapd线程 */
 static void wake_all_kswapds(unsigned int order, const struct alloc_context *ac)
 {
 	struct zoneref *z;
@@ -2701,6 +2705,7 @@ __alloc_pages_slowpath(gfp_t gfp_mask, unsigned int order,
 
 retry:
 	if (!(gfp_mask & __GFP_NO_KSWAPD))
+        /* JYW: 唤醒每个NUMA内存节点上的kswapd线程 */
 		wake_all_kswapds(order, ac);
 
 	/*

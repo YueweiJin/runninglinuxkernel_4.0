@@ -222,7 +222,11 @@ struct zone_reclaim_stat {
 	 *
 	 * The anon LRU stats live in [0], file LRU stats in [1]
 	 */
+    /* JYW: 反映了真实的活跃页面的数量 */
+    /* JYW: 扫描inactive时，shrink_inactive_list() ->     putpack_inactive_list() */
+    /* JYW: 扫描active时，shrink_active_list() ->     访问引用的页面 */
 	unsigned long		recent_rotated[2];
+    /* JYW: 在 shrink_inactive_list() 和 shrink_active_list() 会统计，统计的是待回收/扫描的页面数量 */
 	unsigned long		recent_scanned[2];
 };
 

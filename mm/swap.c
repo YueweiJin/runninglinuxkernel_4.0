@@ -505,7 +505,7 @@ static void __activate_page(struct page *page, struct lruvec *lruvec,
 		lru += LRU_ACTIVE;
 		add_page_to_lru_list(page, lruvec, lru);
 		trace_mm_lru_activate(page);
-
+        /* JYW: 将页面加入active后，更新加入active的页面数量 */
 		__count_vm_event(PGACTIVATE);
 		update_page_reclaim_stat(lruvec, file, 1);
 	}
@@ -796,6 +796,7 @@ static void lru_deactivate_fn(struct page *page, struct lruvec *lruvec,
 	}
 
 	if (active)
+        /* JYW: 从active链表摘除的页面数量 */
 		__count_vm_event(PGDEACTIVATE);
 	update_page_reclaim_stat(lruvec, file, 0);
 }
@@ -805,6 +806,7 @@ static void lru_deactivate_fn(struct page *page, struct lruvec *lruvec,
  * Either "cpu" is the current CPU, and preemption has already been
  * disabled; or "cpu" is being hot-unplugged, and is already dead.
  */
+/* JYW: 将所有cpu的pageves页面放到lru链表 */
 void lru_add_drain_cpu(int cpu)
 {
 	struct pagevec *pvec = &per_cpu(lru_add_pvec, cpu);

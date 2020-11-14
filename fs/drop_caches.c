@@ -51,10 +51,12 @@ int drop_caches_sysctl_handler(struct ctl_table *table, int write,
 
 		if (sysctl_drop_caches & 1) {
 			iterate_supers(drop_pagecache_sb, NULL);
+            /* JYW: 通过sysctl_drop_caches 1 触发drop cache的次数 */
 			count_vm_event(DROP_PAGECACHE);
 		}
 		if (sysctl_drop_caches & 2) {
 			drop_slab();
+            /* JYW: 通过sysctl_drop_caches 2 触发drop slab的次数 */
 			count_vm_event(DROP_SLAB);
 		}
 		if (!stfu) {

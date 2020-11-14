@@ -835,6 +835,7 @@ static bool over_bground_thresh(struct backing_dev_info *bdi)
 {
 	unsigned long background_thresh, dirty_thresh;
 
+    /* JYW: 计算全局脏页阈值 */
 	global_dirty_limits(&background_thresh, &dirty_thresh);
 
 	if (global_page_state(NR_FILE_DIRTY) +

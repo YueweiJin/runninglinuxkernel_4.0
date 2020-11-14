@@ -1891,6 +1891,7 @@ end_io:
  * a lower device by calling into generic_make_request recursively, which
  * means the bio should NOT be touched after the call to ->make_request_fn.
  */
+/* JYW: 制作一个请求 */
 void generic_make_request(struct bio *bio)
 {
 	struct bio_list bio_list_on_stack;
@@ -1951,6 +1952,7 @@ EXPORT_SYMBOL(generic_make_request);
  * interfaces; @bio must be presetup and ready for I/O.
  *
  */
+/* JYW: 向通用块层提交一个bio */
 void submit_bio(int rw, struct bio *bio)
 {
 	bio->bi_rw |= rw;
@@ -1984,7 +1986,7 @@ void submit_bio(int rw, struct bio *bio)
 				count);
 		}
 	}
-
+    /* JYW: 制作一个请求 */
 	generic_make_request(bio);
 }
 EXPORT_SYMBOL(submit_bio);
